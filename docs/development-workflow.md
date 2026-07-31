@@ -376,7 +376,12 @@ Deterministic guarantees, run by the harness/CI rather than judged by a skill:
 - **Format + lint** pass.
 - **7-day dependency cooldown** — CI rejects a lockfile that introduces a
   package version published less than 7 days ago, unless an override marker
-  (with a recorded reason) is present.
+  (with a recorded reason) is present. The cooldown is also enforced
+  **natively at resolution time**: pnpm's `minimumReleaseAge: 10080` (with
+  `blockExoticSubdeps` and `trustPolicy: no-downgrade`) in
+  `pnpm-workspace.yaml`, and npm's `min-release-age = 7` in `.npmrc` — the
+  CI script remains the reviewed-delta check and carries the recorded
+  urgent-override mechanism.
 
 `.mn-passport-skills/` joins the repo's existing gitignored working dirs (`.planning/`,
 `.serena/`).
