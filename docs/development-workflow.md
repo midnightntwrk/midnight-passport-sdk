@@ -363,9 +363,14 @@ Deterministic guarantees, run by the harness/CI rather than judged by a skill:
 - **PR description present**, referencing its spec tranche **and its GitHub
   issue** (`Refs`/`Closes #NN`).
 - **Diff-size guardrail** — the same numbers as the tranche budget: **soft
-  warning past 400 net changed lines, hard failure past 600** (excluding
-  lockfiles, generated code, and test fixtures), pointing back to
-  `mn-passport-skills-pr-open`'s split suggestion.
+  warning past 400 net changed lines, hard past 600** (excluding lockfiles,
+  generated code, and test fixtures), pointing back to
+  `mn-passport-skills-pr-open`'s split suggestion. **In CI both thresholds
+  are advisory** (warnings on the PR, never blocking) — the hard split is
+  enforced inside the loop by `spec-driver`/`pr-open`, and merging an
+  exceptional over-budget PR (a migration, a large generated change) is a
+  human decision. Running the script locally without `--ci` still fails
+  hard past 600, which is what the loop obeys.
 - **Security register never in this repo** — security findings live in the
   private sibling repo `../mn-passport-sdk-debts`; `.mn-passport-skills/` stays
   git-ignored as a backstop so no register file can be committed here.

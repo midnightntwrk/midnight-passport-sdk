@@ -32,9 +32,14 @@ CHANGED=$(git diff -M --numstat "$BASE"...HEAD -- . "${EXCLUDES[@]}" \
 echo "Net changed lines vs $BASE (lockfiles/generated/fixtures excluded): $CHANGED"
 
 if [ "$CHANGED" -gt "$HARD" ]; then
-  MSG="Diff is $CHANGED lines — over the 600-line hard budget. Split this tranche (mn-passport-skills:pr-open)."
-  if [ "$CI" = "--ci" ]; then echo "::error::$MSG"; else echo "HARD FAIL: $MSG"; fi
-  exit 1
+  MSG="Diff is $CHANGED lines — over the 600-line hard budget. Tranches must split (mn-passport-skills:pr-open); merging an exceptional PR (e.g. a migration) is a human decision."
+  if [ "$CI" = "--ci" ]; then
+    # Advisory in CI: the budget is loop discipline, not a merge gate.
+    echo "::warning::$MSG"
+  else
+    echo "HARD FAIL: $MSG"
+    exit 1
+  fi
 elif [ "$CHANGED" -gt "$SOFT" ]; then
   MSG="Diff is $CHANGED lines — over the 400-line soft budget. Consider splitting (mn-passport-skills:pr-open)."
   if [ "$CI" = "--ci" ]; then echo "::warning::$MSG"; else echo "WARN: $MSG"; fi

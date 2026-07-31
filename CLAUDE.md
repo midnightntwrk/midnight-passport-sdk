@@ -66,7 +66,9 @@ compatibility matrix) and `mn-passport-skills:devenv`.
   lockfile; verify versions with `npm view`, never from memory; no custom
   registry config (`@midnight-ntwrk/*` are on public npm).
 - **Registers gitignored** (`.mn-passport-skills/`); **`STATE.md` committed**.
-- **Tranche budget** ≤ 400 net changed lines soft, 600 hard.
+- **Tranche budget** ≤ 400 net changed lines soft, 600 hard — enforced in
+  the loop (plan estimates and `pr-open` split); CI reports it as advisory
+  warnings, and merging an exceptional over-budget PR is a human decision.
 
 ## Normative MUSTs (`conformance` checks these)
 
