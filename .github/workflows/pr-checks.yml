@@ -1,0 +1,89 @@
+# Enforcement layer — deterministic guarantees per docs/development-workflow.md §4.
+# Skills judge; this gate guarantees. Actions are pinned by commit SHA (the
+# exact-pin dependency discipline, applied to the workflow itself).
+name: PR checks
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  description:
+    name: PR references its issue
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require Refs/Closes #NN in the PR description
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if ! printf '%s' "$BODY" | grep -qiE '(refs|closes|fixes|resolves)[[:space:]]+([a-z0-9./-]+)?#[0-9]+'; then
+            echo "::error::PR description must reference its spec issue — 'Refs midnightntwrk/passport#NN' (or 'Closes #NN' on the finishing tranche)."
+            exit 1
+          fi
+          echo "Issue reference found."
+
+  diff-size:
+    name: Tranche budget (400 soft / 600 hard)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Check net changed lines against the budget
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: bash mn-passport-skills/scripts/check-diff-size.sh "origin/$BASE_REF" --ci
+
+  dep-cooldown:
+    name: 7-day dependency cooldown
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+      - name: Reject package versions younger than 7 days
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BASE_REF: ${{ github.base_ref }}
+        run: node mn-passport-skills/scripts/check-dep-cooldown.mjs "origin/$BASE_REF"
+
+  gitignore-backstop:
+    name: Registers never tracked
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Fail if a register path is tracked or no longer git-ignored
+        run: |
+          if git ls-files | grep -iE '(^|/)\.mn-passport-skills(/|$)|security-register|verify-register'; then
+            echo "::error::A register path is tracked — registers must never land in this repo (docs/development-workflow.md §4)."
+            exit 1
+          fi
+          if ! git check-ignore -q .mn-passport-skills/probe; then
+            echo "::error::.mn-passport-skills/ is no longer git-ignored — restore the exclusion (docs/development-workflow.md §4)."
+            exit 1
+          fi
+          echo "Registers stay out of this repo."
+
+  build-lint-test:
+    name: Lint, format, build, and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+      - name: Install, then lint, format, build, and test
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+          pnpm run lint
+          pnpm run format:check
+          pnpm run build
+          pnpm test

@@ -1,0 +1,171 @@
+{
+  "$generatedBy": "scripts/build-acc-artefact.mjs",
+  "schemaVersion": 1,
+  "current": "0.0.0-prototype.1",
+  "versions": {
+    "0.0.0-prototype.1": {
+      "provisional": true,
+      "source": {
+        "path": "../passport/experiments/account-custody-prototype/contracts/account.compact",
+        "sha256": "27096ff8ad1f4110fe461c7986a7cc9320d428d6a2c98f97a652fe4ba0aaff13"
+      },
+      "toolchain": {
+        "cliVersion": "compact 0.5.1",
+        "compilerVersion": "0.31.1",
+        "languageVersion": "0.23.0",
+        "runtimeVersion": "0.16.0"
+      },
+      "moduleHashes": {
+        "contract/index.js": "415dbe541b0a2574cf0a0135d1e091412a339d1ce9c0c49c27a6fe5916f79113",
+        "contract/index.d.ts": "a6b601339272a2ba65fe6063a1f5e7c3eede93cbf9d4127ad198e96b67d634da",
+        "compiler/contract-info.json": "893aa493763b892cd1fe62b17f0cee75fb7c26259b07491d1ed93c27bdb9791e"
+      },
+      "circuits": {
+        "add_device": {
+          "pure": false,
+          "proof": true,
+          "keyLocation": "acc/0.0.0-prototype.1/add_device",
+          "hashes": {
+            "zkir": "defd825e73bfda4d7cc7e818e39ea295d0e4d447c99387dda4b30ae68da6cd90",
+            "bzkir": "5ba530159a9245d15c31ce08427015f721c760d6bf2b16180b9daef80086d8d1",
+            "verifierKey": "eade5b2a4cbc0914f302a7ca6db09089f538054adf22347d236a222d331721f1",
+            "proverKey": "b9e7219cfe963a0f2e08f4cc59ffc3cf87b9ae8b80da1b8793bb674b87f537aa"
+          }
+        },
+        "add_grant": {
+          "pure": false,
+          "proof": true,
+          "keyLocation": "acc/0.0.0-prototype.1/add_grant",
+          "hashes": {
+            "zkir": "3863ad05b0a13fc33998879def3d30cfea2ddf016ec738cecec5dffcb928edcb",
+            "bzkir": "5a8fe4d74b5430b9c4a04e1cded24da684a6d449abbdd08a3ef10db29015d465",
+            "verifierKey": "a9ffe77b5b8899dcd8313a5ee4f9267ab36349e6b0f9ae12087613646ffea210",
+            "proverKey": "3dfb6cb3e7b9a10144b67d26dea528fee93e3b72db19a33e02e9fe8c9a92b882"
+          }
+        },
+        "deposit_night": {
+          "pure": false,
+          "proof": true,
+          "keyLocation": "acc/0.0.0-prototype.1/deposit_night",
+          "hashes": {
+            "zkir": "410e5f4caa21c8fb149e4ecf35cf3fb3ecc30ac5e04d0f6e09ef65e864a2e5a2",
+            "bzkir": "55f503ee41de1eb50396752f0e0639cf2f0bd46309e9b004c903fa08ee9f95f1",
+            "verifierKey": "2ba8e561f260d6f201a0aa8dbaddd3a15ba7048bef674468d8295e68252e2123",
+            "proverKey": "5d10d3c1a95fdfa83406841d4840311159679bf109b541cd2a6f8dbb6317b11b"
+          }
+        },
+        "deposit_shielded": {
+          "pure": false,
+          "proof": true,
+          "keyLocation": "acc/0.0.0-prototype.1/deposit_shielded",
+          "hashes": {
+            "zkir": "bfa84abe8d780f901618ff97dc80258f7af7dec1c89633d2989ff48a08ffca6f",
+            "bzkir": "cf940a1667b2d9eedcd3fabfc63d54bcaf3f0a23f45aa76f19161994b4584963",
+            "verifierKey": "f5f55fb7f10226583338ba023f14a9b206ffd536ce2d5b7a958e09d2e1143d80",
+            "proverKey": "c372dea90d483f2f9fbe846f3d62b58377563a9e26cf9db106ff68166d994842"
+          }
+        },
+        "derive_device_commitment": {
+          "pure": true,
+          "proof": false
+        },
+        "derive_grant_commitment": {
+          "pure": true,
+          "proof": false
+        },
+        "derive_recovery_commitment": {
+          "pure": true,
+          "proof": false
+        },
+        "grant_withdraw_night": {
+          "pure": false,
+          "proof": true,
+          "keyLocation": "acc/0.0.0-prototype.1/grant_withdraw_night",
+          "hashes": {
+            "zkir": "d6bbfbdefbb3dc0104f7587a0d3991907b36a90520e70b5f42d8b106300bc25a",
+            "bzkir": "b27c1798d57327b388d834a652193126b74491c9fdcce88bbfb93489cc0fa9ef",
+            "verifierKey": "90c07250880281d1fcf5029da6df4b4dbacc136efe645b37b4b09ed5b8473011",
+            "proverKey": "e3609ba41715392ee2b340ef03d47ac0c190a87bc4809e3ecba948eb7eb633d8"
+          }
+        },
+        "grant_withdraw_shielded": {
+          "pure": false,
+          "proof": true,
+          "keyLocation": "acc/0.0.0-prototype.1/grant_withdraw_shielded",
+          "hashes": {
+            "zkir": "fcecbaa5a3c35161f8a024020731961973cfa543783fdee2815a66306f6acdc5",
+            "bzkir": "a98782ed2d5f2d3715105bd3aa56e7dbe6ff423d09abce729d24818f5b601dbf",
+            "verifierKey": "f63ba1fb3d834e24f7a5281a167b331bd569ae85a32dbbcc019348352c29dd38",
+            "proverKey": "40c88039c9aee281cbff6353253455ceb3b428e9e669586d23adb85f08f89c5e"
+          }
+        },
+        "publish_recovery_backup": {
+          "pure": false,
+          "proof": true,
+          "keyLocation": "acc/0.0.0-prototype.1/publish_recovery_backup",
+          "hashes": {
+            "zkir": "8b610cd338c528f7cb0625798817b14642430da23c4828b54f9def15b88b2c95",
+            "bzkir": "77865825838cf2a90d0475650fddf9473b6986fa03f249c8b6eb49f4e25edb79",
+            "verifierKey": "c6ccecb27fdc3b824731ed237d1b031c81a00c25738f4c18c77453af2f10d8c1",
+            "proverKey": "7657a02a358ffbb0b8a891f970c8935d1f3e1935487534d9de29aaa24bc1afc8"
+          }
+        },
+        "recover": {
+          "pure": false,
+          "proof": true,
+          "keyLocation": "acc/0.0.0-prototype.1/recover",
+          "hashes": {
+            "zkir": "5feaed75f3d22f260a2c7ec343ab1a55a07829b0e2dcf3e69bfef2736f143d6a",
+            "bzkir": "9609afb7a56c3c6fdcaf178cea5681836c5b94d9addbe391f1422a35622e13eb",
+            "verifierKey": "b2221992cb9cce6117c0612a4dff15f9850afe12edd5bb742fb425416edc8ffb",
+            "proverKey": "76ff8d086a8a02738e4f7097de065c8e756e1267dbf3c86cc565cd513dc4eb3e"
+          }
+        },
+        "remove_device": {
+          "pure": false,
+          "proof": true,
+          "keyLocation": "acc/0.0.0-prototype.1/remove_device",
+          "hashes": {
+            "zkir": "0c2fb0bff92c2fa9fe2a14c32fcee28ef80698be163b96a0150d332717705d18",
+            "bzkir": "d1acce11721d63e2611fb4a9f3b4017829c2705b8c5bb838b7b31c4197ed6b9f",
+            "verifierKey": "b1a0e9393732f6cb09d36b754a2aab737977bab6f168378994370147da081d36",
+            "proverKey": "6058303dea700f1bfcf5da140e2d6f31df0d445a436e4bb15137fd6d11fcea9d"
+          }
+        },
+        "revoke_grant": {
+          "pure": false,
+          "proof": true,
+          "keyLocation": "acc/0.0.0-prototype.1/revoke_grant",
+          "hashes": {
+            "zkir": "01060fe7ae382b545abbcd8d9a8b486090ee5637b7d08c227ed8c114122c75c0",
+            "bzkir": "a3cc4b31af71f0f11f976b9188edceacee1d3583d7d6a4cbb3d0b82094d93dd9",
+            "verifierKey": "577889e0fc807cd6f605145e27cd1ce61f913d6f23424ce8e634382afe0766d2",
+            "proverKey": "3bdbc98110be14fe3bbc8a40b457d0cf5cd23d442005ee18e5e0913d20b2aa32"
+          }
+        },
+        "withdraw_night": {
+          "pure": false,
+          "proof": true,
+          "keyLocation": "acc/0.0.0-prototype.1/withdraw_night",
+          "hashes": {
+            "zkir": "0cddd42effa446bf7c831e0a78068530fe138cc6c33055a86e6dd5f6e1c70763",
+            "bzkir": "88fbadd3b5577f4b8aed0769daa74cb55652eddd5085ae55372b7e993b9d7b5d",
+            "verifierKey": "30075ecca976e8c8b20aca1ec8c410210803226d461c1f23297e3076442c1f54",
+            "proverKey": "77ce4165442c1f8625c853c8301cd43ff8161aa2880f6fed8c7a979b3eef7f2d"
+          }
+        },
+        "withdraw_shielded": {
+          "pure": false,
+          "proof": true,
+          "keyLocation": "acc/0.0.0-prototype.1/withdraw_shielded",
+          "hashes": {
+            "zkir": "7c2f824527a96702cb50b69c8cb02f75ad81078474ff44a33d2ed41d2e1641bb",
+            "bzkir": "f86d5bc76c50bb13dbce8b5f38d7d078a3a3714fab451006e26dec9d35903a30",
+            "verifierKey": "3201121da46045a5f6a0b4d4ca356e0c9788dd152b391591a9ef6c37daae0c92",
+            "proverKey": "8f79e0bf06c55b60d338216f4d79be6de28873278eb62f6e02e0042a6806abcf"
+          }
+        }
+      }
+    }
+  }
+}

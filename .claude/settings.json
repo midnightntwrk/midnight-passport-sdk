@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "midnight-passport-sdk": {
+      "source": {
+        "source": "directory",
+        "path": "./"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "mn-passport-skills@midnight-passport-sdk": true
+  }
+}

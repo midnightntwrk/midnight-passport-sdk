@@ -1,0 +1,41 @@
+# Dependencies (pnpm workspaces — FS-0.1 D-9)
+node_modules/
+
+# Build output
+dist/
+build/
+lib/
+*.tsbuildinfo
+
+# Test / coverage
+coverage/
+*.lcov
+.nyc_output/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# mn-passport-skills working artefacts (gitignored per docs/development-workflow.md)
+# security residual-risk register + verify/provisional register
+.mn-passport-skills/
+
+# Midnight local dev artefacts
+contracts/managed/
+midnight-level-db/
+zk-params/
+*.zkir
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
+
+# Local, not shared
+.midnight-expert/
+.planning/
+packages/contract/artefact/

@@ -1,72 +1,54 @@
-# Midnight Template Repository
+# Midnight Passport SDK
 
-This GitHub repository should be used as a template when creating a new Midnight GitHub repository.
-The template is configured with default repository settings and a set of default files that are expected to exist in all Midnight GitHub repositories.
+The developer SDK for **Midnight Passport** — the user-facing identity and
+wallet layer for the Midnight network. The SDK is the primary programmatic
+surface for a user's **Account Custody Contract (ACC)**: onboarding,
+authentication, scoped grants, recovery, storage, proving, and the dApp
+connector all resolve to authorised interactions with that on-chain account.
 
-### LICENSE
+> **Status:** planning / spec, with a reduced **beta (v1)** defined. This
+> repository will host the SDK packages as they are built.
 
-Apache 2.0.
+## Documentation
 
-### README.md
+The design lives in [`docs/`](./docs):
 
-Provides a brief description for users and developers who want to understand the purpose, setup, and usage of the repository.
+- [`sdk-requirements.md`](./docs/sdk-requirements.md) — what the SDK must do, and why.
+- [`architecture.md`](./docs/architecture.md) — how it's built: layered core, seams, adapters, worked examples.
+- [`development-workflow.md`](./docs/development-workflow.md) — the `mn-passport-skills-*` skills that drive development, spec orchestration, and PR / issue traceability.
+- [`beta-scope.md`](./docs/beta-scope.md) — the reduced first version.
 
-### SECURITY.md
+Component (`[C…]`) and promise (`[P…]`) references in these docs point to the
+Midnight Passport **planning workspace**
+([midnightntwrk/passport → `docs/plans`](https://github.com/midnightntwrk/passport/tree/main/docs/plans)),
+where the component canvases and promises are maintained.
 
-Provides a brief description of the Midnight Foundation's security policy and how to properly disclose security issues.
+## Packages (planned)
 
-### CONTRIBUTING.md
+Published under the `@midnight-ntwrk/` scope:
 
-Provides guidelines for how people can contribute to the Midnight project.
+- `mn-passport-core` — kernel, flows, and seam interfaces (wallet / agent side).
+- `mn-passport-protocol` — shared C23 wire types (dApp ↔ wallet).
+- `mn-passport-contract` — typed ACC bindings over the externally-owned contract artefact.
+- `mn-passport-connect` — the thin dApp-side connector.
+- `mn-passport-adapter-*` — platform (browser, node) and seam adapters (signer, prover, storage, …).
 
-### CODEOWNERS
+## Development
 
-Defines repository ownership rules.
+Development is spec-driven and harness-assisted — see
+[`docs/development-workflow.md`](./docs/development-workflow.md). Every spec is
+planned into small, reviewable PRs anchored to a GitHub issue; progress and
+backlog are tracked in [`STATE.md`](./STATE.md).
 
-### ISSUE_TEMPLATE
+The workflow ships as the **`mn-passport-skills` plugin** in [`mn-passport-skills/`](./mn-passport-skills):
+ten skills (`/mn-passport-skills:spec-author`, `/mn-passport-skills:spec-driver`, the four review
+lenses, `doc-sync`, `pr-open`, and the `deps` / `devenv` watchers), a PreToolUse
+hook that stops
+outward actions for human confirmation, and the scripts behind the CI gate
+([`.github/workflows/pr-checks.yml`](./.github/workflows/pr-checks.yml)).
+Claude Code auto-enables it when you trust the repo (via
+`.claude/settings.json`); manual fallback:
+`/plugin marketplace add .` then `/plugin install mn-passport-skills@midnight-passport-sdk`.
 
-Provides templates for reporting various types of issues, such as: bug report, documentation improvement and feature request.
-
-### PULL_REQUEST_TEMPLATE
-
-Provides a template for a pull request.
-
-### CLA Assistant
-
-The Midnight Foundation appreciates contributions, and like many other open source projects asks contributors to sign a contributor
-License Agreement before accepting contributions. We use CLA assistant (https://github.com/cla-assistant/cla-assistant) to streamline the CLA
-signing process, enabling contributors to sign our CLAs directly within a GitHub pull request.
-
-### Dependabot
-
-The Midnight Foundation uses GitHub Dependabot feature to keep our projects dependencies up-to-date and address potential security vulnerabilities.
-
-### Checkmarx
-
-The Midnight Foundation uses Checkmarx for application security (AppSec) to identify and fix security vulnerabilities.
-All repositories are scanned with Checkmarx's suite of tools including: Static Application Security Testing (SAST), Infrastructure as Code (IaC), Software Composition Analysis (SCA), API Security, Container Security and Supply Chain Scans (SCS).
-
-### Unito
-
-Facilitates two-way data synchronization, automated workflows and streamline processes between: Jira, GitHub issues and Github project Kanban board.
-
-# TODO - New Repo Owner
-
-### Software Package Data Exchange (SPDX)
-Include the following Software Package Data Exchange (SPDX) short-form identifier in a comment at the top headers of each source code file.
-
-
- <I>// This file is part of <B>REPLACE WITH REPO-NAME</B>.<BR>
- // Copyright (C) Midnight Foundation<BR>
- // SPDX-License-Identifier: Apache-2.0<BR>
- // Licensed under the Apache License, Version 2.0 (the "License");<BR>
- // You may not use this file except in compliance with the License.<BR>
- // You may obtain a copy of the License at<BR>
- //<BR>
- //	https://www.apache.org/licenses/LICENSE-2.0<BR>
- //<BR>
- // Unless required by applicable law or agreed to in writing, software<BR>
- // distributed under the License is distributed on an "AS IS" BASIS,<BR>
- // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.<BR>
- // See the License for the specific language governing permissions and<BR>
- // limitations under the License.</I>
+Prerequisite: the private residual-risk register repo cloned as a sibling at
+`../mn-passport-sdk-debts` (checked by `/mn-passport-skills:devenv`).

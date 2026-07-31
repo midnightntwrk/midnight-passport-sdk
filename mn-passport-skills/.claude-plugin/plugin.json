@@ -1,0 +1,8 @@
+{
+  "name": "mn-passport-skills",
+  "version": "0.1.0",
+  "description": "Development-workflow skills for the Midnight Passport SDK: the spec-driver loop, the four review lenses (conformance, security-audit, code-style, verify), doc-sync feedback, pr-open shipping, deps and devenv watchers, plus the enforcement hooks that back them. See docs/development-workflow.md.",
+  "author": {
+    "name": "Midnight Passport SDK team"
+  }
+}

@@ -1,0 +1,11 @@
+packages:
+  - packages/*
+
+# Supply-chain posture, natively enforced (docs/development-workflow.md §4;
+# flagged by org code scanning on the migration PR).
+# The 7-day cooldown, applied at resolution time (minutes).
+minimumReleaseAge: 10080
+# No transitive dependencies from git/URL sources — registry only.
+blockExoticSubdeps: true
+# Updates may never weaken these settings.
+trustPolicy: no-downgrade
