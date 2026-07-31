@@ -1,0 +1,15 @@
+# Formatting is enforced for code (packages/, tests/) and root configs.
+# Prose and the skills plugin keep their own conventions (code-style lens).
+node_modules/
+dist/
+build/
+coverage/
+pnpm-lock.yaml
+*.md
+docs/
+mn-passport-skills/
+.claude/
+.claude-plugin/
+.github/
+.mn-passport-skills/
+packages/contract/artefact/

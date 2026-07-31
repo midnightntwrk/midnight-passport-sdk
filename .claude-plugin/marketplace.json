@@ -1,0 +1,13 @@
+{
+  "name": "midnight-passport-sdk",
+  "owner": {
+    "name": "Midnight Passport SDK team"
+  },
+  "plugins": [
+    {
+      "name": "mn-passport-skills",
+      "source": "./mn-passport-skills",
+      "description": "Development-workflow skills for the Midnight Passport SDK: spec-driver loop, review lenses, doc-sync, pr-open, deps and devenv watchers, plus enforcement hooks. See docs/development-workflow.md."
+    }
+  ]
+}
