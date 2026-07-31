@@ -1,5 +1,6 @@
 # Formatting is enforced for code (packages/, tests/) and root configs.
-# Prose and the skills plugin keep their own conventions (code-style lens).
+# Prose, the skills plugin, and org-owned root configs keep their own
+# conventions (code-style lens; the org manages its template files).
 node_modules/
 dist/
 build/
@@ -13,3 +14,5 @@ mn-passport-skills/
 .github/
 .mn-passport-skills/
 packages/contract/artefact/
+renovate.json
+CODEOWNERS
