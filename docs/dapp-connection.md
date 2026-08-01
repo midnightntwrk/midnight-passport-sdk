@@ -23,8 +23,9 @@ Three invariants make it work:
 
 - **One RPC surface, pluggable transport.** The dApp calls the same typed
   methods; the transport varies by platform — **redirect** (mobile, same
-  device), **relay** (cross-device), **extension / postMessage** (desktop).
-  This doc uses the mobile **redirect** transport.
+  device), **embedded / iframe** (mobile, Passport hosts the dApp — see §3),
+  **relay** (cross-device), **extension / postMessage** (desktop). §4–§5 detail
+  the mobile **redirect** transport.
 - **Passport executes on the device and returns only scoped results.** The
   "RPC" is not a server — it is the Passport PWA running in the browser on the
   user's device, in its own origin, reached by navigating to its routes
@@ -153,6 +154,105 @@ dApp flexibility, witness privacy, and how much Passport hosts:
 
 The rest of this document details **Path 3**; **none of the three is decided
 yet** — Paths 1 and 2 are the one-jump alternatives.
+
+### The embedded (iframe) transport — collapsing the jumps entirely
+
+The paths above assume every handoff is a full-page redirect. It need not be.
+**Passport can stay the top-level PWA and render the dApp inside a full-page
+iframe**, turning the connection into an in-page channel with no navigation. This
+is not a fourth path — it is a **transport** that can carry Path 1 or Path 2 with
+**zero jumps**.
+
+```mermaid
+flowchart TB
+  subgraph PWA["Passport PWA — top-level, first-party passport.night"]
+    CHROME["Passport chrome<br/>consent + passkey ceremony"]
+    subgraph IFRAME["Full-page iframe — dApp origin A"]
+      DAPP["dApp UI + mn-passport-connect shim"]
+    end
+  end
+  DAPP <-->|"postMessage RPC (origin-checked)"| CHROME
+  CHROME -->|"prove + settle (per chosen path)"| SVC["Provider / service"]
+  CHROME -->|"broadcast"| NET["Network"]
+```
+
+**Feasible — with one correction to "inject."** You cannot literally inject
+`window.midnight` or reach into the dApp's DOM: the iframe is a **different
+origin**, and the Same-Origin Policy forbids the parent from touching a
+cross-origin child's globals. The channel is **`postMessage`** — Passport (parent)
+and the dApp (child) exchange the same typed RPC over `postMessage`, with strict
+`origin` / `targetOrigin` checks, and the dApp includes the `mn-passport-connect`
+shim that speaks it. So "inject the provider" becomes "the dApp loads the
+connector, and it auto-selects the embedded transport when it detects it is framed
+by `passport.night`." Same RPC surface as §1 — new transport.
+
+**Two problems it dissolves:**
+
+- **The jumps.** Passport never navigates away; the dApp renders in-place and the
+  RPC is in-page. The multi-jump cost that §3–§5 exist to weigh does not arise.
+- **The storage / passkey context.** Because Passport stays the **top-level,
+  first-party `passport.night` context throughout**, the ceremony and the keystore
+  live exactly where they must — no redirect into a foreign jar, so the
+  **P-across-contexts** problem (and much of `storage-and-recovery.md` §2's
+  bootstrapping) is sidestepped while embedded. The passkey/PRF ceremony runs in
+  Passport's own top-level context, which is precisely where WebAuthn wants it.
+
+> **Direction matters.** This works only with **Passport as the parent**. The
+> mirror image — Passport embedded inside the dApp's iframe — is the one that
+> breaks: a cross-origin child can invoke WebAuthn only with delegated
+> `publickey-credentials-*` permissions policy, and Safari/iOS restrict it, so the
+> ceremony would no longer be reliably first-party. **Passport hosts the dApp,
+> never the reverse.**
+
+**What the dApp must allow.** A page can only be framed if it permits it: the dApp
+must send `Content-Security-Policy: frame-ancestors https://passport.night` and
+**not** `X-Frame-Options: DENY`. Arbitrary dApps that forbid framing cannot be
+embedded — so this transport serves the **curated, supported set**, dovetailing
+with **Path 2** (and it can equally carry Path 1 for a supported dApp that keeps
+its own witness).
+
+**Security design (non-negotiable):**
+
+- **The approval UI is Passport's, never the iframe's.** Consent and the passkey
+  ceremony render in Passport's own chrome, visually outside / over the embedded
+  dApp, so the user approves in Passport — not in third-party code that could
+  spoof it.
+- **Scope the channel.** Allow-list the iframe's origin on every `postMessage`,
+  treat every message as untrusted input, and gate each capability behind an
+  explicit consented RPC — the embedded dApp gets no ambient authority. (SOP
+  already stops the iframe reading Passport's storage; the channel is the only
+  bridge, so it must be tight.)
+- **Protect the host.** Passport itself sends `frame-ancestors 'none'` so it can
+  never be framed (clickjacking of the ceremony), and sandboxes the dApp iframe
+  (`sandbox="allow-scripts allow-forms …"`, granting `publickey-credentials-*`
+  only if a supported dApp genuinely needs its own WebAuthn).
+
+**Caveats:**
+
+- **This is a workaround — the connector moves from the SDK into the PWA.** In the
+  SDK-centric model the connector is a library the dApp ships
+  (`mn-passport-connect`) and the transport is the SDK's concern. The embedded
+  model **offboards that role to the Passport PWA itself**: the PWA becomes the
+  host that frames the dApp and bridges the RPC, so responsibility shifts from the
+  dApp's SDK integration to the Passport app. Powerful for UX, but a deliberate
+  departure from the SDK-as-universal-surface model — not the clean architecture.
+- **Mobile only.** This is a mobile-PWA answer to the jumps. On desktop the
+  **extension / postMessage** transport already gives an in-page channel without
+  Passport hosting the dApp, so the full-page-iframe super-app framing does not
+  apply there.
+- **Partitioned storage for the dApp.** As a cross-origin frame, the embedded dApp
+  gets storage partitioned under `passport.night` (ITP / storage partitioning).
+  Its own third-party-cookie session may break; it uses the **Storage Access API**
+  or a partition-aware session if it needs one.
+- **iOS PWA behaviour** for cross-origin iframes inside an installed Home-Screen
+  web app needs testing — given how many iOS-specific traps we have already hit,
+  treat it as unverified until measured.
+
+So it is the most **seamless** route to the "one experience, no jumps" goal —
+**Passport as a dApp browser / super-app**, launching supported dApps inside
+itself — but a **workaround**: it buys that UX by moving the connector into the
+PWA and only applies on mobile. Weigh it as such against Paths 1–3, not as a
+replacement for the SDK surface.
 
 ## 4. Path 3 in detail
 
@@ -302,6 +402,11 @@ source — **PRF** (passkey) vs **KDF** (password).
   single jump from opposite ends. A possible split to weigh: curated dApps → Path 2,
   arbitrary or self-sufficient dApps → Path 1, must-build-and-keep-custody →
   Path 3.
+- **The embedded (iframe) transport** (§3) — whether it becomes the default for
+  supported dApps, since it removes both the jumps and the storage-context problem
+  for framable dApps. Confirm iOS-PWA cross-origin-iframe behaviour, make
+  `frame-ancestors https://passport.night` part of dApp onboarding, and decide how
+  the embedded dApp handles partitioned storage.
 - The **return transport for the witness** — sealed-to-ephemeral-key (shown) vs
   a one-time code the dApp exchanges over HTTPS. Pick one for the connect spec.
 - The **session bridge** between Phase A and B — how long a single ceremony
