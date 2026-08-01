@@ -20,8 +20,8 @@ jobs:
         env:
           BODY: ${{ github.event.pull_request.body }}
         run: |
-          if ! printf '%s' "$BODY" | grep -qiE '(refs|closes|fixes|resolves)[[:space:]]+([a-z0-9./-]+)?#[0-9]+'; then
-            echo "::error::PR description must reference its spec issue — 'Refs midnightntwrk/passport#NN' (or 'Closes #NN' on the finishing tranche)."
+          if ! printf '%s' "$BODY" | grep -qiE '(refs|closes|fixes|resolves)[[:space:]]+(([a-z0-9./-]+)?#[0-9]+|https?://github\.com/[a-z0-9._-]+/[a-z0-9._-]+/issues/[0-9]+)'; then
+            echo "::error::PR description must reference its spec issue — 'Refs midnightntwrk/passport#NN', a full issue URL, or 'Closes #NN' on the finishing tranche."
             exit 1
           fi
           echo "Issue reference found."
