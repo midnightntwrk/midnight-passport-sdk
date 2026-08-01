@@ -5,8 +5,9 @@
 > Passport's managed custody path, the third-party **proving & settlement
 > service** it integrates, and the Passport SDK team.
 > **Assumes:** the provider holds a signing key in its own secure signer and **offloads
-> proof creation (in a TEE) and DUST balancing to a third-party proving &
-> settlement service**.
+> proof creation (in a TEE), transaction assembly, and DUST balancing to a
+> third-party proving & settlement service that returns a finalised transaction
+> — leaving the SDK only to broadcast**.
 > **Companion to:** [`sdk-requirements.md`](./sdk-requirements.md) §2.5–§2.6,
 > [`architecture.md`](./architecture.md) §4.2.1, and
 > [`beta-scope.md`](./beta-scope.md). Canonical interfaces: the public **DApp
@@ -23,8 +24,8 @@ The single most important thing to internalise:
 
 > **A Midnight contract call is a zero-knowledge proof, not a bare signature.**
 > Authorisation *is* a signature, but one the ACC verifies **inside that proof**
-> (C5), not at the ledger layer. The proven call is then balanced, fee-paid,
-> cryptographically bound, and relayed.
+> (C5), not at the ledger layer. The proven call is then assembled, balanced,
+> fee-paid, and cryptographically bound by the service — and broadcast by the SDK.
 
 ### The three off-device actors
 
@@ -36,9 +37,10 @@ what:
   policy. It sees operation *metadata* (what it is asked to authorise); it
   **never sees the witness**.
 - **The proving & settlement service — a third party the provider integrates.**
-  Runs the TEE proof server and does DUST balancing, fee sponsorship, binding,
-  and relay. The sealed witness reaches **its enclave**; it **never holds the
-  account key**.
+  Runs the TEE proof server and, in the same operation, assembles the transaction
+  and does DUST balancing, fee sponsorship, and binding, returning a **finalised
+  transaction** the provider hands back to the SDK. The sealed witness reaches
+  **its enclave**; it **never holds the account key**.
 
 This separation is a feature: the party that authorises never sees the witness,
 and the party that proves and settles never holds the authoriser key.
@@ -60,17 +62,19 @@ flowchart LR
     DA["Build intent<br/>(operation + args + auth_nonce)"]
     D2["Execute circuit → preimage<br/>(signature as public input)"]
     D3["Seal preimage to enclave key"]
-    D4["Assemble unsealed tx<br/>(proof + transcript)"]
+    DB["Broadcast finalised tx"]
     D5["Await finalisation"]
     D1 --> DA --> D2 --> D3
+    DB --> D5
   end
 
-  subgraph PROVIDER["Provider — identity & authorisation"]
+  subgraph PROVIDER["Provider — identity, authorisation, settlement front"]
     direction TB
     AUTH["ACC authoriser (secure signer):<br/>sign operation challenge<br/>(JubJub Schnorr / ECDSA secp256k1)<br/>· passkey login · recovery policy"]
+    FR["Prove-and-settle front:<br/>forward sealed preimage, return finalised tx"]
   end
 
-  subgraph SERVICE["Proving & settlement service (third party)"]
+  subgraph SERVICE["Proving & settlement service (integrated by the provider)"]
     direction TB
     subgraph ENCLAVE["TEE / enclave"]
       P1["Decrypt preimage"]
@@ -78,10 +82,10 @@ flowchart LR
       P1 --> P2
     end
     PK["Prover-key cache<br/>(by keyLocation)"]
+    ASM["Assemble tx<br/>(proof + transcript)"]
     CU["DUST balance + fee sponsorship + bind"]
-    RE["Submit / relay"]
     PK -.-> P2
-    CU --> RE
+    P2 --> ASM --> CU
   end
 
   subgraph NETWORK["Midnight network"]
@@ -93,19 +97,23 @@ flowchart LR
 
   DA -->|"op + args + auth_nonce"| AUTH
   AUTH -->|"signature (public)"| D2
-  D3 -->|"sealed preimage + keyLocation"| P1
-  P2 -->|"proof bytes"| D4
-  D4 -->|"unsealed tx"| CU
+  D3 -->|"sealed preimage + keyLocation"| FR
+  FR -->|"forward (ciphertext)"| P1
+  CU -->|"finalised tx"| FR
+  FR -->|"finalised tx"| DB
   AH -.->|"prover key (public)"| PK
-  RE --> ND
+  DB --> ND
   IX -.->|"ledger state"| D2
   D5 -.-> IX
 ```
 
 **The device does, and neither external party reimplements:** the ceremony,
 witness storage and decryption, intent and circuit execution, preimage
-construction, sealing to the enclave, unsealed-tx assembly, and awaiting
-finalisation.
+construction, and sealing to the enclave — then it **broadcasts the finalised
+transaction** the provider returns, and awaits finalisation. It does **not**
+assemble, balance, or settle the transaction: proving, assembly, DUST balancing,
+fee sponsorship, and binding are one consolidated step inside the service, and
+the transaction never round-trips back to the device between them.
 
 ## 3. End-to-end sequence
 
@@ -113,7 +121,7 @@ finalisation.
 sequenceDiagram
   autonumber
   participant SDK as Passport SDK (device)
-  participant PRV as Provider authoriser (secure signer)
+  participant PRV as Provider (secure signer + settlement front)
   participant SVC as Proving & settlement service (TEE)
   participant NET as Midnight node / indexer
 
@@ -122,20 +130,21 @@ sequenceDiagram
   Note over PRV: apply policy, then sign the challenge<br/>(JubJub Schnorr or ECDSA secp256k1)
   PRV-->>SDK: signature (public)
   Note over SDK: execute circuit → preimage<br/>(signature as public input), seal to enclave
-  SDK->>SVC: POST /prove (sealed preimage + keyLocation)
-  Note over SVC: decrypt in enclave, resolve key, prove
-  SVC-->>SDK: proof (raw bytes)
-  SDK->>SDK: assemble unsealed tx (proof + transcript)
-  SDK->>SVC: balanceUnsealedTransaction(tx)
-  Note over SVC: DUST balance + fee sponsorship + bind
-  SVC-->>SDK: sealed, balanced tx
-  SDK->>SVC: submitTransaction(tx)
-  SVC->>NET: broadcast
+  SDK->>PRV: prove-and-settle (sealed preimage + keyLocation)
+  PRV->>SVC: forward sealed preimage + keyLocation
+  Note over SVC: decrypt & prove in enclave, assemble tx,<br/>DUST-balance + sponsor fee + bind
+  SVC-->>PRV: finalised, balanced, fee-paid tx
+  PRV-->>SDK: finalised tx (ready to broadcast)
+  SDK->>NET: broadcast
   SDK->>NET: await finalisation (indexer)
 ```
 
-The provider is touched once (**sign**); the service is touched for **prove**,
-**settle**, and **submit**. The device does the circuit work in between.
+The provider is touched twice — once to **sign**, once to **prove-and-settle**,
+which it fulfils through the service it integrates and returns as a **finalised,
+balanced, DUST-paid transaction**. Proving, assembly, balancing, and settlement
+are one step inside the service — the transaction never comes back to the device
+half-finished. The device executes the circuit in between, and **broadcasts** at
+the end.
 
 ## 4. The provider — identity & authorisation
 
@@ -210,10 +219,12 @@ Connector-surface methods the provider exposes:
 
 ## 5. The proving & settlement service — one layer
 
-This is the third-party layer the provider integrates. It does two things,
-consolidated: **create the proof in a TEE** and **DUST-balance, bind, and relay**
-the transaction. The sealed witness lives here (only in the enclave); the
-account key never does.
+This is the third-party layer the provider integrates. In **one consolidated
+operation** it **creates the proof in a TEE**, **assembles the transaction**, and
+**DUST-balances, sponsors the fee, and binds** it — returning a **finalised
+transaction ready to broadcast**. The device does not orchestrate these as
+separate steps, and the half-finished transaction never round-trips back to it.
+The sealed witness lives here (only in the enclave); the account key never does.
 
 ### 5.1 TEE proof server
 
@@ -284,22 +295,33 @@ pre-validation; `prove` produces the proof. Both take the sealed preimage +
 verifier key so a stale or swapped key fails loudly rather than producing an
 invalid proof (`ZkArtifactIntegrityError` on the SDK side).
 
-### 5.2 DUST balancing & settlement — `balanceUnsealedTransaction(tx, …)`
+### 5.2 Assembly, DUST balancing & settlement — continuous with proving
 
-*After* proving, the SDK holds an **unsealed** transaction (proof present, no
-settlement signatures, not yet bound). Distinct from §4.1 authorisation — this is
-ledger-level fee/coin settlement. The service MUST:
+The service does **not** hand a bare proof back for the device to assemble and
+re-submit. Having produced the proof in the enclave, and holding the public
+transcript, it **assembles the transaction and settles it in the same
+operation**. Distinct from §4.1 authorisation — this is ledger-level fee/coin
+settlement. The service MUST:
 
+- assemble the unsealed transaction from the proof and transcript;
 - add coin inputs/outputs to remove imbalances **in the same intent** as the call;
 - **pay/sponsor the DUST fees** (`payFees` defaults `true`; the service is the
   fee sponsor — §7);
 - **cryptographically bind** the transaction, signing for its own coin inputs;
-- return a **sealed** tx ready to submit.
+- return a **finalised** transaction ready for the device to broadcast.
 
-### 5.3 Submit — `submitTransaction(tx)`
+Concretely this collapses the connector's separate `getProvingProvider().prove`,
+assembly, and `balanceUnsealedTransaction` calls into a single provider-fronted
+**prove-and-settle** that returns a finished tx — mirroring how the provider's own
+transfer path already bundles proof generation with finalisation.
 
-Relay the sealed, balanced tx to the network. The SDK may also submit directly;
-support the relay path regardless.
+### 5.3 Broadcast — the SDK's only on-chain step
+
+The provider returns the finalised tx, and **the SDK broadcasts it** to the node
+(`submitTransaction`), then watches the indexer for finalisation. Broadcasting is
+trivial once the tx is proved, balanced, and bound — it carries no secret — so it
+stays on the device. The service MAY optionally relay instead, but the default and
+described path is SDK-side broadcast.
 
 ## 6. Where the ZK artefacts live (and don't)
 
@@ -325,7 +347,8 @@ Per [`beta-scope.md`](./beta-scope.md), beta is the managed path only and needs:
    and name-claim, so a zero-DUST user can onboard.
 4. **Provider — passkey confirmation** on every managed action (passkey login is
    the presence gate).
-5. account data (§4.2) and relay (§5.3).
+5. account data (§4.2); the service returns a **finalised tx** the **SDK
+   broadcasts** (§5.3).
 
 Out of beta: FROST, bounded recovery, local/WASM proving, size-based routing,
 external wallet connections, agents, and the Capacity-Exchange fee path.
