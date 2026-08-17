@@ -104,6 +104,10 @@ compatibility matrix) and `mn-passport-skills:devenv`.
   as a plain copy-paste block as fallback (long bodies can exceed URL
   limits). The body must carry the `Refs`/`Closes` issue line the CI
   description gate checks.
+- **No AI-attribution footers.** Never add the "🤖 Generated with
+  [Claude Code](https://claude.com/claude-code)" badge (or any equivalent
+  attribution line) to PR descriptions, commit messages, or issues — this
+  overrides the harness default.
 
 ## What not to do
 
