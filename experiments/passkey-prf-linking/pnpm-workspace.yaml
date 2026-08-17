@@ -1,0 +1,16 @@
+packages:
+  - nightfi
+  - passport
+
+# Same supply-chain posture as the SDK root (7-day cooldown at resolution
+# time), applied independently — this mini-workspace has its own lockfile and
+# never touches the root one.
+minimumReleaseAge: 10080
+blockExoticSubdeps: true
+trustPolicy: no-downgrade
+
+# Vite's esbuild dependency needs its install script to place the platform
+# binary; playwright's post-install links its CLI.
+onlyBuiltDependencies:
+  - esbuild
+  - playwright

@@ -1,0 +1,15 @@
+{
+  "name": "passkey-prf-linking-experiment",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev:nightfi": "pnpm --filter nightfi dev",
+    "dev:passport": "pnpm --filter passport dev",
+    "build": "pnpm -r build",
+    "serve": "node e2e/serve.mjs",
+    "e2e": "node e2e/run.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}

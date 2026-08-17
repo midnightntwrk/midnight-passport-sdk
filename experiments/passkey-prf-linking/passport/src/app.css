@@ -1,0 +1,80 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, sans-serif;
+}
+body {
+  margin: 0;
+  background: #0d0e1a;
+  color: #e8e6f0;
+}
+main {
+  max-width: 44rem;
+  margin: 4rem auto;
+  padding: 0 1.5rem;
+}
+h1 {
+  font-size: 1.6rem;
+}
+.brand {
+  color: #8f7bff;
+}
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  margin: 1.5rem 0;
+  flex-wrap: wrap;
+}
+button {
+  background: #8f7bff;
+  color: #14121f;
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.7rem 1.2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+button.secondary {
+  background: transparent;
+  color: #8f7bff;
+  border: 1px solid #8f7bff;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.match {
+  color: #7bffb0;
+}
+input {
+  width: 100%;
+  box-sizing: border-box;
+  background: #1c1e30;
+  color: inherit;
+  border: 1px solid #3a3d5c;
+  border-radius: 0.4rem;
+  padding: 0.5rem;
+}
+.error {
+  color: #ff8f8f;
+  border: 1px solid #ff8f8f44;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  word-break: break-word;
+}
+.result dt {
+  margin-top: 0.9rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9a96ad;
+}
+.result dd {
+  margin: 0.15rem 0 0;
+}
+code {
+  word-break: break-all;
+  background: #1c1e30;
+  border-radius: 0.3rem;
+  padding: 0.1rem 0.3rem;
+}
