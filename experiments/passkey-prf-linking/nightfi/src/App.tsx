@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { createPassportPasskey, getPrfAssertion, toBase64Url, RP_ID } from './webauthn';
+import { createPassportPasskey, getPrfAssertion, toBase64Url, toHex, RP_ID } from './webauthn';
 import { derivePublicKeyHex } from './derive';
 
 interface Outcome {
@@ -7,6 +7,9 @@ interface Outcome {
   prfEnabled: boolean;
   prfEvaluatedAtCreate: boolean | null; // null = sign-in flow, not applicable
   publicKeyHex: string;
+  largeBlobSupported: boolean | null;
+  accAddressHex: string | null; // the simulated deployed-contract address
+  blobWritten: boolean | null;
 }
 
 export function App() {
@@ -21,29 +24,39 @@ export function App() {
     try {
       if (flow === 'onboard') {
         const created = await createPassportPasskey('nightfi-demo-user');
-        let prfOutput = created.prfAtCreate;
-        let evaluatedAtCreate = prfOutput !== null;
-        if (!prfOutput) {
-          // PRF not evaluated at create — evaluate it with an immediate
-          // assertion against the credential we just made.
-          const asserted = await getPrfAssertion(created.credential.rawId);
-          prfOutput = asserted.prfOutput;
-        }
+
+        // Simulate provisioning the user's on-chain infrastructure: the
+        // "deployed ACC contract address" is 32 random bytes. Attach it to
+        // the credential via the largeBlob extension so the Passport app
+        // can discover it from the passkey alone.
+        const accAddress = crypto.getRandomValues(new Uint8Array(32));
+        const written = await getPrfAssertion({
+          allowCredentialId: created.credential.rawId,
+          writeBlob: accAddress,
+        });
+
+        const prfOutput = created.prfAtCreate ?? written.prfOutput;
         if (!prfOutput) throw new Error('PRF extension produced no output (unsupported here)');
         setOutcome({
           credentialId: toBase64Url(created.credential.rawId),
           prfEnabled: created.prfEnabled,
-          prfEvaluatedAtCreate: evaluatedAtCreate,
+          prfEvaluatedAtCreate: created.prfAtCreate !== null,
           publicKeyHex: derivePublicKeyHex(prfOutput),
+          largeBlobSupported: created.largeBlobSupported,
+          accAddressHex: toHex(accAddress),
+          blobWritten: written.blobWritten,
         });
       } else {
-        const asserted = await getPrfAssertion();
+        const asserted = await getPrfAssertion({ readBlob: true });
         if (!asserted.prfOutput) throw new Error('PRF extension produced no output');
         setOutcome({
           credentialId: toBase64Url(asserted.credential.rawId),
           prfEnabled: true,
           prfEvaluatedAtCreate: null,
           publicKeyHex: derivePublicKeyHex(asserted.prfOutput),
+          largeBlobSupported: null,
+          accAddressHex: asserted.blob ? toHex(asserted.blob) : null,
+          blobWritten: null,
         });
       }
     } catch (cause) {
@@ -61,8 +74,9 @@ export function App() {
       </h1>
       <p>
         Onboards you with a passkey scoped to <code>{RP_ID}</code> (a Related Origin Request —
-        this page's origin is <code>{location.origin}</code>), evaluates the PRF extension, and
-        derives your portable P-256 public key.
+        this page's origin is <code>{location.origin}</code>), evaluates the PRF extension,
+        derives your portable P-256 public key, deploys your (simulated) contract, and attaches
+        its address to the passkey via largeBlob.
       </p>
       <div className="actions">
         <button disabled={busy} onClick={() => run('onboard')}>
@@ -92,6 +106,18 @@ export function App() {
           <dt>Derived P-256 public key</dt>
           <dd>
             <code data-testid="pubkey">{outcome.publicKeyHex}</code>
+          </dd>
+          <dt>largeBlob supported</dt>
+          <dd data-testid="largeblob-supported">
+            {outcome.largeBlobSupported === null ? 'n/a (sign-in)' : String(outcome.largeBlobSupported)}
+          </dd>
+          <dt>Deployed contract (ACC) address — 32 random bytes</dt>
+          <dd>
+            <code data-testid="acc-address">{outcome.accAddressHex ?? 'none'}</code>
+          </dd>
+          <dt>Address written to the passkey (largeBlob)</dt>
+          <dd data-testid="blob-written">
+            {outcome.blobWritten === null ? 'n/a' : String(outcome.blobWritten)}
           </dd>
         </dl>
       )}

@@ -4,10 +4,12 @@
 // its resident credential persist across navigations):
 //   1. https://nightfi.test        — create a passkey under RP ID
 //      midnightpassport.test (the Related Origin Request), evaluate PRF,
-//      derive the P-256 public key.
+//      derive the P-256 public key, and write the simulated deployed-contract
+//      address (32 random bytes) to the credential's largeBlob.
 //   2. https://midnightpassport.test — discoverable-credential sign-in,
-//      same PRF salt, derive again.
-//   3. Assert both derived keys are identical.
+//      same PRF salt, derive again, and read the largeBlob back.
+//   3. Assert both derived keys are identical AND the contract address
+//      round-tripped through the passkey byte for byte.
 //
 // Requires the static server (e2e/serve.mjs) listening on 443 — the RP ID
 // well-known fetch does not carry a port. Prints a JSON summary consumed by
@@ -19,7 +21,7 @@ import { chromium } from 'playwright';
 const summary = {
   date: new Date().toISOString().slice(0, 10),
   browser: null,
-  authenticator: 'CDP virtual authenticator (ctap2, internal, hasPrf)',
+  authenticator: 'CDP virtual authenticator (ctap2, internal, hasPrf, hasLargeBlob)',
   steps: {},
 };
 
@@ -51,11 +53,13 @@ try {
   await cdp.send('WebAuthn.addVirtualAuthenticator', {
     options: {
       protocol: 'ctap2',
+      ctap2Version: 'ctap2_1',
       transport: 'internal',
       hasResidentKey: true,
       hasUserVerification: true,
       isUserVerified: true,
       hasPrf: true,
+      hasLargeBlob: true,
       automaticPresenceSimulation: true,
     },
   });
@@ -76,6 +80,10 @@ try {
   step('nightfi.prf-evaluated-at-create', await page.textContent('[data-testid="prf-at-create"]'));
   const nightfiKey = await page.textContent('[data-testid="pubkey"]');
   step('nightfi.derived-public-key', nightfiKey);
+  step('nightfi.largeblob-supported', await page.textContent('[data-testid="largeblob-supported"]'));
+  const deployedAddress = await page.textContent('[data-testid="acc-address"]');
+  step('nightfi.deployed-contract-address', deployedAddress);
+  step('nightfi.blob-written', await page.textContent('[data-testid="blob-written"]'));
 
   // ── midnightpassport.test: continue with passkey ──
   await page.goto('https://midnightpassport.test/', { waitUntil: 'networkidle' });
@@ -91,11 +99,15 @@ try {
   step('passport.get-discoverable', 'ok');
   const passportKey = await page.textContent('[data-testid="pubkey"]');
   step('passport.derived-public-key', passportKey);
+  const readAddress = await page.textContent('[data-testid="acc-address"]');
+  step('passport.attached-contract-address', readAddress);
 
-  const match = nightfiKey === passportKey && Boolean(nightfiKey);
-  step('public-keys-match', match);
+  const keysMatch = nightfiKey === passportKey && Boolean(nightfiKey);
+  const blobMatch = deployedAddress === readAddress && /^[0-9a-f]{64}$/u.test(readAddress ?? '');
+  step('public-keys-match', keysMatch);
+  step('contract-address-roundtrip', blobMatch);
   console.log(`\nRESULT ${JSON.stringify(summary, null, 2)}`);
-  process.exitCode = match ? 0 : 1;
+  process.exitCode = keysMatch && blobMatch ? 0 : 1;
 } finally {
   await browser.close();
   server.kill();

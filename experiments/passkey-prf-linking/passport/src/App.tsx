@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { getPrfAssertion, toBase64Url, RP_ID } from './webauthn';
+import { getPrfAssertion, toBase64Url, toHex, RP_ID } from './webauthn';
 import { derivePublicKeyHex } from './derive';
 
 interface Outcome {
   credentialId: string;
   publicKeyHex: string;
+  accAddressHex: string | null; // read back from the passkey's largeBlob
 }
 
 export function App() {
@@ -20,12 +21,14 @@ export function App() {
     try {
       // Discoverable credential: no allowCredentials — the authenticator
       // offers whatever passkeys exist for this RP ID, including one created
-      // from nightfi.test via the Related Origin Request.
-      const asserted = await getPrfAssertion();
+      // from nightfi.test via the Related Origin Request. The same assertion
+      // reads the largeBlob nightfi attached (the deployed ACC address).
+      const asserted = await getPrfAssertion({ readBlob: true });
       if (!asserted.prfOutput) throw new Error('PRF extension produced no output');
       setOutcome({
         credentialId: toBase64Url(asserted.credential.rawId),
         publicKeyHex: derivePublicKeyHex(asserted.prfOutput),
+        accAddressHex: asserted.blob ? toHex(asserted.blob) : null,
       });
     } catch (cause) {
       const err = cause as Error;
@@ -47,8 +50,8 @@ export function App() {
       </h1>
       <p>
         Authenticates with the same passkey (RP ID <code>{RP_ID}</code>, this page's own origin),
-        evaluates the PRF with the same salt, and derives the public key. If the architecture
-        holds, it matches the one NightFi derived.
+        evaluates the PRF with the same salt, derives the public key, and reads the attached
+        information NightFi stored on the credential — the deployed contract address.
       </p>
       <div className="actions">
         <button disabled={busy} onClick={continueWithPasskey}>
@@ -69,6 +72,12 @@ export function App() {
           <dt>Derived P-256 public key</dt>
           <dd>
             <code data-testid="pubkey">{outcome.publicKeyHex}</code>
+          </dd>
+          <dt>Attached information (largeBlob) — your deployed contract</dt>
+          <dd>
+            <code data-testid="acc-address">
+              {outcome.accAddressHex ?? 'no blob attached to this credential'}
+            </code>
           </dd>
           <dt>Compare with the key NightFi derived</dt>
           <dd>

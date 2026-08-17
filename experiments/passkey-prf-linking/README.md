@@ -16,8 +16,8 @@ lockfile, same 7-day cooldown posture), and an automated Playwright check.
 
 | Piece | Role |
 |---|---|
-| `nightfi/` | Partner dApp: `credentials.create()` under the Passport RP ID (the ROR moment) + PRF → derived key |
-| `passport/` | Passport-alike: discoverable-credential `get()` + same PRF salt → derived key + compare box |
+| `nightfi/` | Partner dApp: `credentials.create()` under the Passport RP ID (the ROR moment) + PRF → derived key; simulates the ACC deploy (32 random bytes) and writes the address to the credential's **largeBlob** |
+| `passport/` | Passport-alike: discoverable-credential `get()` + same PRF salt → derived key + compare box; reads the **largeBlob** back and shows the attached deployed-contract address |
 | `passport/public/.well-known/webauthn` | The ROR authorisation: `{ "origins": ["https://nightfi.test"] }` |
 | `Caddyfile` | Manual mode: TLS front on 443 for both domains, proxying the two Vite dev servers |
 | `e2e/` | Automated mode: static HTTPS host-routing server + Playwright with a CDP virtual authenticator (`hasPrf`) |
@@ -80,8 +80,8 @@ availability, both derived keys, match verdict) — paste into `findings.md`.
      nightfi key into the compare box → expect **✓ same public key**.
 
 No real authenticator with PRF? Chrome DevTools → WebAuthn → enable the
-virtual authenticator environment (ctap2 / internal / resident keys /
-user verification / **PRF**) and repeat.
+virtual authenticator environment (ctap2 **(2.1)** / internal / resident
+keys / user verification / **PRF** / **large blob**) and repeat.
 
 ## What this deliberately does not test
 
