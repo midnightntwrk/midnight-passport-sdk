@@ -8,7 +8,7 @@
   },
   "scripts": {
     "build": "tsc -b tsconfig.build.json && tsc -p tsconfig.json",
-    "test": "pnpm run build && node --test",
+    "test": "pnpm run build && node --test \"tests/**/*.test.mjs\"",
     "lint": "node scripts/lint-boundaries.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
