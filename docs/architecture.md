@@ -641,11 +641,61 @@ for on-chain ACC v1.20 and guards the match at connect time (§8.2) — the
 *binding* axis. "Contract v1.20 with SDK 1.54" is the binding axis;
 `protocol` never sees it.
 
-Across the five: (1) wallet-side orchestration with adapters injected, (2) the
+#### Example 6 — Partner-origin issuance: the `onboard` facade (§3.13)
+
+Libraries: `mn-passport-onboard` — which internally wires `core` (kernel +
+onboard/sign-in flows), `adapter-browser` (WebAuthn/ROR ceremonies),
+`adapter-signer-local` (PRF-derived authoriser), and `adapter-prover-remote`
+(direct to the third-party proving and DUST sponsorship service); shared
+constants from `mn-passport-protocol`. Design:
+[`partner-onboarding.md`](./partner-onboarding.md).
+
+```ts
+// in the partner dApp — one import; core + adapters ride along inside
+import { capabilities, createPassport, signIn } from '@midnight-ntwrk/mn-passport-onboard';
+
+// 0 · Gate first: below the ROR/PRF floor, issuing here is impossible —
+//     hand the user to first-party onboarding instead.
+const cap = capabilities();
+if (!cap.canIssueHere) {
+  location.href = `https://midnightpassport.com/onboard?return=${location.origin}`;
+  // cap.reasons: e.g. ['no related-origin support', 'no PRF']
+}
+
+// 1 · Issue — two passkey prompts: create() under the Passport RP ID (ROR),
+//     ACC deployed via the third-party proving & DUST sponsorship service
+//     (fees sponsored), address stamped onto the credential (largeBlob).
+const passport = await createPassport({
+  user: 'nightfi-user',            // display label for the passkey sheet
+  // rpId: 'midnightpassport.com', // protocol default; override if the domain changes
+  // serviceUrl, indexerUrl:       // deployment configuration
+});
+console.log(passport.account);      // the deployed ACC address
+console.log(passport.credentialId); // remember it — helps providers that
+                                     // do not enumerate discoverable credentials
+
+// 2 · Recognise — one prompt: PRF re-derives the key, the blob returns the
+//     ACC address; on a blob miss the facade falls back to the indexer.
+const session = await signIn();
+console.log(session.account, session.publicKey);
+```
+
+Who did what: the facade instantiated the `core` kernel with the browser
+adapters and ran `core`'s own onboard and sign-in flows — the partner wrote
+none of that, and the heavy lifecycle (devices, grants, recovery, assets)
+simply is not exported. Contrast with example 2: `connect` talks to the
+user's wallet **over the C23 wire** and never links `core`; `onboard`
+**embeds** the custody core to issue an account at the partner origin — the
+recorded §4.4 exception. When the managed variant lands
+(partner-onboarding.md §5), the only change here is configuration: an
+`authoriser` option on the same two calls.
+
+Across the six: (1) wallet-side orchestration with adapters injected, (2) the
 cross-boundary two-sided split, (3) a thin-package chain call that never touches
-`core`, (4) adapter composition inside the write pipeline, and (5) the shared
+`core`, (4) adapter composition inside the write pipeline, (5) the shared
 wire-contract that keeps the two sides of the split in lockstep without either
-depending on the other.
+depending on the other, and (6) the issuance facade that embeds the core at a
+partner origin rather than reimplementing it.
 
 ## 5. Security architecture
 
