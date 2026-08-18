@@ -72,7 +72,8 @@ availability, both derived keys, match verdict) — paste into `findings.md`.
    caddy run            # TLS front on 443 for both domains
    ```
 
-4. In **Chrome/Edge 128+ or Safari 18+** (Firefox has not shipped ROR):
+4. In **Chrome/Edge 128+, Safari 18+, or Firefox 152+** (the ROR floor —
+   older browsers fail with `SecurityError`):
    - `https://nightfi.test` → *Create your Midnight Passport* → note the
      derived public key. The passkey sheet should display the
      **midnightpassport.test** RP.

@@ -125,6 +125,46 @@ RP ID on port 443: nothing else was listening.)
   passkeys wholly unavailable on the test machine (no Windows Hello
   enrolled), so no Windows provider row exists yet.
 
+## Compatibility floor — where this will NOT work
+
+Version floors per mechanism (from vendor documentation and release notes,
+2026/08/18 — the C9 matrix should re-verify on hardware):
+
+| Mechanism | Apple (iOS / macOS) | Android | Windows | Browsers |
+|---|---|---|---|---|
+| Passkeys at all | iOS 16 / macOS 13 | **Android 9+** (Google Password Manager); third-party providers need **Android 14+** (Credential Manager) | Windows Hello **enrolled** (PIN minimum) — none without it | any evergreen |
+| **ROR** (partner-origin ceremonies) | **iOS 18 / macOS 15** (Safari 18) | Chrome/Edge **128+** | Chrome/Edge **128+** | Chrome/Edge 128+ (2024/08) · Safari 18 (2024/09) · **Firefox 152** (2026/05) |
+| **PRF** (derived key) | **iOS 18 / macOS 15** (iCloud Keychain); cross-device (hybrid) PRF had data-loss bugs until **18.4** — treat 18.4+ as the practical floor | GPM passkeys include PRF **by default** (Android 9+ with current Play services) | **Windows 11 25H2+** returns PRF at authentication; PRF **at create()** additionally needs **Chrome 147+** (`WEBAUTHN_API_VERSION_8`); older Windows: none | Chromium long-standing; Firefox 148+ first with Windows-Hello PRF |
+| **largeBlob** (attached contract) | **iOS 17 / macOS 14** (iCloud Keychain) | **not supported** by GPM | **not supported** by Windows Hello | — (also CTAP 2.1 security keys) |
+
+So, concretely, this will **not** work:
+
+- **Anywhere below the ROR floor** (iOS < 18, Safari < 18, Chrome/Edge <
+  128, Firefox < 152): partner-origin ceremonies fail with `SecurityError`
+  — nightfi cannot even create the credential. The redirect-to-Passport
+  (first-party) fallback is the only path.
+- **The full flow (ROR + PRF + largeBlob) on anything except Apple
+  platforms**: the only mainstream stack where every leg works is
+  **iOS 18 / macOS 15+ with iCloud Keychain** (practically 18.4+) — which
+  matches the manual macOS confirmation above.
+- **The largeBlob leg on Android** (GPM does not implement it) and **on
+  Windows Hello** — the attached-contract pointer degrades to the
+  registry/indexer lookup there, which is why it must stay a cache, never
+  the source of truth.
+- **The PRF leg on Windows below 11 25H2**, and PRF-at-create below
+  Chrome 147 — the §2.2 password/KDF fallback is load-bearing for the
+  Windows installed base, not an edge case.
+- **Any Windows machine without Windows Hello enrolled**: no authenticator
+  exists; every ceremony fails outright (observed first-hand above).
+- **More than ~5 partner registrable domains**: the ROR origins list is
+  capped at five labels; ecosystem growth beyond that needs the C23
+  connection surface, not ROR.
+
+Mobile minimums, in one line: **iOS 18 (practically 18.4) for the full
+flow, iOS 17 if only the largeBlob leg matters; Android 9 for
+passkeys + PRF (any recent Chrome ≥ 128 for ROR), but largeBlob never —
+Android gets identity continuity without the attached pointer.**
+
 ## Not yet verified (bounded by this setup)
 
 - **Real authenticators.** The virtual authenticator honours CTAP 2.1
@@ -148,8 +188,10 @@ RP ID on port 443: nothing else was listening.)
 - **Safari 18+ / iOS.** ROR shipped there per current documentation, but
   PRF-under-ROR on Apple platforms is untested here (headless WebKit does
   not expose a virtual authenticator with PRF).
-- **Firefox** has not shipped ROR at all — a redirect-to-Passport fallback
-  remains mandatory in any real design.
+- **Firefox** shipped ROR in **Firefox 152 (2026/05)** — older Firefox (and
+  any browser below the ROR floor, §Compatibility) still needs the
+  redirect-to-Passport fallback, which remains mandatory in any real
+  design.
 - **The ~5-label origins cap** was not exercised (one partner origin);
   the ecosystem-size constraint stands as documented in the SDK evaluation.
 - **RP-side verification topology** (challenge issuance, origin allow-list
