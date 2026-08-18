@@ -41,6 +41,8 @@ flowchart TB
   CLI["CLI / scripts"] --> FLOWS
   AGENT["AI agent"] --> CONNECT
   DAPP["Partner dApp"] --> CONNECT["@midnight-ntwrk/mn-passport-connect — thin, C23"]
+  DAPP --> ONBOARD["@midnight-ntwrk/mn-passport-onboard — issuance facade (§3.13)"]
+  ONBOARD --> FLOWS
 
   subgraph CORE["@midnight-ntwrk/mn-passport-core — kernel + surface"]
     FLOWS["Flow surfaces: onboard, connect, devices, grants, recover, assets, agents"] --> CMD["Command + state surface"]
@@ -50,9 +52,14 @@ flowchart TB
 
   CONNECT -. "C23 protocol" .-> KERNEL
   SEAMS --> ADAPT["Platform adapters: browser, node"]
-  ADAPT --> EXT["External: wallet-infra provider, TEE prover (enclave), vendor keystore, indexer"]
+  ADAPT --> EXT["External: TEE prover (enclave) — direct for partner-origin issuance, wallet-infra provider, vendor keystore, indexer"]
   KERNEL --> CHAIN["Midnight chain / ACC"]
 ```
+
+The two dApp-side entry points differ deliberately: `connect` talks to the
+user's wallet **over the C23 wire** and never links the core;
+`onboard` (§3.13) **embeds** the core's onboard flow to issue an account at
+the partner origin — the recorded exception, detailed in §4.4.
 
 ## 3. The three approaches
 
