@@ -37,25 +37,35 @@ proved the ROR check is load-bearing, not permissive.
 
 ```json
 {
-  "date": "2026-08-17",
+  "date": "2026-08-18",
   "browser": "Chromium 151.0.7922.34 (Playwright)",
-  "authenticator": "CDP virtual authenticator (ctap2, internal, hasPrf, hasLargeBlob)",
+  "authenticator": "CDP virtual authenticator (ctap2_1, internal, hasPrf, hasLargeBlob)",
   "steps": {
     "nightfi.create-under-ror": "ok",
     "nightfi.prf-enabled": "true",
-    "nightfi.prf-evaluated-at-create": "true",
-    "nightfi.derived-public-key": "028850745a12b88f35c9749d6478c35ca57fdbdba6069bb9d077cff98db241d5a6",
+    "nightfi.derived-public-key": "020c46280d3d8629c014dd81eefcd345e32052d5b53acb2ac5b46f63563f1fad79",
     "nightfi.largeblob-supported": "true",
-    "nightfi.deployed-contract-address": "2558c536350fe3e740dcc55660dbaddd6873b16644a7d5e8827a5861e1f7b5b3",
+    "nightfi.deployed-contract-address": "ac3f29eb1c9bbbc85c4893855062f45015bce8735e85737b67f5f92705740d1b",
     "nightfi.blob-written": "true",
     "passport.get-discoverable": "ok",
-    "passport.derived-public-key": "028850745a12b88f35c9749d6478c35ca57fdbdba6069bb9d077cff98db241d5a6",
-    "passport.attached-contract-address": "2558c536350fe3e740dcc55660dbaddd6873b16644a7d5e8827a5861e1f7b5b3",
+    "passport.derived-public-key": "020c46280d3d8629c014dd81eefcd345e32052d5b53acb2ac5b46f63563f1fad79",
+    "passport.attached-contract-address": "ac3f29eb1c9bbbc85c4893855062f45015bce8735e85737b67f5f92705740d1b",
     "public-keys-match": true,
     "contract-address-roundtrip": true
   }
 }
 ```
+
+**Ceremony discipline (adopted from the validated account-custody
+prototype, and now enforced by both apps):** PRF is only *enabled* at
+`create()` (bare `prf: {}`) and evaluated in its own `get()`, and every
+`get()` carries **exactly one extension** — PRF eval, largeBlob write, and
+largeBlob read are three separate ceremonies. An earlier iteration that
+bundled `prf.eval` into `create()` and combined PRF with largeBlob in one
+`get()` also passed on the virtual authenticator, but the combination is
+not something real providers are expected to honour uniformly — the
+prototype's "PRF results are only guaranteed during get()" note is treated
+as load-bearing.
 
 Step by step:
 
@@ -64,11 +74,13 @@ Step by step:
    `https://midnightpassport.test/.well-known/webauthn`, found the caller
    origin listed, and allowed registration. ROR covers **registration**, not
    just assertions.
-2. **PRF under ROR — works, including at `create()`.** The PRF extension
-   reported `enabled: true` and returned its output during the create
-   ceremony itself (`prf-evaluated-at-create: true`), so no follow-up
-   assertion was needed. This was the recorded unverified linchpin of the
-   SDK evaluation — in Chromium it holds.
+2. **PRF under ROR — works.** `create()` reported `prf.enabled: true`, and
+   the dedicated follow-up `get()` (still from `nightfi.test`, under ROR)
+   returned the PRF output. This was the recorded unverified linchpin of
+   the SDK evaluation — in Chromium it holds. (The virtual authenticator
+   also returned PRF output during `create()` itself in an earlier
+   iteration; per the ceremony-discipline note below, that behaviour is
+   not relied upon.)
 3. **Cross-origin key continuity — exact.** The discoverable-credential
    sign-in at `midnightpassport.test` (same RP ID, same salt) produced the
    same PRF output, hence the same derived P-256 public key,
@@ -77,12 +89,11 @@ Step by step:
 4. **Attached information round-trips through the passkey (largeBlob).**
    `create()` requested `largeBlob: { support: 'preferred' }` (reported
    `supported: true` under CTAP 2.1); nightfi simulated the ACC deploy as
-   32 random bytes and wrote them with a `get()` carrying
+   32 random bytes and wrote them in a dedicated `get()` carrying only
    `largeBlob: { write }` (spec requires an allowlist of exactly one
-   credential for writes — so the write is a second ceremony after
-   `create()`); Passport's single discoverable sign-in carried
-   `largeBlob: { read: true }` and received the identical bytes,
-   `2558c536…b5b3`. Discovery of the user's deployed contract needed no
+   credential for writes); Passport's discoverable sign-in read them back
+   in a dedicated `largeBlob: { read: true }` ceremony — identical bytes,
+   `ac3f29eb…0d1b`. Discovery of the user's deployed contract needed no
    registry, no backend — the passkey itself carried the pointer.
 
 ## Negative control — ROR is enforced
@@ -108,7 +119,18 @@ RP ID on port 443: nothing else was listening.)
   Manager, third-party managers) — and **largeBlob's matrix is narrower
   than PRF's** (notably absent from Windows Hello at the time of writing),
   so the C9 browser × OS support matrix needs measuring on hardware for
-  both extensions, separately.
+  both extensions, separately. A first manual attempt on a stock Windows
+  machine (2026/08/18) never reached a real provider: with the DevTools
+  virtual environment off, ceremonies failed outright (`NotAllowedError`,
+  no sheet — webauthn.io included), i.e. **passkeys wholly unavailable on
+  that machine** (no Windows Hello enrolled). That user profile is real,
+  and it is why the §2.2 password/KDF fallback and the managed path are
+  not optional. The apps now log each ceremony's outcome on-page so any
+  future real-provider run yields a complete support row. Both apps also
+  mitigate providers that honour allowlisted assertions but do not
+  enumerate discoverable credentials: nightfi remembers its credential ID
+  (localStorage), and the Passport-alike offers an explicit-credential-ID
+  diagnostic sign-in.
 - **Safari 18+ / iOS.** ROR shipped there per current documentation, but
   PRF-under-ROR on Apple platforms is untested here (headless WebKit does
   not expose a virtual authenticator with PRF).

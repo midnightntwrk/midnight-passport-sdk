@@ -78,3 +78,14 @@ code {
   border-radius: 0.3rem;
   padding: 0.1rem 0.3rem;
 }
+.steps {
+  font-size: 0.85rem;
+  color: #9a96ad;
+  border: 1px solid #3a3d5c;
+  border-radius: 0.5rem;
+  padding: 0.75rem 0.75rem 0.75rem 2rem;
+}
+.steps li {
+  margin: 0.2rem 0;
+  word-break: break-word;
+}

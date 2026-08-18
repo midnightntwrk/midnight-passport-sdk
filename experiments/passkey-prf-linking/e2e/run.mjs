@@ -77,7 +77,6 @@ try {
   }
   step('nightfi.create-under-ror', 'ok');
   step('nightfi.prf-enabled', await page.textContent('[data-testid="prf-enabled"]'));
-  step('nightfi.prf-evaluated-at-create', await page.textContent('[data-testid="prf-at-create"]'));
   const nightfiKey = await page.textContent('[data-testid="pubkey"]');
   step('nightfi.derived-public-key', nightfiKey);
   step('nightfi.largeblob-supported', await page.textContent('[data-testid="largeblob-supported"]'));
