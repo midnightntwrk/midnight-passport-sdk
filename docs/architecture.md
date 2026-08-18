@@ -179,7 +179,12 @@ Dependency rule: everything points **inward** to `@midnight-ntwrk/mn-passport-co
 interfaces; nothing points outward. `@midnight-ntwrk/mn-passport-connect` links neither the
 core nor any adapter — only the shared protocol types and the contract
 bindings (for §3.12 deposits) — so a dApp can never pull the kernel into
-its bundle.
+its bundle. **One recorded exception sits beside it:**
+`@midnight-ntwrk/mn-passport-onboard` (§3.13) deliberately *does* link the
+core and adapters, because partner-origin issuance is custody work — it is
+a composition facade, never a reimplementation, and its threat model is
+stated rather than hidden (ADR 0005). The `connect` rule itself is
+unchanged.
 
 **Foundation**
 
@@ -187,7 +192,12 @@ its bundle.
   protocol (EIP-6963 discovery, CAIP-25-shaped requests,
   Sign-In-with-Passport messages). Deliberately dependency-light so *both*
   the wallet side and the thin dApp connector share it without either
-  pulling in the other. No logic — just contracts.
+  pulling in the other. No logic — just contracts. Also home to the
+  **partner-onboarding shared constants** (§3.13): the Passport RP ID
+  (config-overridable), the PRF device-key salt, and the versioned largeBlob
+  payload schema — the three things the partner package and the Passport app
+  must agree on. Types and constants only, as ever: the blob's pure codec
+  lives in `core`.
 - **`@midnight-ntwrk/mn-passport-contract`** — typed bindings and the exported pure
   commitment circuits over the **externally-owned, versioned ACC artefact**
   (§8.2). Wraps the contract team's published build (compiled module, ZK
@@ -212,8 +222,11 @@ its bundle.
 
 - **`@midnight-ntwrk/mn-passport-adapter-browser`** — wires the seams to browser APIs:
   `FetchZkConfigProvider` (ZK assets over HTTP), WebAuthn **PRF passkeys**
-  for the ceremony, the in-tab wasm prover (Web Worker), browser storage /
-  vendor keystore, `fetch` and `WebSocket`. The default target — Passport
+  for the ceremony — including the Related-Origin-Request credential
+  creation and the bundled PRF + largeBlob assertions the §3.13 issuance
+  and recognition flows need (the `Platform.ceremony` extension; `core`
+  never learns WebAuthn exists) — the in-tab wasm prover (Web Worker),
+  browser storage / vendor keystore, `fetch` and `WebSocket`. The default target — Passport
   is browser-first. Consumed by the Official UI (MNF) and web dApps
   embedding the wallet.
 - **`@midnight-ntwrk/mn-passport-adapter-node`** — wires the same seams to Node.js so the SDK
@@ -281,6 +294,17 @@ the provider-free default always ships.
   own threat model; talks C23 *to* the wallet across a trust boundary and
   **must not link `@midnight-ntwrk/mn-passport-core`** or any adapter
   (`mn-passport-contract` is a foundation dependency, permitted).
+- **`@midnight-ntwrk/mn-passport-onboard`** — the partner-origin **issuance
+  facade** (§3.13, [`partner-onboarding.md`](./partner-onboarding.md)). A
+  narrow API (`createPassport`, `signIn`) that is composition only: it
+  instantiates the `core` kernel with the browser platform adapter, the
+  PRF-derived local signer (the provider-managed variant is a future
+  iteration), the remote prover connected **directly** to the third-party
+  proving and DUST sponsorship service, and sponsored settlement, then runs
+  `core`'s own onboard / sign-in flows. Links `core`
+  and adapters **by design** — issuance is custody work, and one kernel
+  implementation beats a duplicated one; the trade is recorded in ADR 0005.
+  Exposes no lifecycle surface beyond issuance and recognition.
 
 ```mermaid
 flowchart LR
@@ -291,6 +315,7 @@ flowchart LR
   BROW["@midnight-ntwrk/mn-passport-adapter-browser"]
   NODE["@midnight-ntwrk/mn-passport-adapter-node"]
   CONNECT["@midnight-ntwrk/mn-passport-connect"]
+  ONBOARD["@midnight-ntwrk/mn-passport-onboard"]
 
   CORE --> CONTRACT
   CORE --> PROTO
@@ -301,10 +326,16 @@ flowchart LR
   NODE --> CAPS
   CONNECT --> PROTO
   CONNECT --> CONTRACT
+  ONBOARD --> CORE
+  ONBOARD --> BROW
+  ONBOARD --> CAPS
 ```
 *Arrows read "depends on". `@midnight-ntwrk/mn-passport-connect` reaches only
 `@midnight-ntwrk/mn-passport-protocol` and `@midnight-ntwrk/mn-passport-contract`
-(deposit bindings, §3.12) — never the core or an adapter.*
+(deposit bindings, §3.12) — never the core or an adapter.
+`@midnight-ntwrk/mn-passport-onboard` is the recorded exception in the other
+direction: a facade that links the core and adapters because issuance is
+custody work (§3.13, ADR 0005).*
 
 ### 4.5 Private storage and backup
 
@@ -393,6 +424,7 @@ flowchart TB
   subgraph T1["Entry libraries"]
     CORE["mn-passport-core — kernel + flows + seams (wallet / agent side)"]
     CONNECT["mn-passport-connect — thin (dApp side)"]
+    ONBOARD["mn-passport-onboard — issuance facade (dApp side, links core)"]
   end
   subgraph T2["Adapters — fill core's seams"]
     SIGN["adapter-signer-*"]
@@ -417,6 +449,9 @@ flowchart TB
   UI --> CORE
   AGENT --> CORE
   DAPP --> CONNECT
+  DAPP --> ONBOARD
+  ONBOARD --> CORE
+  ONBOARD --> T2
   CORE --> T2
   CORE --> CONTRACT
   CORE --> PROTO

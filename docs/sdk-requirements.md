@@ -360,6 +360,9 @@ End-to-end account creation from a single ceremony:
 4. **Anchor the DID** — create the account's `did:midnight` identifier
    (§3.7).
 
+The same orchestration is also reachable **from a partner dApp** — issuance
+at the partner origin via a Related Origin Request, detailed in §3.13.
+
 ### 3.2 dApp authentication and authorisation
 
 The SDK is the client half of the dApp connection surface:
@@ -711,6 +714,50 @@ C23 wallet message — it rides the typed contract bindings
 (`mn-passport-contract`), not the kernel. Surfacing it through the dApp
 connector does not breach the "connector never links the core" rule (§3.9):
 the contract package is a foundation dependency, not the custody core.
+
+### 3.13 Partner-origin onboarding
+
+A partner dApp can **issue a Passport itself**: create a passkey under the
+Passport RP ID via a WebAuthn **Related Origin Request**, deploy the user's
+ACC over the managed proving and settlement rails (fees sponsored, so a
+zero-DUST user onboards from the partner origin), and stamp the deployed ACC
+address onto the credential via the **largeBlob** extension so the Passport
+app later *recognises* the account from one ceremony. Detailed design:
+[`partner-onboarding.md`](./partner-onboarding.md); mechanism validated in
+`experiments/passkey-prf-linking/` (2026/08/18, including on a real
+authenticator).
+
+Normative rules:
+
+- **One implementation.** The capability ships as the
+  `@midnight-ntwrk/mn-passport-onboard` **facade over `mn-passport-core`**
+  and the adapters — issuance is custody work, so the kernel is embedded,
+  never reimplemented. The facade exposes **issuance and recognition only**
+  (`createPassport`, `signIn`); the full account lifecycle stays in the
+  Passport app. The §3.9 rule is unchanged: `mn-passport-connect` never
+  links the core.
+- **Shared constants come from `mn-passport-protocol`**: the Passport RP ID
+  (config-overridable — the domain may change), the PRF device-key salt, and
+  the versioned largeBlob payload schema. Partner and Passport MUST agree on
+  all three or recognition breaks.
+- **The largeBlob is a cache, never the source of truth.** A blob miss or a
+  stale blob degrades to an indexer/registry lookup by device commitment;
+  a blob hit is verified against chain state before it is trusted.
+- **The redirect fallback is mandatory.** Below the ROR/PRF compatibility
+  floor the integration MUST fall back to first-party onboarding in the
+  Passport app (the C23 surface); capability detection is part of the facade.
+- **The related-origins list is governed.** Every listed origin can exercise
+  Passport credentials; listing is a recorded security decision, bounded by
+  the ~5-label client cap — the partner set is curated by design.
+- **Direct service connection (passkey/PRF path).** The facade connects
+  **directly** to the third-party proving and DUST sponsorship service — the
+  deploy preimage sealed to the service's enclave key (§2.5) — with no
+  provider in the loop; provider *routing* belongs to the managed path.
+- **Managed variant — future iteration.** Behind the same signer seam, a
+  wallet-infrastructure provider may supply the authoriser and presence gate
+  (§2.6) instead of the PRF-derived key — same ACC, migration per §2.1. Its
+  partner-origin flow is not yet documented
+  ([`partner-onboarding.md`](./partner-onboarding.md) §5).
 
 ## 4. Reference implementations (UI / App)
 
