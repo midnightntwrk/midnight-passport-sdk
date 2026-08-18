@@ -1,12 +1,14 @@
-# Provider integration — contract execution, authorisation, and TEE proving
+# Provider integration — contract execution, authorisation, and third-party proving & DUST sponsorship
 
-> **Status:** draft · 2026/07/28
+> **Status:** draft · 2026/08/17
 > **Audience:** the wallet-infrastructure provider ("the provider") backing
-> Passport's managed custody path, the third-party **proving & settlement
-> service** it integrates, and the Passport SDK team.
-> **Assumes:** the provider holds a signing key in its own secure signer and **offloads
-> proof creation (in a TEE) and DUST balancing to a third-party proving &
-> settlement service**.
+> Passport's managed custody path, the **third-party proving & DUST
+> sponsorship service** it integrates, and the Passport SDK team.
+> **Assumes:** the provider holds a signing key in its own secure signer and
+> **routes proof creation (in a TEE) and DUST sponsorship to a third-party
+> service**, which proves, balances, sponsors, and binds **in one process**;
+> the sealed, balanced transaction returns through the provider and the **SDK
+> broadcasts it**.
 > **Companion to:** [`sdk-requirements.md`](./sdk-requirements.md) §2.5–§2.6,
 > [`architecture.md`](./architecture.md) §4.2.1, and
 > [`beta-scope.md`](./beta-scope.md). Canonical interfaces: the public **DApp
@@ -31,17 +33,34 @@ The single most important thing to internalise:
 There are two external systems behind Passport, and it matters which one sees
 what:
 
-- **The provider — identity & authorisation.** Holds the account authoriser key
-  in its secure signer, signs operation challenges, and runs passkey login and recovery
-  policy. It sees operation *metadata* (what it is asked to authorise); it
+- **The provider — identity, authorisation, and routing.** Holds the account
+  authoriser key in its secure signer, signs operation challenges, and runs
+  passkey login and recovery policy. Once the circuit is executed on the
+  device, it **routes the sealed proving payload to the third-party service,
+  and the sealed, balanced transaction back to the device**. Mind the two
+  senses of "sealed": the outbound proving payload is **encrypted** to the
+  service's enclave (opaque ciphertext to the provider), while the returned
+  transaction is sealed in the ledger sense — **cryptographically bound, not
+  encrypted**. The provider therefore sees operation *metadata* (what it is
+  asked to authorise) and **every complete transaction pre-broadcast** (the
+  same bytes the network will see, linkable to the account it authorised); it
   **never sees the witness**.
-- **The proving & settlement service — a third party the provider integrates.**
-  Runs the TEE proof server and does DUST balancing, fee sponsorship, binding,
-  and relay. The sealed witness reaches **its enclave**; it **never holds the
-  account key**.
+- **The third-party proving & DUST sponsorship service — a third party the
+  provider integrates.** Runs the TEE proof server and, **in the same
+  process**, does DUST balancing, fee sponsorship, and binding, returning the
+  sealed, balanced transaction. The sealed witness reaches **its enclave**; it
+  **never holds the account key** — and it never broadcasts: **the SDK does**.
 
 This separation is a feature: the party that authorises never sees the witness,
-and the party that proves and settles never holds the authoriser key.
+and the party that proves and settles never holds the authoriser key. Routing
+does not weaken the witness guarantee — the outbound payload the provider
+forwards is opaque ciphertext, sealed to the service's enclave. It does give
+the provider **pre-broadcast visibility**: the returned transaction is bound,
+not encrypted, so the provider observes the full public content of every
+transaction it routes (public once broadcast anyway, but earlier, and tied to
+an authenticated account). If that visibility is ever unwanted, the service
+would have to seal the returned transaction to a device key — recorded under
+the open wire-encoding item (§9).
 
 ### The organising principle: two secrets, two holders
 
@@ -60,17 +79,18 @@ flowchart LR
     DA["Build intent<br/>(operation + args + auth_nonce)"]
     D2["Execute circuit → preimage<br/>(signature as public input)"]
     D3["Seal preimage to enclave key"]
-    D4["Assemble unsealed tx<br/>(proof + transcript)"]
+    D4["Broadcast sealed, balanced tx"]
     D5["Await finalisation"]
     D1 --> DA --> D2 --> D3
   end
 
-  subgraph PROVIDER["Provider — identity & authorisation"]
+  subgraph PROVIDER["Provider — identity, authorisation & routing"]
     direction TB
-    AUTH["ACC authoriser (secure signer):<br/>sign operation challenge<br/>(JubJub Schnorr / ECDSA secp256k1)<br/>· passkey login · recovery policy"]
+    AUTH["ACC authoriser (secure signer):<br/>sign operation challenge<br/>(JubJub Schnorr / ECDSA secp256k1 / secp256r1)<br/>· passkey login · recovery policy"]
+    ROUTE["Route:<br/>sealed payload → service (opaque ciphertext)<br/>sealed, balanced tx → device (bound, readable)"]
   end
 
-  subgraph SERVICE["Proving & settlement service (third party)"]
+  subgraph SERVICE["Third-party proving & DUST sponsorship — one process"]
     direction TB
     subgraph ENCLAVE["TEE / enclave"]
       P1["Decrypt preimage"]
@@ -79,9 +99,8 @@ flowchart LR
     end
     PK["Prover-key cache<br/>(by keyLocation)"]
     CU["DUST balance + fee sponsorship + bind"]
-    RE["Submit / relay"]
     PK -.-> P2
-    CU --> RE
+    P2 -->|"proof (in-process)"| CU
   end
 
   subgraph NETWORK["Midnight network"]
@@ -93,19 +112,23 @@ flowchart LR
 
   DA -->|"op + args + auth_nonce"| AUTH
   AUTH -->|"signature (public)"| D2
-  D3 -->|"sealed preimage + keyLocation"| P1
-  P2 -->|"proof bytes"| D4
-  D4 -->|"unsealed tx"| CU
+  D3 -->|"sealed preimage + keyLocation"| ROUTE
+  ROUTE -->|"sealed payload"| P1
+  CU -->|"sealed, balanced tx"| ROUTE
+  ROUTE -->|"sealed, balanced tx"| D4
   AH -.->|"prover key (public)"| PK
-  RE --> ND
+  D4 --> ND
   IX -.->|"ledger state"| D2
   D5 -.-> IX
 ```
 
 **The device does, and neither external party reimplements:** the ceremony,
 witness storage and decryption, intent and circuit execution, preimage
-construction, sealing to the enclave, unsealed-tx assembly, and awaiting
-finalisation.
+construction, sealing to the enclave, **broadcasting the sealed, balanced
+transaction**, and awaiting finalisation. Proving, balancing, sponsorship, and
+binding all happen on the service, in one process, once the provider routes
+the sealed payload; the finished transaction comes back through the provider
+for the device to broadcast.
 
 ## 3. End-to-end sequence
 
@@ -114,28 +137,29 @@ sequenceDiagram
   autonumber
   participant SDK as Passport SDK (device)
   participant PRV as Provider authoriser (secure signer)
-  participant SVC as Proving & settlement service (TEE)
+  participant SVC as Third-party proving & DUST sponsorship (TEE)
   participant NET as Midnight node / indexer
 
   Note over SDK: ceremony decrypts witness,<br/>build intent (op + args + auth_nonce)
   SDK->>PRV: request authorisation signature (the bundle)
-  Note over PRV: apply policy, then sign the challenge<br/>(JubJub Schnorr or ECDSA secp256k1)
+  Note over PRV: apply policy, then sign the challenge<br/>(JubJub Schnorr, or ECDSA secp256k1 / secp256r1 as they land)
   PRV-->>SDK: signature (public)
   Note over SDK: execute circuit → preimage<br/>(signature as public input), seal to enclave
-  SDK->>SVC: POST /prove (sealed preimage + keyLocation)
-  Note over SVC: decrypt in enclave, resolve key, prove
-  SVC-->>SDK: proof (raw bytes)
-  SDK->>SDK: assemble unsealed tx (proof + transcript)
-  SDK->>SVC: balanceUnsealedTransaction(tx)
-  Note over SVC: DUST balance + fee sponsorship + bind
-  SVC-->>SDK: sealed, balanced tx
-  SDK->>SVC: submitTransaction(tx)
-  SVC->>NET: broadcast
+  SDK->>PRV: sealed preimage + keyLocation<br/>(opaque ciphertext to the provider)
+  PRV->>SVC: route proving + DUST sponsorship (sealed payload)
+  Note over SVC: one process — decrypt in enclave, resolve key, prove,<br/>DUST-balance + sponsor fees + bind
+  SVC-->>PRV: sealed, balanced tx
+  PRV-->>SDK: sealed, balanced tx
+  SDK->>NET: broadcast
   SDK->>NET: await finalisation (indexer)
 ```
 
-The provider is touched once (**sign**); the service is touched for **prove**,
-**settle**, and **submit**. The device does the circuit work in between.
+The provider is touched twice — **sign**, then **route** (out with the sealed
+payload, back with the finished transaction). The service does **prove and
+settle in one process** and returns the sealed, balanced transaction; the
+device does the circuit work in between and **broadcasts** — there is no proof
+returned on its own, no device-side unsealed-tx assembly, and no separate
+balance call.
 
 ## 4. The provider — identity & authorisation
 
@@ -158,16 +182,28 @@ the MIP forbids an HD tree, and per-account keys cap a compromise to one account
 - **JubJub Schnorr** (RedDSA over JubJub) — verified in-circuit **today**
   (`s·G == R + c·pk`, native Compact built-ins); the specified,
   experiment-validated path (C5; `experiments/redjubjub-wallet`).
-- **ECDSA over secp256k1** — the scheme most secure signers support, usable as native
-  secp256k1 support lands in Compact and the ledger. P-256/secp256r1 stays
-  **blocked**. Until secp256k1 ships, **JubJub Schnorr is the only
-  in-circuit-verified scheme** — choose with that timing in mind (§9).
+- **ECDSA over secp256k1** — the scheme most secure signers support, usable as
+  native secp256k1 support lands in Compact and the ledger.
+- **ECDSA over secp256r1 (P-256)** — the curve **native to WebAuthn passkeys**.
+  Compact is going to verify secp256r1 in-circuit; once that lands, a secure
+  signer holding a P-256 key becomes a first-class authoriser (it signs the
+  raw challenge, exactly like the two schemes above). A **passkey**-held
+  credential can also authorise ACC operations, with one structural addition:
+  a WebAuthn authenticator never signs the challenge itself — it signs
+  `authenticatorData || SHA-256(clientDataJSON)`, with the challenge embedded
+  base64url-encoded inside `clientDataJSON` — so the verifying circuit must
+  additionally check that envelope (challenge embedding, ceremony type,
+  rpIdHash, flags). Measured viable end-to-end in the passport workspace's
+  [p256-in-circuit experiment](https://github.com/midnightntwrk/passport/pull/117):
+  signature-only k = 15 (about 0.5 s), whole envelope in-circuit k = 16 (about
+  1.2 s), real platform-passkey assertions verified through both. Two spec
+  notes from that experiment: Apple authenticators emit **high-S** signatures
+  (the challenge spec must accept both S forms or mandate client-side
+  normalisation), and envelope verification makes passkey authorisations
+  **relying-party-scoped** (the rpIdHash the ACC accepts must be pinned).
 
-Both are **single-signer for now. FROST threshold signing is a future
-improvement** (§9) and **requires a contract change**, so it is a deliberate post-beta upgrade
-rather than a drop-in key swap. For
-beta the provider signs with **its own single per-account key, held in its secure signer, via its own
-process**.
+Until the ECDSA curves ship, **JubJub Schnorr is the only in-circuit-verified
+scheme** — choose with that timing in mind (§9).
 
 **What the provider signs, and when.** A signature authorises exactly one call on
 one account. The challenge binds the account, the circuit, the argument list, and
@@ -193,7 +229,11 @@ definition, and a single signing key is a single point of compromise.
 - **Post-beta hardening:** bound the power — scope it and constrain recovery
   (time-lock + user notification/veto, or a guardian quorum via the ACC's BUSS
   mechanism), because a key that can rotate the user's device can otherwise
-  rotate it to itself; and add FROST to remove the single-key risk.
+  rotate it to itself; and add FROST to remove the single-key risk. FROST
+  needs **no ACC change**: the threshold ceremony produces a standard JubJub
+  Schnorr signature that verifies against the registered **group public key**
+  with the same in-circuit check (C5), so adopting it is a key registration or
+  rotation on the provider side, not a contract upgrade.
 
 ### 4.2 `signData` and account data
 
@@ -208,27 +248,29 @@ Connector-surface methods the provider exposes:
 - `getConfiguration` → indexer URI, indexer WS URI, node URI, and `networkId`.
   The proving endpoint it points to is the **service's** (§5).
 
-## 5. The proving & settlement service — one layer
+## 5. Third-party proving & DUST sponsorship — one process
 
-This is the third-party layer the provider integrates. It does two things,
-consolidated: **create the proof in a TEE** and **DUST-balance, bind, and relay**
-the transaction. The sealed witness lives here (only in the enclave); the
-account key never does.
+This is the third-party service the provider integrates and routes to. Per
+transaction it does two things, **in the same process**: **create the proof in
+a TEE**, then **DUST-balance, sponsor, and bind** the transaction, returning
+the sealed, balanced result for the device to broadcast. The sealed witness
+lives here (only in the enclave); the account key never does.
 
 ### 5.1 TEE proof server
 
 Turns a **proof preimage** (which may encode a witness) into a **ZK proof**.
 
-The SDK reaches it through the connector's delegated-proving interface
-(`getProvingProvider` → `ProvingProvider`), whose calls are, concretely, HTTP
-POSTs:
+The device reaches it **via the provider**: the connector's delegated-proving
+interface (`getProvingProvider` → `ProvingProvider`) is the device-side entry
+point, and the provider routes each call to the service, whose surface is,
+concretely, HTTP POSTs:
 
 | Property | Value |
 |---|---|
 | Endpoints | `POST /check`, `POST /prove` |
 | Request `Content-Type` | `application/octet-stream` |
 | Request body | a single binary blob (`Uint8Array`) — **not JSON** |
-| Response | raw binary (`Uint8Array`): `/prove` → the proof; `/check` → the check result |
+| Response | `/check` → the check result (raw binary); `/prove` → the **sealed, balanced transaction** produced by the full in-process prove → balance → sponsor → bind run (encoding: §9) — the proof is never returned on its own |
 | Timeout / retries | proving is slow; SDK default 5 min, retries on `500`/`503` |
 
 **Two hardening changes vs. the stock proof server:**
@@ -279,27 +321,31 @@ rotation/re-attestation.
 > the service owns attestation either way.
 
 **`/check` vs `/prove`:** `check` returns the public transcript values for
-pre-validation; `prove` produces the proof. Both take the sealed preimage +
-`keyLocation`. **Artefact integrity:** pin keys by a content hash tied to the
+pre-validation; `prove` produces the proof and carries straight on into
+settlement in the same process (§5.2), returning the sealed, balanced
+transaction. Both take the sealed preimage + `keyLocation`. **Artefact integrity:** pin keys by a content hash tied to the
 verifier key so a stale or swapped key fails loudly rather than producing an
 invalid proof (`ZkArtifactIntegrityError` on the SDK side).
 
-### 5.2 DUST balancing & settlement — `balanceUnsealedTransaction(tx, …)`
+### 5.2 DUST balancing & sponsorship — in-process, after proving
 
-*After* proving, the SDK holds an **unsealed** transaction (proof present, no
-settlement signatures, not yet bound). Distinct from §4.1 authorisation — this is
-ledger-level fee/coin settlement. The service MUST:
+*After* proving — **inside the same process, on the service** — the transaction
+is unsealed (proof present, no settlement signatures, not yet bound). Distinct
+from §4.1 authorisation — this is ledger-level fee/coin settlement. There is
+no device-side `balanceUnsealedTransaction` call: the device never holds the
+unsealed transaction. The service MUST:
 
 - add coin inputs/outputs to remove imbalances **in the same intent** as the call;
-- **pay/sponsor the DUST fees** (`payFees` defaults `true`; the service is the
-  fee sponsor — §7);
+- **pay/sponsor the DUST fees** (the service is the fee sponsor — §7);
 - **cryptographically bind** the transaction, signing for its own coin inputs;
-- return a **sealed** tx ready to submit.
+- return the **sealed, balanced tx** to the routed call, ready to broadcast (§5.3).
 
-### 5.3 Submit — `submitTransaction(tx)`
+### 5.3 Broadcast — the device's job
 
-Relay the sealed, balanced tx to the network. The SDK may also submit directly;
-support the relay path regardless.
+The sealed, balanced tx flows back through the provider to the device, and the
+**SDK broadcasts it** to the network, then awaits finalisation on the indexer
+(§3). The service never submits; its process ends when it returns the finished
+transaction.
 
 ## 6. Where the ZK artefacts live (and don't)
 
@@ -316,16 +362,19 @@ for one proof** — and only for operations that have a witness at all.
 Per [`beta-scope.md`](./beta-scope.md), beta is the managed path only and needs:
 
 1. **Provider — ACC authoriser** (§4.1): a single per-account key in a secure signer, registered
-   on the ACC, signing challenges with **JubJub Schnorr** (or ECDSA secp256k1
-   once in-circuit support lands). Custodial (full authoriser); FROST and bounded
+   on the ACC, signing challenges with **JubJub Schnorr** (or ECDSA —
+   secp256k1, or passkey-native secp256r1 — once in-circuit support lands).
+   Custodial (full authoriser); FROST and bounded
    recovery are post-beta.
-2. **Service — TEE proof server** (§5.1) reachable for **every** proof (no local
-   WASM path, no size-based routing).
-3. **Service — DUST balancing & fee sponsorship** (§5.2), including ACC-deploy
-   and name-claim, so a zero-DUST user can onboard.
-4. **Provider — passkey confirmation** on every managed action (passkey login is
+2. **Provider — routing** (§3): forward the device's sealed proving payload to
+   the service, and the sealed, balanced transaction back to the device.
+3. **Service — TEE proof server** (§5.1), reached via the provider's routing,
+   for **every** proof (no local WASM path, no size-based routing).
+4. **Service — in-process DUST balancing & fee sponsorship** (§5.2), including
+   ACC-deploy and name-claim, so a zero-DUST user can onboard.
+5. **Provider — passkey confirmation** on every managed action (passkey login is
    the presence gate).
-5. account data (§4.2) and relay (§5.3).
+6. account data (§4.2); the device broadcasts (§5.3).
 
 Out of beta: FROST, bounded recovery, local/WASM proving, size-based routing,
 external wallet connections, agents, and the Capacity-Exchange fee path.
@@ -334,9 +383,10 @@ external wallet connections, agents, and the Capacity-Exchange fee path.
 
 **Provider — authorisation**
 - [ ] Per-account keypair; register the **public** key on the ACC; private key in a secure signer.
-- [ ] Sign the challenge — SHA-256 over `{account, circuit, args, auth_nonce}` — with **JubJub Schnorr** (today) or **ECDSA secp256k1** (as support lands).
+- [ ] Sign the challenge — SHA-256 over `{account, circuit, args, auth_nonce}` — with **JubJub Schnorr** (today) or **ECDSA** (secp256k1 or secp256r1, as in-circuit support lands). A passkey cannot sign this challenge directly — WebAuthn signs its own envelope with the challenge embedded — so a passkey authoriser goes through the envelope-verifying circuit (§4.1), not this raw-challenge path.
 - [ ] No compact-runtime / prover / node needed for signing.
 - [ ] Apply authorisation policy **before** signing (the enforcement point, especially for recovery).
+- [ ] Route the sealed proving payload (sealed preimage + `keyLocation`) to the service, and the sealed, balanced transaction back to the device; the proving payload is opaque ciphertext to the provider.
 - [ ] `signData`, addresses/balances, `getConfiguration` (pointing at the service's prover), `getConnectionStatus`, `hintUsage`.
 - [ ] _(Future)_ FROST; bounded-recovery constraints.
 
@@ -348,21 +398,28 @@ external wallet connections, agents, and the Capacity-Exchange fee path.
 - [ ] Publish an attestation-backed enclave public key; document rotation.
 - [ ] Pin keys by content hash; handle large payloads, multi-minute proofs, and SDK retries idempotently.
 
-**Service — settlement**
-- [ ] `balanceUnsealedTransaction` — balance in-intent, pay/sponsor DUST, bind, return sealed tx.
-- [ ] `submitTransaction` — relay.
+**Service — settlement (same process as proving)**
+- [ ] After proving, in the same process: balance in-intent, pay/sponsor DUST, bind.
+- [ ] Return the sealed, balanced tx to the routed call; the device broadcasts.
 
 ## 9. Open items to confirm
 
-- **Provider ↔ service integration topology** — does the device call the service
-  directly, or does the provider proxy it? Either way the preimage is sealed to
-  the **service's** enclave, so the provider cannot read it even if it forwards —
-  but the trust chain for obtaining/pinning the service's enclave key needs
-  fixing.
+- **Provider ↔ service integration topology — decided: the provider routes.**
+  The device hands the sealed proving payload to the provider, which routes it
+  to the service; the preimage is sealed to the **service's** enclave, so the
+  provider cannot read what it forwards. Still open: the trust chain for
+  obtaining/pinning the service's enclave key, and the **wire encoding of the
+  returned sealed, balanced transaction** the device broadcasts — including
+  whether it should additionally be sealed to a device key to remove the
+  provider's pre-broadcast visibility (today it is bound but readable).
 - **Authoriser signature scheme + timing** — JubJub Schnorr is the only
-  in-circuit-verified scheme today; confirm the Compact/ledger **secp256k1**
-  timeline (in-circuit gadget vs ledger-native authorisation, or both) before
-  committing to secp256k1.
+  in-circuit-verified scheme today; confirm the Compact/ledger timelines for
+  **secp256k1** and for **secp256r1 (P-256, passkey-native)** — in-circuit
+  gadget vs ledger-native authorisation, or both — before committing to an
+  ECDSA curve. Upstream status: the secp256r1 operations are already frozen
+  into ZKIR 3.0 (merged 2026/07/31) and the Compact toolchain's ledger
+  dependency carries them; the remaining leg is the Compact language surface
+  (LFDT-Minokawa/compact#674, on the current quarter's roadmap).
 - **Custodial stance** — beta is custodial (full authoriser, single per-account
   key). Confirm and record; schedule bounded-recovery + FROST hardening.
 - **DUST sponsorship mechanics** — the service's fee-payer account, its funding,
