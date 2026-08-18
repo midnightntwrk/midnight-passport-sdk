@@ -1,12 +1,10 @@
 import { useState } from 'react';
 import {
   createPassportPasskey,
-  evalPrf,
+  assertBundled,
   fromBase64Url,
-  readBlob,
   toBase64Url,
   toHex,
-  writeBlob,
   RP_ID,
 } from './webauthn';
 import { derivePublicKeyHex } from './derive';
@@ -26,6 +24,31 @@ interface Outcome {
   blobWritten: boolean | null;
 }
 
+function FlagRow({
+  label,
+  testid,
+  value,
+  naText,
+}: {
+  label: string;
+  testid: string;
+  value: boolean | null;
+  naText: string;
+}) {
+  const text = value === null ? naText : String(value);
+  const cls = value === null ? 'tag--muted' : value ? 'tag--yes' : 'tag--no';
+  return (
+    <div className="receipt__row">
+      <dt>{label}</dt>
+      <dd>
+        <span className={`tag ${cls}`} data-testid={testid}>
+          {text}
+        </span>
+      </dd>
+    </div>
+  );
+}
+
 export function App() {
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -43,38 +66,39 @@ export function App() {
     setLog([]);
     try {
       if (flow === 'onboard') {
-        // Three ceremonies, one extension each (see webauthn.ts). Each is
-        // tolerated independently so a failing extension still yields a
-        // full support-matrix row.
+        // Two ceremonies (the spec floor): create(), then ONE get() bundling
+        // prf.eval + largeBlob.write. largeBlob writes are illegal at create(),
+        // so that follow-up get() is unavoidable — but it carries the PRF eval
+        // too, so no third prompt. create() also attempts prf.eval, so a
+        // provider that returns PRF at registration derives the key with no
+        // dependence on the get() at all.
         const created = await createPassportPasskey('nightfi-demo-user');
         localStorage.setItem(CREDENTIAL_ID_KEY, toBase64Url(created.credential.rawId));
         logStep(
-          `create(): ok — prfEnabled=${created.prfEnabled}, largeBlobSupported=${created.largeBlobSupported}`,
+          `create(): ok — prfEnabled=${created.prfEnabled}, prfAtCreate=${created.prfOutput ? '32 bytes' : 'none'}, largeBlobSupported=${created.largeBlobSupported}`,
         );
 
-        let publicKeyHex: string | null = null;
-        try {
-          const prf = await evalPrf(created.credential.rawId);
-          publicKeyHex = prf.prfOutput ? derivePublicKeyHex(prf.prfOutput) : null;
-          logStep(`get(prf.eval): ok — output=${prf.prfOutput ? '32 bytes' : 'none'}`);
-        } catch (cause) {
-          const err = cause as Error;
-          logStep(`get(prf.eval): FAILED — ${err.name}: ${err.message}`);
-        }
-
         // Simulate provisioning the user's on-chain infrastructure: the
-        // "deployed ACC contract address" is 32 random bytes, attached to
-        // the credential via largeBlob so the Passport app can discover it
-        // from the passkey alone.
+        // "deployed ACC contract address" is 32 random bytes, attached to the
+        // credential via largeBlob so the Passport app can discover it from the
+        // passkey alone — written in the same gesture that (re)evaluates PRF.
         const accAddress = crypto.getRandomValues(new Uint8Array(32));
+        let publicKeyHex = created.prfOutput ? derivePublicKeyHex(created.prfOutput) : null;
         let blobWritten: boolean | null = null;
         try {
-          const written = await writeBlob(created.credential.rawId, accAddress);
-          blobWritten = written.written;
-          logStep(`get(largeBlob.write): ok — written=${written.written}`);
+          const bundled = await assertBundled({
+            prf: true,
+            largeBlobWrite: accAddress,
+            allowCredentialId: created.credential.rawId,
+          });
+          blobWritten = bundled.written;
+          if (!publicKeyHex && bundled.prfOutput) publicKeyHex = derivePublicKeyHex(bundled.prfOutput);
+          logStep(
+            `get(prf.eval + largeBlob.write): ok — prf=${bundled.prfOutput ? '32 bytes' : 'DROPPED'}, written=${bundled.written}`,
+          );
         } catch (cause) {
           const err = cause as Error;
-          logStep(`get(largeBlob.write): FAILED — ${err.name}: ${err.message}`);
+          logStep(`get(prf.eval + largeBlob.write): FAILED — ${err.name}: ${err.message}`);
         }
 
         setOutcome({
@@ -86,29 +110,26 @@ export function App() {
           blobWritten,
         });
       } else {
-        // Prefer the credential ID remembered from onboarding (allowlisted
-        // assertions work under ROR even where discoverable enumeration
-        // does not); fall back to the discoverable flow without one.
+        // One ceremony: prf.eval + largeBlob.read bundled. Prefer the
+        // credential ID remembered from onboarding (allowlisted assertions work
+        // under ROR even where discoverable enumeration does not); fall back to
+        // the discoverable flow without one.
         const storedId = localStorage.getItem(CREDENTIAL_ID_KEY);
         logStep(`sign-in: allowlist=${storedId ? 'stored credential ID' : 'none (discoverable)'}`);
-        const prf = await evalPrf(storedId ? fromBase64Url(storedId) : undefined);
-        logStep(`get(prf.eval): ok — output=${prf.prfOutput ? '32 bytes' : 'none'}`);
-        let accAddressHex: string | null = null;
-        try {
-          // Second ceremony allowlisted from the first's credential.
-          const read = await readBlob(prf.credential.rawId);
-          accAddressHex = read.blob ? toHex(read.blob) : null;
-          logStep(`get(largeBlob.read): ok — blob=${read.blob ? `${read.blob.length} bytes` : 'none'}`);
-        } catch (cause) {
-          const err = cause as Error;
-          logStep(`get(largeBlob.read): FAILED — ${err.name}: ${err.message}`);
-        }
+        const bundled = await assertBundled({
+          prf: true,
+          largeBlobRead: true,
+          allowCredentialId: storedId ? fromBase64Url(storedId) : undefined,
+        });
+        logStep(
+          `get(prf.eval + largeBlob.read): ok — prf=${bundled.prfOutput ? '32 bytes' : 'DROPPED'}, blob=${bundled.blob ? `${bundled.blob.length} bytes` : 'none'}`,
+        );
         setOutcome({
-          credentialId: toBase64Url(prf.credential.rawId),
+          credentialId: toBase64Url(bundled.credential.rawId),
           prfEnabled: null,
-          publicKeyHex: prf.prfOutput ? derivePublicKeyHex(prf.prfOutput) : null,
+          publicKeyHex: bundled.prfOutput ? derivePublicKeyHex(bundled.prfOutput) : null,
           largeBlobSupported: null,
-          accAddressHex,
+          accAddressHex: bundled.blob ? toHex(bundled.blob) : null,
           blobWritten: null,
         });
       }
@@ -120,68 +141,105 @@ export function App() {
     }
   }
 
+  const issued = outcome?.prfEnabled !== null && outcome !== null;
+
   return (
-    <main>
-      <h1>
-        <span className="brand">NightFi</span> — the partner dApp
-      </h1>
-      <p>
-        Onboards you with a passkey scoped to <code>{RP_ID}</code> (a Related Origin Request —
-        this page's origin is <code>{location.origin}</code>), evaluates the PRF extension,
-        derives your portable P-256 public key, deploys your (simulated) contract, and attaches
-        its address to the passkey via largeBlob. Each extension runs in its own ceremony, so
-        expect up to three prompts.
-      </p>
-      <div className="actions">
-        <button disabled={busy} onClick={() => run('onboard')}>
-          Create your Midnight Passport
-        </button>
-        <button disabled={busy} onClick={() => run('signin')} className="secondary">
-          Sign in with an existing passkey
-        </button>
+    <div className="night">
+      <div className="frame">
+        <header className="marquee">
+          <div className="sign">
+            <span className="sign__night">Night</span>
+            <span className="sign__fi">Fi</span>
+          </div>
+          <span className="sign__open">Open · Midnight</span>
+          <p className="marquee__eyebrow">
+            Partner dApp · issues under <code>{RP_ID}</code>
+          </p>
+          <h1 className="marquee__headline">Your Midnight Passport, issued after hours.</h1>
+          <p className="marquee__lede">
+            Create a passkey scoped to Midnight Passport (a Related Origin Request from{' '}
+            <code>{location.host}</code>), evaluate the PRF to derive your portable P-256 key, deploy
+            your contract, and staple its address to the credential via largeBlob — then walk it to
+            the border and be recognised.
+          </p>
+        </header>
+
+        <div className="actions">
+          <button className="btn btn--issue" disabled={busy} onClick={() => run('onboard')}>
+            Create your Midnight Passport
+          </button>
+          <button className="btn btn--ghost" disabled={busy} onClick={() => run('signin')}>
+            Sign in with an existing passkey
+          </button>
+        </div>
+
+        {log.length > 0 && (
+          <ol className="tape" data-testid="steps">
+            {log.map((line, i) => (
+              <li key={i}>{line}</li>
+            ))}
+          </ol>
+        )}
+
+        {error && (
+          <p className="notice" data-testid="error">
+            {error}
+          </p>
+        )}
+
+        {outcome && (
+          <section className="receipt">
+            <div className="receipt__title">
+              Issuance receipt
+              <span>{issued ? 'NEW CREDENTIAL' : 'RE-AUTH'}</span>
+            </div>
+            <div className="receipt__perf" />
+
+            <dl>
+              <div className="receipt__row">
+                <dt>Holder key — P-256, derived from PRF</dt>
+                <dd>
+                  <code data-testid="pubkey">
+                    {outcome.publicKeyHex ?? 'no PRF output — unsupported by this authenticator'}
+                  </code>
+                </dd>
+              </div>
+              <div className="receipt__row">
+                <dt>Deployed contract (ACC) — 32 bytes, stapled via largeBlob</dt>
+                <dd>
+                  <code data-testid="acc-address">{outcome.accAddressHex ?? 'none'}</code>
+                </dd>
+              </div>
+              <div className="receipt__row">
+                <dt>Credential</dt>
+                <dd>
+                  <code data-testid="credential-id">{outcome.credentialId}</code>
+                </dd>
+              </div>
+              <FlagRow
+                label="PRF enabled at create()"
+                testid="prf-enabled"
+                value={outcome.prfEnabled}
+                naText="n/a (sign-in)"
+              />
+              <FlagRow
+                label="largeBlob supported"
+                testid="largeblob-supported"
+                value={outcome.largeBlobSupported}
+                naText="n/a (sign-in)"
+              />
+              <FlagRow
+                label="Address written to the passkey"
+                testid="blob-written"
+                value={outcome.blobWritten}
+                naText="n/a"
+              />
+            </dl>
+
+            <div className="receipt__stamp">{issued ? 'Issued · Midnight' : 'Re-authenticated'}</div>
+          </section>
+        )}
       </div>
-      {log.length > 0 && (
-        <ol className="steps" data-testid="steps">
-          {log.map((line, i) => (
-            <li key={i}>{line}</li>
-          ))}
-        </ol>
-      )}
-      {error && (
-        <p className="error" data-testid="error">
-          {error}
-        </p>
-      )}
-      {outcome && (
-        <dl className="result">
-          <dt>Credential ID</dt>
-          <dd>
-            <code data-testid="credential-id">{outcome.credentialId}</code>
-          </dd>
-          <dt>PRF enabled at create()</dt>
-          <dd data-testid="prf-enabled">
-            {outcome.prfEnabled === null ? 'n/a (sign-in)' : String(outcome.prfEnabled)}
-          </dd>
-          <dt>Derived P-256 public key</dt>
-          <dd>
-            <code data-testid="pubkey">
-              {outcome.publicKeyHex ?? 'no PRF output — unsupported by this authenticator'}
-            </code>
-          </dd>
-          <dt>largeBlob supported</dt>
-          <dd data-testid="largeblob-supported">
-            {outcome.largeBlobSupported === null ? 'n/a (sign-in)' : String(outcome.largeBlobSupported)}
-          </dd>
-          <dt>Deployed contract (ACC) address — 32 random bytes</dt>
-          <dd>
-            <code data-testid="acc-address">{outcome.accAddressHex ?? 'none'}</code>
-          </dd>
-          <dt>Address written to the passkey (largeBlob)</dt>
-          <dd data-testid="blob-written">
-            {outcome.blobWritten === null ? 'n/a' : String(outcome.blobWritten)}
-          </dd>
-        </dl>
-      )}
-    </main>
+    </div>
   );
 }

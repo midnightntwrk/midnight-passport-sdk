@@ -1,11 +1,20 @@
 import { useState } from 'react';
-import { evalPrf, fromBase64Url, readBlob, toBase64Url, toHex, RP_ID } from './webauthn';
+import { assertBundled, fromBase64Url, toBase64Url, toHex, RP_ID } from './webauthn';
 import { derivePublicKeyHex } from './derive';
+import { Guilloche } from './Guilloche';
 
 interface Outcome {
   credentialId: string;
   publicKeyHex: string | null; // null = PRF unsupported by this authenticator
   accAddressHex: string | null; // read back from the passkey's largeBlob
+}
+
+// Format a value as a machine-readable-zone line: uppercased, non-alphanumerics
+// filled with the filler character `<`, padded/truncated to a fixed width — the
+// same treatment a passport's MRZ gives a name or document number.
+function mrzLine(value: string, width: number): string {
+  const filled = value.toUpperCase().replace(/[^0-9A-Z]/gu, '<');
+  return filled.slice(0, width).padEnd(width, '<');
 }
 
 export function App() {
@@ -26,27 +35,19 @@ export function App() {
     setOutcome(null);
     setLog([]);
     try {
-      // Two ceremonies, one extension each (see webauthn.ts). The first is
-      // discoverable (or allowlisted via the diagnostic input, for providers
-      // that honour allowlisted assertions but refuse to enumerate); the
-      // second reuses the first's credential, so no second picker. Each is
-      // tolerated independently so a failing extension still yields data.
+      // ONE ceremony, both extensions bundled (see webauthn.ts): derive the
+      // key from PRF and read the attached contract address in a single prompt.
+      // Discoverable, or allowlisted via the diagnostic input for providers
+      // that honour allowlisted assertions but refuse to enumerate.
       logStep(`sign-in: allowlist=${credentialId ? 'explicit credential ID' : 'none (discoverable)'}`);
-      const read = await readBlob(credentialId ? fromBase64Url(credentialId) : undefined);
-      logStep(`get(largeBlob.read): ok — blob=${read.blob ? `${read.blob.length} bytes` : 'none'}`);
-      let publicKeyHex: string | null = null;
-      try {
-        const prf = await evalPrf(read.credential.rawId);
-        publicKeyHex = prf.prfOutput ? derivePublicKeyHex(prf.prfOutput) : null;
-        logStep(`get(prf.eval): ok — output=${prf.prfOutput ? '32 bytes' : 'none'}`);
-      } catch (cause) {
-        const err = cause as Error;
-        logStep(`get(prf.eval): FAILED — ${err.name}: ${err.message}`);
-      }
+      const assert = await assertBundled(credentialId ? fromBase64Url(credentialId) : undefined);
+      logStep(
+        `get(prf.eval + largeBlob.read): ok — prf=${assert.prfOutput ? '32 bytes' : 'DROPPED'}, blob=${assert.blob ? `${assert.blob.length} bytes` : 'none'}`,
+      );
       setOutcome({
-        credentialId: toBase64Url(read.credential.rawId),
-        publicKeyHex,
-        accAddressHex: read.blob ? toHex(read.blob) : null,
+        credentialId: toBase64Url(assert.credential.rawId),
+        publicKeyHex: assert.prfOutput ? derivePublicKeyHex(assert.prfOutput) : null,
+        accAddressHex: assert.blob ? toHex(assert.blob) : null,
       });
     } catch (cause) {
       const err = cause as Error;
@@ -61,90 +62,159 @@ export function App() {
       ? compareWith.trim().toLowerCase() === outcome.publicKeyHex
       : null;
 
+  const mrzData = outcome?.publicKeyHex ?? RP_ID;
+
   return (
-    <main>
-      <h1>
-        <span className="brand">Midnight Passport</span> — the identity layer
-      </h1>
-      <p>
-        Authenticates with the same passkey (RP ID <code>{RP_ID}</code>, this page's own origin),
-        reads the attached information NightFi stored on the credential — the deployed contract
-        address — and evaluates the PRF with the same salt to derive the public key. Two
-        prompts: one extension per ceremony.
-      </p>
-      <div className="actions">
-        <button disabled={busy} onClick={() => continueWithPasskey()}>
-          Continue with Passkey
-        </button>
-      </div>
-      <details>
-        <summary>Diagnostic: sign in with an explicit credential ID</summary>
-        <p>
-          For providers that honour allowlisted assertions but do not enumerate discoverable
-          credentials: paste the credential ID shown by NightFi.
+    <div className="uv">
+      <Guilloche className="uv__bg" size={640} />
+      <main className="doc">
+        <header className="doc__masthead">
+          <Guilloche className="seal" size={108} />
+          <div className="doc__id">
+            <p className="eyebrow">Cryptographic identity · verified here</p>
+            <h1 className="doc__title">
+              MIDNIGHT<span>PASSPORT</span>
+            </h1>
+          </div>
+        </header>
+
+        <dl className="doc__meta">
+          <div>
+            <dt>Document</dt>
+            <dd>Passkey / P-256</dd>
+          </div>
+          <div>
+            <dt>Authority</dt>
+            <dd>midnight.network</dd>
+          </div>
+          <div>
+            <dt>RP ID</dt>
+            <dd>{RP_ID}</dd>
+          </div>
+        </dl>
+
+        <p className="lede">
+          The border. Authenticates with the same passkey NightFi issued, reads the contract
+          address stamped into the credential, and re-derives your key from the PRF — one prompt,
+          both extensions bundled. If the key matches, the identity is admitted.
         </p>
-        <input
-          value={credentialIdInput}
-          onChange={(e) => setCredentialIdInput(e.target.value)}
-          placeholder="credential ID (base64url) from nightfi.test"
-          data-testid="credential-id-input"
-        />
+
         <div className="actions">
           <button
-            disabled={busy || credentialIdInput.trim().length === 0}
-            onClick={() => continueWithPasskey(credentialIdInput.trim())}
-            className="secondary"
+            className="btn btn--primary"
+            disabled={busy}
+            onClick={() => continueWithPasskey()}
           >
-            Continue with this credential
+            <span className="btn__key" aria-hidden="true">
+              ⧉
+            </span>
+            Continue with Passkey
           </button>
         </div>
-      </details>
-      {log.length > 0 && (
-        <ol className="steps" data-testid="steps">
-          {log.map((line, i) => (
-            <li key={i}>{line}</li>
-          ))}
-        </ol>
-      )}
-      {error && (
-        <p className="error" data-testid="error">
-          {error}
-        </p>
-      )}
-      {outcome && (
-        <dl className="result">
-          <dt>Credential ID</dt>
-          <dd>
-            <code data-testid="credential-id">{outcome.credentialId}</code>
-          </dd>
-          <dt>Attached information (largeBlob) — your deployed contract</dt>
-          <dd>
-            <code data-testid="acc-address">
-              {outcome.accAddressHex ?? 'no blob attached to this credential'}
-            </code>
-          </dd>
-          <dt>Derived P-256 public key</dt>
-          <dd>
-            <code data-testid="pubkey">
-              {outcome.publicKeyHex ?? 'no PRF output — unsupported by this authenticator'}
-            </code>
-          </dd>
-          <dt>Compare with the key NightFi derived</dt>
-          <dd>
-            <input
-              value={compareWith}
-              onChange={(e) => setCompareWith(e.target.value)}
-              placeholder="paste the public key hex from nightfi.test"
-              data-testid="compare-input"
-            />
-            {comparison !== null && (
-              <p className={comparison ? 'match' : 'error'} data-testid="compare-verdict">
-                {comparison ? '✓ same public key — identity linked' : '✗ keys differ'}
-              </p>
-            )}
-          </dd>
-        </dl>
-      )}
-    </main>
+
+        <details className="drawer">
+          <summary>Diagnostic — sign in with an explicit credential ID</summary>
+          <p>
+            For providers that honour allowlisted assertions but do not enumerate discoverable
+            credentials: paste the credential ID shown by NightFi.
+          </p>
+          <input
+            className="field-input"
+            value={credentialIdInput}
+            onChange={(e) => setCredentialIdInput(e.target.value)}
+            placeholder="credential ID (base64url) from nightfi.test"
+            data-testid="credential-id-input"
+          />
+          <div className="actions">
+            <button
+              className="btn btn--ghost"
+              disabled={busy || credentialIdInput.trim().length === 0}
+              onClick={() => continueWithPasskey(credentialIdInput.trim())}
+            >
+              Continue with this credential
+            </button>
+          </div>
+        </details>
+
+        {log.length > 0 && (
+          <ol className="ledger" data-testid="steps">
+            {log.map((line, i) => (
+              <li key={i}>{line}</li>
+            ))}
+          </ol>
+        )}
+
+        {error && (
+          <p className="alert" data-testid="error">
+            {error}
+          </p>
+        )}
+
+        {outcome && (
+          <section className="record">
+            <div className="record__field">
+              <dt>Holder key — P-256, derived from PRF</dt>
+              <dd>
+                <code
+                  data-testid="pubkey"
+                  className={outcome.publicKeyHex ? 'is-key' : 'is-empty'}
+                >
+                  {outcome.publicKeyHex ?? 'no PRF output — unsupported by this authenticator'}
+                </code>
+              </dd>
+            </div>
+            <div className="record__field">
+              <dt>Attached visa — deployed contract (largeBlob)</dt>
+              <dd>
+                <code
+                  data-testid="acc-address"
+                  className={outcome.accAddressHex ? 'is-visa' : 'is-empty'}
+                >
+                  {outcome.accAddressHex ?? 'no blob attached to this credential'}
+                </code>
+              </dd>
+            </div>
+            <div className="record__field">
+              <dt>Credential</dt>
+              <dd>
+                <code data-testid="credential-id">{outcome.credentialId}</code>
+              </dd>
+            </div>
+            <div className="record__field">
+              <dt>Cross-origin check — paste the key NightFi derived</dt>
+              <dd>
+                <div className="compare__row">
+                  <input
+                    className="field-input"
+                    value={compareWith}
+                    onChange={(e) => setCompareWith(e.target.value)}
+                    placeholder="public key hex from nightfi.test"
+                    data-testid="compare-input"
+                  />
+                  {comparison !== null && (
+                    <span
+                      className={`stamp ${comparison ? 'stamp--ok' : 'stamp--no'}`}
+                      data-testid="compare-verdict"
+                    >
+                      {comparison ? '✓ Identity linked' : '✗ Keys differ'}
+                    </span>
+                  )}
+                </div>
+              </dd>
+            </div>
+          </section>
+        )}
+
+        <footer className="mrz" aria-hidden="true">
+          <div>
+            P&lt;MPMIDNIGHT&lt;&lt;PASSPORT&lt;&lt;{mrzLine(RP_ID, 24)}
+          </div>
+          <div>
+            <span>KEY</span>
+            {mrzLine(mrzData, 44)}
+          </div>
+        </footer>
+      </main>
+    </div>
   );
 }

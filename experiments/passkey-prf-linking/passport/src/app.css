@@ -1,91 +1,442 @@
+/* Midnight Passport — "the passport under UV". A cryptographic identity
+   document seen under ultraviolet light: an ink-navy field where the security
+   features (guilloché, seal, machine-readable zone, entry stamp) fluoresce in
+   UV cyan and foil gold. Cold, symmetric, machine-readable — the deliberate
+   counterpoint to NightFi's warm neon storefront. */
+
 :root {
   color-scheme: dark;
-  font-family: system-ui, sans-serif;
+
+  --ink: #060a18;
+  --ink-panel: #0b1230;
+  --ink-raise: #0f1740;
+  --hairline: #1e2a52;
+  --paper: #e4eaf6;
+  --paper-dim: #8793b8;
+  --accent: #2fd9c7; /* UV cyan */
+  --accent-2: #d9b25a; /* foil gold */
+  --ok: #4ce0a0;
+  --danger: #ff6b8b;
+
+  --font-display: 'Space Mono', ui-monospace, monospace;
+  --font-body: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-data: 'IBM Plex Mono', ui-monospace, monospace;
 }
+
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
-  background: #0d0e1a;
-  color: #e8e6f0;
+  font-family: var(--font-body);
+  color: var(--paper);
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(47, 217, 199, 0.12), transparent 60%),
+    radial-gradient(90% 60% at 50% 120%, rgba(217, 178, 90, 0.08), transparent 55%),
+    var(--ink);
+  min-height: 100vh;
 }
-main {
+
+/* full-bleed UV field with a faint fluorescing engraving behind the document */
+.uv {
+  position: relative;
+  min-height: 100vh;
+  padding: clamp(1rem, 4vw, 4rem) 1.25rem;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  overflow: hidden;
+}
+.uv__bg {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(120vh, 120vw);
+  height: min(120vh, 120vw);
+  opacity: 0.05;
+  pointer-events: none;
+  animation: drift 90s linear infinite;
+}
+
+/* the document — a passport data page */
+.doc {
+  position: relative;
+  width: 100%;
   max-width: 44rem;
-  margin: 4rem auto;
-  padding: 0 1.5rem;
+  background:
+    linear-gradient(180deg, rgba(47, 217, 199, 0.05), transparent 20%),
+    var(--ink-panel);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  padding: clamp(1.5rem, 4vw, 2.75rem);
+  box-shadow:
+    0 0 0 1px rgba(47, 217, 199, 0.06),
+    0 40px 90px -50px rgba(0, 0, 0, 0.9),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  animation: rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
-h1 {
-  font-size: 1.6rem;
+/* laminate sheen along the top edge */
+.doc::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  border-radius: 10px 10px 0 0;
+  background: linear-gradient(90deg, transparent, var(--accent), var(--accent-2), transparent);
+  opacity: 0.7;
 }
-.brand {
-  color: #8f7bff;
+
+/* masthead: seal + document identity */
+.doc__masthead {
+  display: flex;
+  gap: 1.25rem;
+  align-items: center;
 }
+.seal {
+  flex: none;
+  width: clamp(72px, 16vw, 108px);
+  height: clamp(72px, 16vw, 108px);
+  filter: drop-shadow(0 0 6px rgba(47, 217, 199, 0.35));
+  animation: spin 60s linear infinite;
+}
+.doc__id {
+  min-width: 0;
+}
+.eyebrow {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-data);
+  font-size: 0.66rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.doc__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(1.5rem, 5vw, 2.15rem);
+  line-height: 0.98;
+  letter-spacing: 0.02em;
+  color: var(--paper);
+}
+.doc__title span {
+  display: block;
+  color: var(--accent);
+  -webkit-text-stroke: 0;
+}
+
+/* passport header fields */
+.doc__meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem 1.25rem;
+  margin: 1.5rem 0 0;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--hairline);
+}
+.doc__meta div {
+  min-width: 0;
+}
+.doc__meta dt {
+  font-family: var(--font-data);
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--paper-dim);
+}
+.doc__meta dd {
+  margin: 0.3rem 0 0;
+  font-family: var(--font-data);
+  font-size: 0.82rem;
+  color: var(--paper);
+  overflow-wrap: anywhere;
+}
+
+.lede {
+  margin: 1.5rem 0 0;
+  color: #c2cbe4;
+  font-size: 0.98rem;
+  line-height: 1.6;
+  max-width: 40ch;
+}
+.lede code {
+  font-family: var(--font-data);
+  color: var(--accent);
+  font-size: 0.85em;
+}
+
+/* actions */
 .actions {
   display: flex;
-  gap: 0.75rem;
-  margin: 1.5rem 0;
   flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 1.75rem 0 0;
 }
-button {
-  background: #8f7bff;
-  color: #14121f;
-  border: none;
-  border-radius: 0.5rem;
-  padding: 0.7rem 1.2rem;
-  font-size: 1rem;
+.btn {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
   font-weight: 600;
+  letter-spacing: 0.01em;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0.8rem 1.3rem;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
 }
-button.secondary {
+.btn--primary {
+  background: linear-gradient(180deg, #38ecd7, var(--accent));
+  color: #032420;
+  box-shadow: 0 0 24px -6px rgba(47, 217, 199, 0.6);
+}
+.btn--primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 0 34px -4px rgba(47, 217, 199, 0.8);
+}
+.btn--ghost {
   background: transparent;
-  color: #8f7bff;
-  border: 1px solid #8f7bff;
+  color: var(--accent);
+  border-color: rgba(47, 217, 199, 0.4);
 }
-button:disabled {
-  opacity: 0.5;
+.btn--ghost:hover:not(:disabled) {
+  background: rgba(47, 217, 199, 0.08);
+}
+.btn:disabled {
+  opacity: 0.45;
   cursor: wait;
 }
-.match {
-  color: #7bffb0;
+.btn__key {
+  font-family: var(--font-data);
+  font-size: 0.9em;
 }
-input {
-  width: 100%;
-  box-sizing: border-box;
-  background: #1c1e30;
-  color: inherit;
-  border: 1px solid #3a3d5c;
-  border-radius: 0.4rem;
-  padding: 0.5rem;
+
+/* diagnostic drawer */
+.drawer {
+  margin: 1.5rem 0 0;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 0.4rem 1rem;
+  background: rgba(255, 255, 255, 0.015);
 }
-.error {
-  color: #ff8f8f;
-  border: 1px solid #ff8f8f44;
-  border-radius: 0.5rem;
-  padding: 0.75rem;
-  word-break: break-word;
-}
-.result dt {
-  margin-top: 0.9rem;
-  font-size: 0.8rem;
+.drawer summary {
+  cursor: pointer;
+  font-family: var(--font-data);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #9a96ad;
+  color: var(--paper-dim);
+  padding: 0.6rem 0;
 }
-.result dd {
-  margin: 0.15rem 0 0;
+.drawer summary:hover {
+  color: var(--accent);
 }
-code {
-  word-break: break-all;
-  background: #1c1e30;
-  border-radius: 0.3rem;
-  padding: 0.1rem 0.3rem;
-}
-.steps {
+.drawer p {
+  color: var(--paper-dim);
   font-size: 0.85rem;
-  color: #9a96ad;
-  border: 1px solid #3a3d5c;
-  border-radius: 0.5rem;
-  padding: 0.75rem 0.75rem 0.75rem 2rem;
+  line-height: 1.5;
 }
-.steps li {
-  margin: 0.2rem 0;
-  word-break: break-word;
+.field-input {
+  width: 100%;
+  font-family: var(--font-data);
+  font-size: 0.85rem;
+  color: var(--paper);
+  background: var(--ink);
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  padding: 0.6rem 0.7rem;
+}
+.field-input::placeholder {
+  color: #566089;
+}
+.field-input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(47, 217, 199, 0.18);
+}
+
+/* processing ledger */
+.ledger {
+  list-style: none;
+  margin: 1.5rem 0 0;
+  padding: 0.9rem 1rem;
+  border-left: 2px solid var(--accent);
+  background: rgba(47, 217, 199, 0.04);
+  border-radius: 0 8px 8px 0;
+  font-family: var(--font-data);
+  font-size: 0.78rem;
+  color: #aab5d6;
+}
+.ledger li {
+  padding: 0.18rem 0;
+  overflow-wrap: anywhere;
+}
+.ledger li::before {
+  content: '› ';
+  color: var(--accent);
+}
+
+.alert {
+  margin: 1.5rem 0 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(255, 107, 139, 0.4);
+  border-left-width: 3px;
+  border-radius: 6px;
+  background: rgba(255, 107, 139, 0.07);
+  color: #ffb3c2;
+  font-family: var(--font-data);
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+/* the record — result rendered as passport data fields */
+.record {
+  margin: 1.75rem 0 0;
+  display: grid;
+  gap: 1.1rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--hairline);
+}
+.record__field dt {
+  font-family: var(--font-data);
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--paper-dim);
+  margin-bottom: 0.35rem;
+}
+.record__field dd {
+  margin: 0;
+}
+.record__field code {
+  font-family: var(--font-data);
+  font-size: 0.82rem;
+  color: var(--paper);
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+.record__field code.is-empty {
+  color: var(--paper-dim);
+  font-style: italic;
+}
+.record__field code.is-key {
+  color: var(--accent);
+}
+.record__field code.is-visa {
+  color: var(--accent-2);
+}
+
+/* cross-origin compare + entry stamp */
+.compare__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+.compare__row .field-input {
+  flex: 1 1 16rem;
+}
+.stamp {
+  flex: none;
+  font-family: var(--font-data);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 0.55rem 0.8rem;
+  border-radius: 6px;
+  border: 2px solid currentColor;
+  transform: rotate(-4deg);
+  animation: thunk 0.3s cubic-bezier(0.3, 1.4, 0.5, 1) both;
+}
+.stamp--ok {
+  color: var(--ok);
+  box-shadow: inset 0 0 0 1px rgba(76, 224, 160, 0.3);
+  text-shadow: 0 0 10px rgba(76, 224, 160, 0.4);
+}
+.stamp--no {
+  color: var(--danger);
+}
+
+/* machine-readable zone */
+.mrz {
+  margin: 2rem -0.35rem -0.35rem;
+  padding: 0.9rem 1rem;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.02) 0 1.35em,
+    transparent 1.35em 1.6em
+  );
+  border-top: 1px solid var(--hairline);
+  border-radius: 0 0 8px 8px;
+  font-family: var(--font-data);
+  font-size: clamp(0.62rem, 2.6vw, 0.82rem);
+  letter-spacing: 0.08em;
+  line-height: 1.6;
+  color: var(--accent);
+  white-space: nowrap;
+  overflow-x: auto;
+}
+.mrz span {
+  color: var(--paper-dim);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes drift {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes thunk {
+  from {
+    opacity: 0;
+    transform: rotate(-4deg) scale(1.4);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(-4deg) scale(1);
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 34rem) {
+  .doc__masthead {
+    flex-direction: column;
+    text-align: center;
+    align-items: center;
+  }
+  .doc__meta {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before {
+    animation: none !important;
+    transition: none !important;
+  }
 }

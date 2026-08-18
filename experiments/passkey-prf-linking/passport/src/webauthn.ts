@@ -1,39 +1,37 @@
-// WebAuthn helpers for the ROR experiment. The RP ID is ALWAYS the Passport
-// domain — nightfi.test exercising it is exactly the Related Origin Request
-// this experiment exists to validate.
+// WebAuthn helpers for the Passport-alike side of the ROR experiment. Same RP
+// ID as the credential was created under (this page's own origin), so these
+// are ordinary same-origin assertions — no ROR here.
 //
-// Ceremony discipline (mirrors the validated account-custody prototype,
-// ../passport/experiments/account-custody-prototype):
-//   - PRF is only ENABLED at create() (bare `prf: {}`); results are only
-//     guaranteed during get().
-//   - ONE extension per get() ceremony — real providers have been observed
-//     dropping PRF or aborting outright when prf.eval and largeBlob are
-//     combined in a single request.
+// Ceremony discipline — MINIMISED variant (2026/08/18): the original flow ran
+// one extension per get() (largeBlob.read then prf.eval = two prompts) to hedge
+// against providers that drop PRF when it is combined with largeBlob. This
+// variant BUNDLES prf.eval and largeBlob.read into a single get() — one prompt
+// — and reports a dropped PRF as a measured finding rather than adding a
+// ceremony back.
 
 export const RP_ID = 'midnightpassport.test';
 export const PRF_SALT = new TextEncoder().encode('mn-passport/prf-experiment/v1');
 
-// The DOM lib does not yet type the PRF/largeBlob extensions; these local
-// shapes keep the code fully typed without `any`.
-interface CreateExtensionInputs {
-  prf: Record<string, never>;
-  largeBlob: { support: 'preferred' | 'required' };
-}
 interface ExtensionOutputs {
-  prf?: { enabled?: boolean; results?: { first?: ArrayBuffer } };
-  largeBlob?: { supported?: boolean; blob?: ArrayBuffer; written?: boolean };
+  prf?: { results?: { first?: ArrayBuffer } };
+  largeBlob?: { blob?: ArrayBuffer };
 }
 
-export interface CreateResult {
+export interface AssertResult {
   credential: PublicKeyCredential;
-  prfEnabled: boolean;
-  largeBlobSupported: boolean;
+  prfOutput: Uint8Array | null;
+  blob: Uint8Array | null;
 }
 
-async function assertOnce(
-  extensions: AuthenticationExtensionsClientInputs,
-  allowCredentialId?: BufferSource,
-): Promise<PublicKeyCredential> {
+/**
+ * One assertion carrying PRF eval and largeBlob read together — derive the key
+ * and read the attached contract address in a single prompt.
+ */
+export async function assertBundled(allowCredentialId?: BufferSource): Promise<AssertResult> {
+  const extensions = {
+    prf: { eval: { first: PRF_SALT } },
+    largeBlob: { read: true },
+  };
   const credential = (await navigator.credentials.get({
     publicKey: {
       rpId: RP_ID,
@@ -42,86 +40,14 @@ async function assertOnce(
       allowCredentials: allowCredentialId
         ? [{ type: 'public-key', id: allowCredentialId }]
         : [],
-      extensions,
+      extensions: extensions as AuthenticationExtensionsClientInputs,
     },
   })) as PublicKeyCredential | null;
   if (!credential) throw new Error('assertion returned null');
-  return credential;
-}
-
-export async function createPassportPasskey(username: string): Promise<CreateResult> {
-  const extensions: CreateExtensionInputs = {
-    prf: {},
-    largeBlob: { support: 'preferred' },
-  };
-  const credential = (await navigator.credentials.create({
-    publicKey: {
-      rp: { id: RP_ID, name: 'Midnight Passport (experiment)' },
-      user: {
-        id: crypto.getRandomValues(new Uint8Array(16)),
-        name: username,
-        displayName: username,
-      },
-      challenge: crypto.getRandomValues(new Uint8Array(32)),
-      pubKeyCredParams: [
-        { type: 'public-key', alg: -7 }, // ES256 / P-256
-        { type: 'public-key', alg: -257 }, // RS256 fallback
-      ],
-      authenticatorSelection: {
-        residentKey: 'required',
-        userVerification: 'required',
-      },
-      extensions,
-    },
-  })) as PublicKeyCredential | null;
-  if (!credential) throw new Error('credential creation returned null');
-  const ext = credential.getClientExtensionResults() as ExtensionOutputs;
-  return {
-    credential,
-    prfEnabled: ext.prf?.enabled ?? false,
-    largeBlobSupported: ext.largeBlob?.supported ?? false,
-  };
-}
-
-/** PRF evaluation — its own ceremony, no other extension. */
-export async function evalPrf(
-  allowCredentialId?: BufferSource,
-): Promise<{ credential: PublicKeyCredential; prfOutput: Uint8Array | null }> {
-  const credential = await assertOnce(
-    { prf: { eval: { first: PRF_SALT } } } as AuthenticationExtensionsClientInputs,
-    allowCredentialId,
-  );
   const ext = credential.getClientExtensionResults() as ExtensionOutputs;
   return {
     credential,
     prfOutput: ext.prf?.results?.first ? new Uint8Array(ext.prf.results.first) : null,
-  };
-}
-
-/** largeBlob write — its own ceremony; the spec requires an allowlist of one. */
-export async function writeBlob(
-  allowCredentialId: BufferSource,
-  blob: BufferSource,
-): Promise<{ credential: PublicKeyCredential; written: boolean }> {
-  const credential = await assertOnce(
-    { largeBlob: { write: blob } } as AuthenticationExtensionsClientInputs,
-    allowCredentialId,
-  );
-  const ext = credential.getClientExtensionResults() as ExtensionOutputs;
-  return { credential, written: ext.largeBlob?.written ?? false };
-}
-
-/** largeBlob read — its own ceremony. */
-export async function readBlob(
-  allowCredentialId?: BufferSource,
-): Promise<{ credential: PublicKeyCredential; blob: Uint8Array | null }> {
-  const credential = await assertOnce(
-    { largeBlob: { read: true } } as AuthenticationExtensionsClientInputs,
-    allowCredentialId,
-  );
-  const ext = credential.getClientExtensionResults() as ExtensionOutputs;
-  return {
-    credential,
     blob: ext.largeBlob?.blob ? new Uint8Array(ext.largeBlob.blob) : null,
   };
 }
