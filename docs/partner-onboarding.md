@@ -92,6 +92,54 @@ flowchart TB
   `core` (protocol ships zero runtime logic, architecture §4.4; both
   consumers of the codec — the facade and the Passport app — reach `core`).
 
+### 2.1 What it looks like in code
+
+> **Illustrative API** (architecture §4.6 convention): indicative shapes to
+> show what the partner developer writes — signatures are fixed by the
+> FS-2.3 spec when the tranches land, not here.
+
+```ts
+// in the partner dApp — one import; core + adapters ride along inside
+import {
+  capabilities,
+  createPassport,
+  signIn,
+} from '@midnight-ntwrk/mn-passport-onboard';
+
+// 0 · Gate first: below the ROR/PRF floor, issuing here is impossible —
+//     hand the user to first-party onboarding instead (§6).
+const cap = capabilities();
+if (!cap.canIssueHere) {
+  location.href = `https://midnightpassport.com/onboard?return=${location.origin}`;
+  // reasons: e.g. ['no related-origin support', 'no PRF']
+}
+
+// 1 · Issue — two passkey prompts (§3): create() under the Passport RP ID,
+//     ACC deployed via the third-party proving & DUST sponsorship service
+//     (fees sponsored), address stamped onto the credential (largeBlob).
+const passport = await createPassport({
+  user: 'nightfi-user',            // display label for the passkey sheet
+  // rpId: 'midnightpassport.com', // protocol default; override if the domain changes
+  // serviceUrl, indexerUrl:       // deployment configuration
+});
+console.log(passport.account);      // the deployed ACC address
+console.log(passport.credentialId); // remember it — helps providers that
+                                     // do not enumerate discoverable credentials
+
+// 2 · Recognise — one prompt (§4): PRF re-derives the key, the blob returns
+//     the ACC address; on a blob miss the facade falls back to the indexer.
+const session = await signIn();
+console.log(session.account, session.publicKey);
+```
+
+Who did what: the facade wired the kernel (`core`) with `adapter-browser`
+(the WebAuthn/ROR ceremonies), `adapter-signer-local` (the PRF-derived
+authoriser), and the direct service connection — the partner wrote none of
+that. The heavy lifecycle never appears: managing devices, grants, or
+recovery is the Passport app's job, and the facade simply does not export
+it. When the managed variant lands (§5), the only change here is
+configuration — an `authoriser` option on the same two calls.
+
 ## 3. Flow — issue (partner origin, passkey/PRF path)
 
 > **This section documents the passkey/PRF (self-custody) path only.** The
