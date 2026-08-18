@@ -56,16 +56,18 @@ proved the ROR check is load-bearing, not permissive.
 }
 ```
 
-**Ceremony discipline (adopted from the validated account-custody
-prototype, and now enforced by both apps):** PRF is only *enabled* at
-`create()` (bare `prf: {}`) and evaluated in its own `get()`, and every
-`get()` carries **exactly one extension** — PRF eval, largeBlob write, and
-largeBlob read are three separate ceremonies. An earlier iteration that
-bundled `prf.eval` into `create()` and combined PRF with largeBlob in one
-`get()` also passed on the virtual authenticator, but the combination is
-not something real providers are expected to honour uniformly — the
-prototype's "PRF results are only guaranteed during get()" note is treated
-as load-bearing.
+**Ceremony discipline — bundled to the spec floor (adopted 2026/08/18):**
+`create()` attempts `prf.eval` opportunistically (a provider that returns
+PRF at registration needs no follow-up assertion for the key), and the one
+unavoidable follow-up `get()` (largeBlob writes are illegal at `create()`)
+carries **both** `prf.eval` and `largeBlob.write` — so onboarding is two
+prompts and sign-in (PRF + blob read) is one. A dropped PRF in a bundled
+ceremony is treated as a **measured finding** for that provider, not a
+reason to add ceremonies back; an interim one-extension-per-ceremony
+variant (create + three dedicated gets, kept in the branch history) is the
+diagnostic fallback if a provider misbehaves under bundling. Confirmed
+end-to-end both automated (virtual authenticator) and manually on a real
+macOS authenticator (below).
 
 Step by step:
 
@@ -110,6 +112,18 @@ So the success in the main run was granted **by** the related-origin
 authorisation — the well-known fetch happens on every ceremony, and an
 unlisted origin is rejected outright. (Also confirms the fetch targets the
 RP ID on port 443: nothing else was listening.)
+
+## Real-authenticator results so far
+
+- **macOS (2026/08/18) — full flow confirmed.** The complete bundled flow —
+  create under ROR, PRF-derived key, largeBlob write at nightfi, read-back
+  and key match at the Passport-alike — was run manually on a real macOS
+  platform authenticator and worked as expected (developer-confirmed).
+  Browser and passkey-provider details (Safari vs Chrome; iCloud Keychain
+  vs other) still to be recorded for the C9 matrix.
+- **Stock Windows (2026/08/18) — blocked before any provider.** See below:
+  passkeys wholly unavailable on the test machine (no Windows Hello
+  enrolled), so no Windows provider row exists yet.
 
 ## Not yet verified (bounded by this setup)
 
