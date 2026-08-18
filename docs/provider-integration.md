@@ -37,9 +37,14 @@ what:
   authoriser key in its secure signer, signs operation challenges, and runs
   passkey login and recovery policy. Once the circuit is executed on the
   device, it **routes the sealed proving payload to the third-party service,
-  and the sealed, balanced transaction back to the device**. It sees operation
-  *metadata* (what it is asked to authorise) and opaque ciphertext (what it
-  routes); it **never sees the witness**.
+  and the sealed, balanced transaction back to the device**. Mind the two
+  senses of "sealed": the outbound proving payload is **encrypted** to the
+  service's enclave (opaque ciphertext to the provider), while the returned
+  transaction is sealed in the ledger sense — **cryptographically bound, not
+  encrypted**. The provider therefore sees operation *metadata* (what it is
+  asked to authorise) and **every complete transaction pre-broadcast** (the
+  same bytes the network will see, linkable to the account it authorised); it
+  **never sees the witness**.
 - **The third-party proving & DUST sponsorship service — a third party the
   provider integrates.** Runs the TEE proof server and, **in the same
   process**, does DUST balancing, fee sponsorship, and binding, returning the
@@ -48,8 +53,14 @@ what:
 
 This separation is a feature: the party that authorises never sees the witness,
 and the party that proves and settles never holds the authoriser key. Routing
-does not change this — the payload the provider forwards is opaque ciphertext,
-sealed to the service's enclave.
+does not weaken the witness guarantee — the outbound payload the provider
+forwards is opaque ciphertext, sealed to the service's enclave. It does give
+the provider **pre-broadcast visibility**: the returned transaction is bound,
+not encrypted, so the provider observes the full public content of every
+transaction it routes (public once broadcast anyway, but earlier, and tied to
+an authenticated account). If that visibility is ever unwanted, the service
+would have to seal the returned transaction to a device key — recorded under
+the open wire-encoding item (§9).
 
 ### The organising principle: two secrets, two holders
 
@@ -76,7 +87,7 @@ flowchart LR
   subgraph PROVIDER["Provider — identity, authorisation & routing"]
     direction TB
     AUTH["ACC authoriser (secure signer):<br/>sign operation challenge<br/>(JubJub Schnorr / ECDSA secp256k1 / secp256r1)<br/>· passkey login · recovery policy"]
-    ROUTE["Route (opaque ciphertext):<br/>sealed payload → service<br/>sealed, balanced tx → device"]
+    ROUTE["Route:<br/>sealed payload → service (opaque ciphertext)<br/>sealed, balanced tx → device (bound, readable)"]
   end
 
   subgraph SERVICE["Third-party proving & DUST sponsorship — one process"]
@@ -174,10 +185,22 @@ the MIP forbids an HD tree, and per-account keys cap a compromise to one account
 - **ECDSA over secp256k1** — the scheme most secure signers support, usable as
   native secp256k1 support lands in Compact and the ledger.
 - **ECDSA over secp256r1 (P-256)** — the curve **native to WebAuthn passkeys**.
-  Compact is going to verify secp256r1 in-circuit; once that lands, a
-  passkey-held credential can authorise ACC operations directly (no binding
-  hop), and a secure signer holding a P-256 key becomes a first-class
-  authoriser.
+  Compact is going to verify secp256r1 in-circuit; once that lands, a secure
+  signer holding a P-256 key becomes a first-class authoriser (it signs the
+  raw challenge, exactly like the two schemes above). A **passkey**-held
+  credential can also authorise ACC operations, with one structural addition:
+  a WebAuthn authenticator never signs the challenge itself — it signs
+  `authenticatorData || SHA-256(clientDataJSON)`, with the challenge embedded
+  base64url-encoded inside `clientDataJSON` — so the verifying circuit must
+  additionally check that envelope (challenge embedding, ceremony type,
+  rpIdHash, flags). Measured viable end-to-end in the passport workspace's
+  [p256-in-circuit experiment](https://github.com/midnightntwrk/passport/pull/117):
+  signature-only k = 15 (about 0.5 s), whole envelope in-circuit k = 16 (about
+  1.2 s), real platform-passkey assertions verified through both. Two spec
+  notes from that experiment: Apple authenticators emit **high-S** signatures
+  (the challenge spec must accept both S forms or mandate client-side
+  normalisation), and envelope verification makes passkey authorisations
+  **relying-party-scoped** (the rpIdHash the ACC accepts must be pinned).
 
 Until the ECDSA curves ship, **JubJub Schnorr is the only in-circuit-verified
 scheme** — choose with that timing in mind (§9).
@@ -206,7 +229,11 @@ definition, and a single signing key is a single point of compromise.
 - **Post-beta hardening:** bound the power — scope it and constrain recovery
   (time-lock + user notification/veto, or a guardian quorum via the ACC's BUSS
   mechanism), because a key that can rotate the user's device can otherwise
-  rotate it to itself; and add FROST to remove the single-key risk.
+  rotate it to itself; and add FROST to remove the single-key risk. FROST
+  needs **no ACC change**: the threshold ceremony produces a standard JubJub
+  Schnorr signature that verifies against the registered **group public key**
+  with the same in-circuit check (C5), so adopting it is a key registration or
+  rotation on the provider side, not a contract upgrade.
 
 ### 4.2 `signData` and account data
 
@@ -356,7 +383,7 @@ external wallet connections, agents, and the Capacity-Exchange fee path.
 
 **Provider — authorisation**
 - [ ] Per-account keypair; register the **public** key on the ACC; private key in a secure signer.
-- [ ] Sign the challenge — SHA-256 over `{account, circuit, args, auth_nonce}` — with **JubJub Schnorr** (today) or **ECDSA** (secp256k1, or passkey-native secp256r1, as in-circuit support lands).
+- [ ] Sign the challenge — SHA-256 over `{account, circuit, args, auth_nonce}` — with **JubJub Schnorr** (today) or **ECDSA** (secp256k1 or secp256r1, as in-circuit support lands). A passkey cannot sign this challenge directly — WebAuthn signs its own envelope with the challenge embedded — so a passkey authoriser goes through the envelope-verifying circuit (§4.1), not this raw-challenge path.
 - [ ] No compact-runtime / prover / node needed for signing.
 - [ ] Apply authorisation policy **before** signing (the enforcement point, especially for recovery).
 - [ ] Route the sealed proving payload (sealed preimage + `keyLocation`) to the service, and the sealed, balanced transaction back to the device; the proving payload is opaque ciphertext to the provider.
@@ -382,12 +409,17 @@ external wallet connections, agents, and the Capacity-Exchange fee path.
   to the service; the preimage is sealed to the **service's** enclave, so the
   provider cannot read what it forwards. Still open: the trust chain for
   obtaining/pinning the service's enclave key, and the **wire encoding of the
-  returned sealed, balanced transaction** the device broadcasts.
+  returned sealed, balanced transaction** the device broadcasts — including
+  whether it should additionally be sealed to a device key to remove the
+  provider's pre-broadcast visibility (today it is bound but readable).
 - **Authoriser signature scheme + timing** — JubJub Schnorr is the only
   in-circuit-verified scheme today; confirm the Compact/ledger timelines for
   **secp256k1** and for **secp256r1 (P-256, passkey-native)** — in-circuit
   gadget vs ledger-native authorisation, or both — before committing to an
-  ECDSA curve.
+  ECDSA curve. Upstream status: the secp256r1 operations are already frozen
+  into ZKIR 3.0 (merged 2026/07/31) and the Compact toolchain's ledger
+  dependency carries them; the remaining leg is the Compact language surface
+  (LFDT-Minokawa/compact#674, on the current quarter's roadmap).
 - **Custodial stance** — beta is custodial (full authoriser, single per-account
   key). Confirm and record; schedule bounded-recovery + FROST hardening.
 - **DUST sponsorship mechanics** — the service's fee-payer account, its funding,
