@@ -1,10 +1,14 @@
 # M2 — Connect (feature specs)
 
-> The thin dApp-side connector: **Sign-In-with-Passport** returning the profile
-> `{ name, account }`. No witness provisioning, no grants, no deposits.
-> Backing: [`sdk-requirements.md`](../../sdk-requirements.md) §3.9,
-> [`architecture.md`](../../architecture.md) §4.4 & §4.6, [`beta-scope.md`](../../beta-scope.md) §2(4).
-> Mostly parallel with M1 — build against a fixture ACC; no external gate.
+> The dApp side: the thin connector (**Sign-In-with-Passport** returning the
+> profile `{ name, account }`) and the **partner-origin issuance facade**
+> (FS-2.3). No witness provisioning, no grants, no deposits.
+> Backing: [`sdk-requirements.md`](../../sdk-requirements.md) §3.9 & §3.13,
+> [`architecture.md`](../../architecture.md) §4.4 & §4.6,
+> [`beta-scope.md`](../../beta-scope.md) §2(4)–(5),
+> [`partner-onboarding.md`](../../partner-onboarding.md).
+> FS-2.1/2.2 are mostly parallel with M1 (build against a fixture ACC);
+> FS-2.3 depends on the kernel and seams (FS-0.3–0.8) and the M1 rails.
 
 ## FS-2.1 — Protocol wire types (`mn-passport-protocol`, C23)
 
@@ -49,3 +53,53 @@
   over a challenge (provider-integration §5.3)? Session persistence across
   origins (recall the cross-origin isolation constraint).
 - **Issue.** `#TBD`
+
+## FS-2.3 — Partner-origin onboarding (`mn-passport-onboard`)
+
+- **Objective.** A partner dApp issues a Passport in place: passkey under the
+  Passport RP ID (Related Origin Request), ACC deployed via a **direct
+  connection to the third-party proving and DUST sponsorship service** (fees
+  sponsored; no provider in the loop), the deployed address stamped onto the
+  credential via largeBlob; sign-in with the existing passkey. Passkey/PRF
+  path only — the managed provider-authoriser variant is a future iteration.
+- **In scope.** The `protocol` shared constants (RP ID, PRF device-key salt,
+  versioned largeBlob schema — types only; the pure codec lives in `core`,
+  protocol ships zero logic); the `Platform.ceremony`
+  extension (`createCredential`, bundled PRF + largeBlob assertions) with its
+  `adapter-browser` implementation; `core`'s onboard and sign-in flows; the
+  `mn-passport-onboard` facade (`createPassport`, `signIn`, capability
+  detection, indexer fallback on blob miss); the direct integration with the
+  third-party proving and DUST sponsorship service (sealed preimage).
+- **Out of scope.** The managed (provider authoriser + routing) variant —
+  future iteration, TODO recorded in
+  [`partner-onboarding.md`](../../partner-onboarding.md) §5; grants,
+  recovery, device management, assets, witness provisioning; the redirect
+  fallback's PWA half (it is the existing first-party onboarding);
+  origins-list hosting/governance implementation.
+- **Backing.** requirements §3.13; [`partner-onboarding.md`](../../partner-onboarding.md);
+  architecture §4.4 (the recorded facade exception, ADR 0005); beta-scope
+  §2(5); `experiments/passkey-prf-linking/findings.md` (mechanism confirmed,
+  compatibility floor).
+- **Surface (indicative).** `createPassport(opts) → { account, credentialId,
+  publicKey }`; `signIn(opts) → { account, publicKey }`;
+  `passkeyAuthoriser()` behind the FS-0.4 signer seam (the seam is where the
+  future managed authoriser slots in); `PASSPORT_RP_ID`,
+  `PRF_DEVICE_KEY_SALT`, `encodeBlob`/`decodeBlob`.
+- **Dependencies.** FS-0.3–0.8 (kernel + seams), FS-1.x rails for real
+  integration (mocked until then), FS-2.1 wire types. **Gate:** the
+  related-origins well-known deployment on the Passport domain.
+- **Acceptance.** Issue → recognise round-trip green in the harness (two
+  prompts to issue, one to sign in); blob miss degrades to the indexer path;
+  `connect` remains core-free; the facade exposes no lifecycle surface.
+- **Verify.** The `experiments/passkey-prf-linking` e2e harness lifted to
+  drive the real packages (virtual authenticator; ROR negative control).
+- **Tranches (proposed).** (1) protocol constants + `core` blob codec; (2)
+  `Platform.ceremony` extension + `adapter-browser` ceremonies; (3) `core`
+  onboard/sign-in flows against dev seams; (4) the facade + indexer
+  fallback; (5) direct third-party-service integration (sealed preimage,
+  sponsored settlement).
+- **Open questions.** Challenge-verification topology; production RP ID and
+  origins-list governance; whether the PWA adopts the same bundled-ceremony
+  shape (it should — one implementation in `core`).
+- **Issue.** midnightntwrk/passport#77 (C27 · Passport Facade) — a dedicated
+  issue may replace it before spec-driver plans.

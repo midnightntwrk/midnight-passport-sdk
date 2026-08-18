@@ -12,8 +12,9 @@
 Ship a reduced beta that does two things well:
 
 1. proves **full account setup** works end to end on the **managed path**, and
-2. lets a first reference dApp — a **marketing experience**, fully off-chain
-   for now — sign a user in and read their profile.
+2. lets a first reference dApp — a **marketing experience** — **issue a new
+   Passport in place** (partner-origin onboarding, §2 item 5), sign a user
+   in, and read their profile.
 
 Everything not needed for those two is explicitly deferred (§4). The beta is
 deliberately the *managed, provider-backed* path only: it is the fastest way
@@ -61,17 +62,31 @@ enclave) is disclosed at onboarding and shown as a standing reminder, per
 
 **(4) dApp connect — sign-in + profile read only** — the connector (§3.9)
 implements **Sign-In-with-Passport** and returns the user's **profile: the
-ACC contract address plus the alias (name)**. That is the whole surface in
-beta. No witness provisioning (#58), no scoped-grant issuance or spending,
-no deposits.
+ACC contract address plus the alias (name)**. That is the whole
+conversational surface in beta. No witness provisioning (#58), no
+scoped-grant issuance or spending, no deposits.
 
-**Reference dApp — a marketing experience (fully off-chain for now).** It
-installs `mn-passport-connect`, signs the user in, and reads
-`{ name, account }` to identify and personalise for the user (for example,
-gating or tailoring the experience per Passport account). It runs entirely
-off-chain: it never spends, never asks for a grant, and never touches
-witness state. That read-only shape is exactly why it is a safe first
-integration and a good dogfooding partner.
+**(5) Partner-origin onboarding** — a partner dApp can **issue the Passport
+itself** via `mn-passport-onboard` (§3.13,
+[`partner-onboarding.md`](./partner-onboarding.md)): passkey created under
+the Passport RP ID (Related Origin Request), ACC deployed over the same
+provider rails as item (3) (fees sponsored), and the ACC address stamped
+onto the credential via largeBlob so the Passport app recognises the account
+in one ceremony. Sign-in with the existing passkey works at the partner
+origin and at Passport. The facade connects **directly** to the third-party
+proving and DUST sponsorship service (passkey/PRF path only for now — the
+managed provider-authoriser variant is deferred to a future iteration,
+[`partner-onboarding.md`](./partner-onboarding.md) §5). The
+redirect-to-Passport fallback is mandatory below the compatibility floor. **Scope consequence:** the facade embeds the `core`
+kernel, so the kernel and seam foundations (FS-0.3–0.8) move onto the beta
+critical path.
+
+**Reference dApp — a marketing experience that onboards.** It installs
+`mn-passport-onboard` + `mn-passport-connect`: it can **issue a new Passport
+in place** (item 5), sign an existing user in, and read `{ name, account }`
+to personalise. It still never spends, never asks for a grant, and never
+touches witness state — issuance and recognition only, which keeps it a safe
+first integration and a good dogfooding partner for both packages.
 
 ## 3. The active slice (packages and adapters)
 
@@ -82,7 +97,14 @@ Live in beta:
 - `mn-passport-contract` — ACC bindings for deploy and the calls onboarding
   needs.
 - `mn-passport-connect` + `mn-passport-protocol` — the dApp side, sign-in and
-  profile read only.
+  profile read only; `protocol` also carries the §3.13 shared constants
+  (RP ID, PRF salt, largeBlob schema).
+- `mn-passport-onboard` — the partner-origin issuance facade (§2 item 5):
+  composition over `core` + adapters, exposing `createPassport` and `signIn`
+  only.
+- `adapter-browser` — the browser Platform adapter (WebAuthn/ROR ceremonies,
+  bundled PRF + largeBlob assertions, fetch/WebSocket) the facade and the
+  PWA share.
 - `adapter-signer-managed` — the provider-backed custody path.
 - `adapter-signer-local` — the self-custody signer, built as the
   **contingency fallback** should the provider integration slip (§2 item 2,
@@ -96,9 +118,12 @@ and the witness-provisioning half of the connector.
 
 ```mermaid
 flowchart TB
-  DAPP["marketing experience (off-chain)"] --> CONNECT["mn-passport-connect: sign-in + profile"]
+  DAPP["marketing experience"] --> CONNECT["mn-passport-connect: sign-in + profile"]
+  DAPP --> ONBOARD["mn-passport-onboard: issue + recognise (facade)"]
   CONNECT -. "returns { name, account }" .-> DAPP
   USER["user"] --> CORE["mn-passport-core (managed)"]
+  ONBOARD --> CORE
+  ONBOARD --> BROW["adapter-browser — WebAuthn/ROR + largeBlob"]
   CORE --> SIGN["adapter-signer-managed — provider"]
   CORE --> PROVE["adapter-prover-remote — provider's remote prover (2a)"]
   CORE --> CONTRACT["mn-passport-contract: deploy ACC + claim name"]
@@ -141,6 +166,11 @@ Beta leans on the **provider** for anything managed it happens to offer
   contingency (§2 item 2, ADR 0001); define the date/milestone at which the
   provider's signer readiness is assessed and the fallback is either promoted
   to the beta onboarding path or left dark.
+- **Kernel/seam critical path.** Item (5)'s facade embeds the `core` kernel,
+  so FS-0.3–0.8 (kernel, signer, prover, settlement, storage, platform) are
+  no longer parallel groundwork but beta-blocking — they need issues and
+  plans first (ADR 0005). Assess this against the October date; the redirect
+  fallback keeps the reference dApp shippable if the facade slips.
 
 ## 6. Delivery
 
