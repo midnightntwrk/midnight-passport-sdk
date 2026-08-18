@@ -182,12 +182,6 @@ the MIP forbids an HD tree, and per-account keys cap a compromise to one account
 Until the ECDSA curves ship, **JubJub Schnorr is the only in-circuit-verified
 scheme** — choose with that timing in mind (§9).
 
-All are **single-signer for now. FROST threshold signing is a future
-improvement** (§9) and **requires a contract change**, so it is a deliberate post-beta upgrade
-rather than a drop-in key swap. For
-beta the provider signs with **its own single per-account key, held in its secure signer, via its own
-process**.
-
 **What the provider signs, and when.** A signature authorises exactly one call on
 one account. The challenge binds the account, the circuit, the argument list, and
 the account's `auth_nonce`, hashed with **SHA-256** — a fixed public definition,
