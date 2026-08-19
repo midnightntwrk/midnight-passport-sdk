@@ -1,0 +1,19 @@
+# Manual-mode TLS front: real browser, real authenticator.
+# `caddy trust` installs Caddy's local CA; add hosts entries for both
+# domains → 127.0.0.1 (see README, including the WSL2/Windows notes).
+{
+	local_certs
+}
+
+https://midnightpassport.test {
+	handle /.well-known/webauthn {
+		header Content-Type application/json
+		root * ./passport/public
+		file_server
+	}
+	reverse_proxy 127.0.0.1:5174
+}
+
+https://nightfi.test {
+	reverse_proxy 127.0.0.1:5173
+}

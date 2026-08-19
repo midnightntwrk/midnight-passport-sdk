@@ -68,8 +68,9 @@ code, or perform outward actions.
   **tranches, each sized to one small/medium PR**, each with an acceptance
   gate. **Every tranche carries a size estimate** (files touched, rough net
   lines), against the **tranche budget**: target **≤ ~400 net changed lines**,
-  hard split above **600** (both excluding lockfiles, generated code, and
-  test fixtures — cheap-to-review mechanical lines don't count). A plan with
+  hard split above **600** (both excluding lockfiles, generated code, test
+  fixtures, and the standalone `experiments/` tree — cheap-to-review
+  mechanical lines and non-tranche exploratory work don't count). A plan with
   a tranche estimated over budget is **invalid** — it gets re-split at plan
   time, when splitting is cheap, not after the code exists. The estimate is
   what lets the human reviewer catch an oversized tranche during plan review.
@@ -364,7 +365,8 @@ Deterministic guarantees, run by the harness/CI rather than judged by a skill:
   issue** (`Refs`/`Closes #NN`).
 - **Diff-size guardrail** — the same numbers as the tranche budget: **soft
   warning past 400 net changed lines, hard past 600** (excluding lockfiles,
-  generated code, and test fixtures), pointing back to
+  generated code, test fixtures, and the standalone `experiments/` tree —
+  exploratory prototypes, not tranche work), pointing back to
   `mn-passport-skills-pr-open`'s split suggestion. **In CI both thresholds
   are advisory** (warnings on the PR, never blocking) — the hard split is
   enforced inside the loop by `spec-driver`/`pr-open`, and merging an
@@ -401,9 +403,10 @@ Stated so the doc is decisive; each is revisitable.
 - **Specs are per-feature**, derived from `sdk/docs`; the big docs are the
   source of truth.
 - **Tranche budget: 400 soft / 600 hard** net changed lines (excluding
-  lockfiles, generated code, and test fixtures). Applied three times with
-  the same numbers: plan-phase estimates (a plan with an over-budget tranche
-  is invalid), `pr-open`'s backstop check, and the CI guardrail.
+  lockfiles, generated code, test fixtures, and the standalone
+  `experiments/` tree). Applied three times with the same numbers:
+  plan-phase estimates (a plan with an over-budget tranche is invalid),
+  `pr-open`'s backstop check, and the CI guardrail.
 - **Two registers, two homes.** The *security register* (owned by
   `security-audit`) lives in the **private sibling repo
   `../mn-passport-sdk-debts`** and is committed + pushed there per PR. The

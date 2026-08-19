@@ -1,0 +1,3 @@
+# Local TLS material for the e2e server — never committed.
+e2e/.certs/
+test-results/
