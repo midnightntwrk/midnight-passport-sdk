@@ -43,7 +43,7 @@ Three shapes were considered for the packaging:
 ## Decision
 
 - **Adopt partner-origin onboarding** as requirements **§3.13**, designed in
-  [`partner-onboarding.md`](../partner-onboarding.md) and specced as
+  [`onboarding-and-key-authorisation.md`](../onboarding-and-key-authorisation.md) and specced as
   **FS-2.3**.
 - **Package it as the `mn-passport-onboard` facade over `core` + adapters**
   (option 3): one kernel implementation, no duplicated functionality;

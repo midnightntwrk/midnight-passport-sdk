@@ -398,6 +398,21 @@ The SDK is the client half of the dApp connection surface:
   including the 1-of-n / last-device guard ([C1], [C9], [C13]).
 - On the decentralised path, device authorisations are verified in-circuit
   by the ACC; on the managed path they are delegated to the provider.
+- **Authorising additional keys (platforms and providers).** A
+  new platform — a Passport-embedding environment or a managed provider
+  needing its own authoriser key for the user; never a dApp, which
+  integrates through the connector (§3.9) and holds no account key — MUST
+  NOT write to the **authoriser key set**, and the proposal never touches
+  the chain at all. The platform generates its key per the §2.3 signing
+  requirements — a managed provider signs with its **P-256 secure-signer
+  key**, never passkey/PRF (PRF is the self-custody passkey mechanism) —
+  and **exposes the public key out-of-band, preferably as a QR code** (a versioned payload: scheme tag, public key, optional label).
+  The **Passport app scans it**, shows the fingerprint under the §2.2
+  ceremony, and — with an existing authorised key — **grants the key as an
+  authoriser** through the existing add-authoriser circuit. The PWA is the
+  only party that receives the key and the only party that signs the
+  grant. No candidate storage, no cap, no new circuits — no ACC change.
+  Full design: [`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md) §6.
 
 ### 3.6 Private local-storage management
 
@@ -723,7 +738,7 @@ ACC over the managed proving and settlement rails (fees sponsored, so a
 zero-DUST user onboards from the partner origin), and stamp the deployed ACC
 address onto the credential via the **largeBlob** extension so the Passport
 app later *recognises* the account from one ceremony. Detailed design:
-[`partner-onboarding.md`](./partner-onboarding.md); mechanism validated in
+[`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md); mechanism validated in
 `experiments/passkey-prf-linking/` (2026/08/18, including on a real
 authenticator).
 
@@ -757,7 +772,13 @@ Normative rules:
   wallet-infrastructure provider may supply the authoriser and presence gate
   (§2.6) instead of the PRF-derived key — same ACC, migration per §2.1. Its
   partner-origin flow is not yet documented
-  ([`partner-onboarding.md`](./partner-onboarding.md) §5).
+  ([`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md) §5).
+- **Authorising additional keys from new platforms.**
+  When the existing credential cannot follow the user to a new platform,
+  the platform exposes its public key (QR) and the **Passport app grants
+  it** with an existing authorised key — per §3.5, never a platform-side
+  write to the authoriser key set
+  ([`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md) §6).
 
 ## 4. Reference implementations (UI / App)
 

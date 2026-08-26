@@ -200,7 +200,7 @@ unchanged.
   Sign-In-with-Passport messages). Deliberately dependency-light so *both*
   the wallet side and the thin dApp connector share it without either
   pulling in the other. No logic — just contracts. Also home to the
-  **partner-onboarding shared constants** (§3.13): the Passport RP ID
+  **onboarding and key-authorisation shared constants** (§3.13): the Passport RP ID
   (config-overridable), the PRF device-key salt, and the versioned largeBlob
   payload schema — the three things the partner package and the Passport app
   must agree on. Types and constants only, as ever: the blob's pure codec
@@ -302,7 +302,7 @@ the provider-free default always ships.
   **must not link `@midnight-ntwrk/mn-passport-core`** or any adapter
   (`mn-passport-contract` is a foundation dependency, permitted).
 - **`@midnight-ntwrk/mn-passport-onboard`** — the partner-origin **issuance
-  facade** (§3.13, [`partner-onboarding.md`](./partner-onboarding.md)). A
+  facade** (§3.13, [`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md)). A
   narrow API (`createPassport`, `signIn`) that is composition only: it
   instantiates the `core` kernel with the browser platform adapter, the
   PRF-derived local signer (the provider-managed variant is a future
@@ -648,7 +648,7 @@ onboard/sign-in flows), `adapter-browser` (WebAuthn/ROR ceremonies),
 `adapter-signer-local` (PRF-derived authoriser), and `adapter-prover-remote`
 (direct to the third-party proving and DUST sponsorship service); shared
 constants from `mn-passport-protocol`. Design:
-[`partner-onboarding.md`](./partner-onboarding.md).
+[`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md).
 
 ```ts
 // in the partner dApp — one import; core + adapters ride along inside
@@ -687,7 +687,7 @@ simply is not exported. Contrast with example 2: `connect` talks to the
 user's wallet **over the C23 wire** and never links `core`; `onboard`
 **embeds** the custody core to issue an account at the partner origin — the
 recorded §4.4 exception. When the managed variant lands
-(partner-onboarding.md §5), the only change here is configuration: an
+(onboarding-and-key-authorisation.md §5), the only change here is configuration: an
 `authoriser` option on the same two calls.
 
 Across the six: (1) wallet-side orchestration with adapters injected, (2) the

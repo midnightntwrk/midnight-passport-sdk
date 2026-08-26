@@ -19,7 +19,7 @@ Two things, done well (from [`beta-scope.md`](../beta-scope.md) §1):
    sponsored so a zero-DUST user can onboard.
 2. **A first reference dApp** — a **marketing experience** — that **issues a
    new Passport in place** (partner-origin onboarding, FS-2.3 /
-   [`partner-onboarding.md`](../partner-onboarding.md)), signs a user in,
+   [`onboarding-and-key-authorisation.md`](../onboarding-and-key-authorisation.md)), signs a user in,
    and reads their profile (`{ name, account }`).
 
 Everything else is deferred (§9). Beta is deliberately **managed-path first**
@@ -72,7 +72,7 @@ submit) runs through **BCW**. *Exit:* a zero-DUST user deploys an ACC and claims
 **`mn-passport-onboard`** (FS-2.3, the partner-origin issuance facade over
 `core` + adapters — passkey under the Passport RP ID via ROR, ACC deploy on
 the managed rails, largeBlob bootstrap, sign-in, managed-authoriser variant;
-see [`partner-onboarding.md`](../partner-onboarding.md)). No witness
+see [`onboarding-and-key-authorisation.md`](../onboarding-and-key-authorisation.md)). No witness
 provisioning, no grants, no deposits (§4 of beta-scope). *Exit:* a dApp signs
 a user in and reads `{ name, account }`, and a dApp issues a new Passport
 that the Passport app recognises from one ceremony.

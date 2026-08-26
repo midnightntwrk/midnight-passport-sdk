@@ -1,4 +1,4 @@
-# Partner-origin onboarding — issuing a Passport from inside a dApp
+# Onboarding and key authorisation — Passports issued, recognised, and extended outside the PWA
 
 > **Status:** draft · 2026/08/18
 > **Companion to:** [`sdk-requirements.md`](./sdk-requirements.md) (§3.13 is
@@ -150,7 +150,7 @@ Notes:
   spec floor; it doubles as the post-deploy confirmation gesture and carries
   the PRF evaluation for providers that do not return PRF at `create()`.
 - A provider that drops PRF or largeBlob in a bundled ceremony is recorded as
-  a measured finding and handled by the fallback ladder (§6) — never by
+  a measured finding and handled by the fallback ladder (§7) — never by
   silently adding prompts.
 
 ## 4. Flow — sign in (recognition)
@@ -189,7 +189,90 @@ variant. Same ACC, same facade API — requirements §2.1's progressive
 decentralisation as a configuration choice, and migration between the two is
 an authoriser swap on the ACC, as everywhere else.
 
-## 6. Where this does not work — the fallback ladder
+## 6. Authorising additional keys — new platforms and providers on an existing account
+
+§3 issues a *new* account. The complementary flow is a user who already has
+a Passport appearing on a **new external platform** — a Passport-embedding
+environment or a managed wallet-infrastructure provider that needs its own
+authoriser key for the user, because the existing credential cannot follow
+them there (outside the ROR origin set, a different passkey provider, or a
+provider-held key that is not a passkey at all). This is a *platform*
+concern, not a dApp one: **a dApp never holds an account key** — dApps
+integrate through the Passport dApp connector (§3.9, scoped grants) and are
+untouched by this flow.
+
+**The problem.** The platform's new key must become an authoriser on the
+ACC, but the platform cannot present an existing authoriser — that is
+precisely what it lacks — and the ACC cannot accept authoriser-key-set
+writes (the "device set" in C1's terms) from an unauthorised caller.
+
+**The answer: the key travels out-of-band; the grant never leaves the
+PWA.** Nothing about the *proposal* needs the chain at all — a public key
+is public data. So:
+
+1. **The platform generates its key** following the Passport signing
+   requirements (§2.3) and **exposes the public key, preferably as a QR
+   code** — a versioned payload (scheme tag, public key or commitment, an
+   optional display label), defined in `mn-passport-protocol` with its pure
+   codec in `core`, like the largeBlob schema. **Providers never use
+   passkey/PRF** — PRF is the self-custody passkey mechanism; a managed
+   provider signs with its **P-256 secure-signer key**, attached per §2.3
+   (the one-time binding today; the P-256 key directly as a typed
+   authoriser once in-circuit verification lands —
+   midnightntwrk/passport#117). QR is the primary transport (the
+   cross-device case); a copyable string / deep link covers the same-device
+   case, where a screen cannot scan itself.
+2. **The Passport PWA scans the QR**, shows the key fingerprint and label
+   under the §2.2 ceremony, and — with an **existing authorised key** —
+   **grants the public key as an authoriser on the ACC** through the
+   existing add-authoriser circuit. The PWA, through the full SDK, is the
+   only party that receives the key and the only party that signs the
+   grant.
+3. The platform learns the grant landed by watching for its public key in
+   the account's authoriser set (the same indexer lookup as §4's blob-miss
+   fallback), or simply by the user continuing on the platform, whose next
+   authorised call now verifies.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor User
+  participant PLAT as New platform
+  participant PWA as Passport PWA (full SDK)
+  participant ACC as ACC contract
+
+  User->>PLAT: "Add this platform to my Passport"
+  PLAT->>PLAT: generate key per §2.3
+  PLAT-->>User: QR — versioned payload (scheme, public key, label)
+  User->>PWA: scan the QR
+  PWA->>User: ceremony — shows fingerprint + label (existing authorised key)
+  PWA->>ACC: grant authoriser (existing add-authoriser circuit)
+  Note over ACC: authoriser key set gains the typed entry —<br/>no new storage, no new circuits
+  PLAT->>PLAT: detect grant (indexer lookup by public key) → operate
+```
+
+**Why this shape wins:**
+
+- **No ACC contract change.** The proposal never touches the chain, so
+  there is no candidate storage, no cap, no expiry policy, and no new
+  circuits — the existing authorised add-key operation is the whole
+  on-chain surface. The contract-team gate disappears.
+- **No spam surface.** Nothing unauthorised ever writes to the contract, so
+  there is nothing to cap and nothing an attacker can fill.
+- **The trust channel is physical.** The QR scan is the out-of-band human
+  step: the user points their own device at the screen they intend to
+  authorise, and the ceremony shows the fingerprint before anything is
+  granted. An attacker must get their QR in front of the user’s deliberate
+  scanning act — and the fingerprint display is the check against even
+  that.
+
+**SDK surfaces:** platform side — the `onboard` facade gains
+`createAuthoriserRequest()` (generate the key per §2.3, return the payload
+and its QR/string encoding) and the grant-detection helper; PWA side —
+`grantAuthoriser(payload)` joins `core`'s devices flow (ceremony-gated,
+`require_device`). Granting authority remains exclusively a PWA act.
+
+## 7. Where this does not work — the fallback ladder
 
 From the experiment's measured compatibility floor (2026/08/18; re-verify per
 C9 on hardware):
@@ -207,7 +290,7 @@ The full flow (ROR + PRF + largeBlob) exists today on Apple platforms
 blob; Windows trails. The facade MUST expose capability detection so a dApp
 can choose the right door before prompting the user.
 
-## 7. Security framing (normative)
+## 8. Security framing (normative)
 
 - **The origins list is a governed security surface.** Every listed origin
   can run ceremonies against Passport credentials; the well-known file is
@@ -223,24 +306,39 @@ can choose the right door before prompting the user.
   origins list. Accepted residual risk, recorded in the security register.
 - **Challenge verification topology is open.** Sign-in assertions must be
   verified against a challenge someone issued — Passport-side verification
-  service vs in-circuit assertion verification (once secp256r1 lands) is an
-  open item carried by the spec, not decided here.
+  service vs in-circuit assertion verification is an open item carried by
+  the spec, not decided here. Note the in-circuit option is **envelope
+  verification, not a bare signature check**: a passkey never signs the
+  challenge itself — it signs `authenticatorData ‖ SHA-256(clientDataJSON)`,
+  a browser-built JSON envelope that *contains* the challenge. The upstream
+  `p256-in-circuit` experiment (midnightntwrk/passport#117) has now measured
+  exactly this on midnight-zk: the whole-envelope relation (fixed
+  `webauthn.get` prefix, base64url challenge binding expanded natively by
+  the verifier, rpIdHash and flags checks, two in-circuit SHA-256 layers,
+  P-256 ECDSA) verifies a real platform-authenticator assertion at
+  **36,466 rows (k = 16, ~4 KB proof)** against **1,467 rows for native
+  Jubjub Schnorr** — roughly 25×. Which is why the §2.3 one-time binding to
+  a cheap native key remains a *choice*, not a workaround secp256r1
+  deletes.
 - All existing MUSTs hold unchanged: ceremony gate before witness use
   (§2.2), preimage encrypted to the enclave on remote proving (§2.5),
   deposit-not-address (§3.12), and the two version axes (§4.6) — the blob's
   `binding` field exists so recognition can route to the right contract
   bindings.
 
-## 8. Open items
+## 9. Open items
 
 - Dedicated GitHub issue for FS-2.3 (currently anchored to
   midnightntwrk/passport#77, C27 Passport Facade).
 - The managed (provider authoriser + routing) flow — future iteration (§5).
+- The authoriser-request payload encoding (§6): QR size budget, the
+  copyable/deep-link form for the same-device case, and how the approval UI
+  renders the attacker-chosen label without lending it authority.
 - **Sponsorship policy for direct, provider-less deploys**: what authorises
   the third-party service to sponsor DUST for a call that arrives without a
   provider in front of it (per-partner credentials, rate limits, or open
   sponsorship)?
-- Challenge-verification topology (§7).
+- Challenge-verification topology (§8).
 - The RP ID's production value and the origins-list governance process
   (who approves a partner, where the file is served and monitored).
 - Whether the Passport PWA's own onboarding adopts the same two-prompt

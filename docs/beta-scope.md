@@ -68,7 +68,7 @@ scoped-grant issuance or spending, no deposits.
 
 **(5) Partner-origin onboarding** — a partner dApp can **issue the Passport
 itself** via `mn-passport-onboard` (§3.13,
-[`partner-onboarding.md`](./partner-onboarding.md)): passkey created under
+[`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md)): passkey created under
 the Passport RP ID (Related Origin Request), ACC deployed over the same
 provider rails as item (3) (fees sponsored), and the ACC address stamped
 onto the credential via largeBlob so the Passport app recognises the account
@@ -76,7 +76,7 @@ in one ceremony. Sign-in with the existing passkey works at the partner
 origin and at Passport. The facade connects **directly** to the third-party
 proving and DUST sponsorship service (passkey/PRF path only for now — the
 managed provider-authoriser variant is deferred to a future iteration,
-[`partner-onboarding.md`](./partner-onboarding.md) §5). The
+[`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md) §5). The
 redirect-to-Passport fallback is mandatory below the compatibility floor. **Scope consequence:** the facade embeds the `core`
 kernel, so the kernel and seam foundations (FS-0.3–0.8) move onto the beta
 critical path.

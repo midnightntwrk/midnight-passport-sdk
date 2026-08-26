@@ -3,7 +3,7 @@
 > **Status:** draft · 2026/08/18 · authored per `mn-passport-skills:spec-author` conventions
 > **Milestone:** M2 — Connect ([`roadmap.md`](../../roadmap.md) §2).
 > **Brief:** [`M2-connect.md`](../../milestones/M2-connect.md) § FS-2.3.
-> **Backing:** [`partner-onboarding.md`](../../../partner-onboarding.md) (the
+> **Backing:** [`onboarding-and-key-authorisation.md`](../../../onboarding-and-key-authorisation.md) (the
 > design), [`sdk-requirements.md`](../../../sdk-requirements.md) §3.13,
 > [`architecture.md`](../../../architecture.md) §4.4,
 > [`provider-integration.md`](../../../provider-integration.md),
@@ -23,7 +23,7 @@ stamp the deployed ACC address onto the credential (largeBlob) so the
 Passport app — or the partner, later — **recognises** the account from a
 single ceremony. Support sign-in with the existing passkey. **Passkey/PRF
 path only**: the managed provider-authoriser variant is a future iteration
-(partner-onboarding.md §5).
+(onboarding-and-key-authorisation.md §5).
 
 ## 2. Scope
 
@@ -55,7 +55,7 @@ path only**: the managed provider-authoriser variant is a future iteration
 
 - **The managed variant** (provider authoriser + routing,
   provider-integration §4.1) — future iteration; the signer seam is its
-  slot-in point, and partner-onboarding.md §5 carries the TODO.
+  slot-in point, and onboarding-and-key-authorisation.md §5 carries the TODO.
 - Grants, recovery, device management, assets, witness provisioning, name
   claim (blocked on C2), deposits.
 - The redirect fallback's PWA half (it is the existing first-party
@@ -73,8 +73,8 @@ path only**: the managed provider-authoriser variant is a future iteration
 | D-3 | RP ID, PRF salt, and blob schema live in `protocol`. | Partner and Passport must agree on all three or recognition breaks; `protocol` is the no-logic shared-contract home. | requirements §3.13 |
 | D-4 | Ceremony budget is the spec floor: issuance = `create()` (bundled `prf.eval`) + one `get()` (`prf.eval` + `largeBlob.write`); sign-in = one bundled `get()`. A dropped extension is a measured finding, not a reason to add prompts. | Confirmed automated + on a real authenticator; largeBlob writes are illegal at `create()`. | findings.md, ceremony-discipline note |
 | D-5 | **largeBlob is a cache, never the source of truth**: blob miss → indexer lookup by device commitment; blob hit → verified against chain state before trust. | GPM and Windows Hello lack largeBlob; the ACC is the identity (P8, chain-only). | findings.md compatibility floor; requirements §1.1 |
-| D-6 | Capability detection + the mandatory redirect fallback are part of the facade's public surface. | Below the ROR/PRF floor the partner must route users to first-party onboarding, not fail. | partner-onboarding.md §6 |
-| D-7 | The facade connects **directly** to the third-party proving and DUST sponsorship service (sealed preimage → the service proves/balances/sponsors/binds in one process → SDK broadcasts); no provider in the loop on this path. | Passkey/PRF issuance has no provider by definition; the service's surface is the same one the managed rails use, so nothing is invented. The provider-routed managed variant is deferred. | partner-onboarding.md §3, §5; provider-integration.md §5 |
+| D-6 | Capability detection + the mandatory redirect fallback are part of the facade's public surface. | Below the ROR/PRF floor the partner must route users to first-party onboarding, not fail. | onboarding-and-key-authorisation.md §7 |
+| D-7 | The facade connects **directly** to the third-party proving and DUST sponsorship service (sealed preimage → the service proves/balances/sponsors/binds in one process → SDK broadcasts); no provider in the loop on this path. | Passkey/PRF issuance has no provider by definition; the service's surface is the same one the managed rails use, so nothing is invented. The provider-routed managed variant is deferred. | onboarding-and-key-authorisation.md §3, §5; provider-integration.md §5 |
 
 ## 4. Surface and interfaces
 
@@ -110,7 +110,7 @@ export function passkeyAuthoriser(): Authoriser;      // adapter-signer-local (F
 
 ## 5. Flow
 
-Per [`partner-onboarding.md`](../../../partner-onboarding.md) §3–§4 (issue
+Per [`onboarding-and-key-authorisation.md`](../../../onboarding-and-key-authorisation.md) §3–§4 (issue
 on the passkey/PRF path, sign-in — the sequence diagrams there are normative
 for this spec; §5's managed variant is a recorded TODO, out of scope here).
 
@@ -182,8 +182,11 @@ until the M1 rails integrate.
 
 - **OQ-1** — dedicated GitHub issue (currently #77).
 - **OQ-2** — challenge-verification topology for assertions consumed by
-  third parties (Passport verification service vs in-circuit secp256r1,
-  once it lands).
+  third parties: Passport verification service vs in-circuit verification —
+  noting the latter is **envelope verification** (`authenticatorData ‖
+  SHA-256(clientDataJSON)`, prefix/challenge/rpIdHash/flags checks), not a
+  bare signature check, measured upstream at ~25× native Jubjub Schnorr
+  (midnightntwrk/passport#117; onboarding-and-key-authorisation.md §8).
 - **OQ-3** — production RP ID value and origins-list governance.
 - **OQ-4** — does the PWA's own onboarding adopt the same bundled-ceremony
   shape (recommended: yes — one implementation in `core`)?
@@ -195,4 +198,4 @@ until the M1 rails integrate.
   sponsorship)?
 - **OQ-7** — the managed (provider authoriser + routing) partner-origin
   flow: to be designed and documented in a future iteration
-  (partner-onboarding.md §5).
+  (onboarding-and-key-authorisation.md §5).
