@@ -144,13 +144,21 @@ Notes:
   the service's enclave key before it leaves the device** (the §2.5 MUST,
   unchanged), the service proves, DUST-balances, sponsors, and binds in one
   process, and the SDK broadcasts. A zero-DUST user onboards from a partner
-  origin because fees are sponsored. Provider *routing* of this payload
-  belongs to the managed path and is out of scope here — the
-  provider-integration topology decision ("the provider routes") applies to
-  the managed path, not to this provider-less one.
+  origin because fees are sponsored. Provider *routing* of this payload is
+  the **managed path's** decided topology (provider-integration §9:
+  "decided — the provider routes"); the direct connection here is a
+  **separate decision for the provider-less path**, recorded in ADR 0005 —
+  it reuses the service's same §5 surface, it does not reinterpret the
+  managed decision. With no provider in the loop, the **enclave-key pinning
+  duty moves to Passport**: the service publishes its attestation-backed
+  key (provider-integration §5.1) and the deployment pins it (§7).
 - largeBlob writes are illegal at `create()`, so the second prompt is the
-  spec floor; it doubles as the post-deploy confirmation gesture and carries
-  the PRF evaluation for providers that do not return PRF at `create()`.
+  spec floor; it doubles as the post-deploy confirmation gesture.
+- **Prompt budget is conditional on PRF-at-create.** The deploy needs the
+  PRF-derived secret, so on authenticators that withhold PRF results at
+  `create()` the flow inserts one dedicated `prf.eval` assertion **before**
+  the deploy — three prompts total on those providers, two everywhere else.
+  The extra prompt is capability-determined and disclosed, never silent.
 - A provider that drops PRF or largeBlob in a bundled ceremony is recorded as
   a measured finding and handled by the fallback ladder (§7) — never by
   silently adding prompts.
@@ -297,11 +305,12 @@ carries requests only.
 ## 7. Where this does not work — the fallback ladder
 
 From the experiment's measured compatibility floor (2026/08/18; re-verify per
-C9 on hardware):
+C9 on hardware). **This table is the canonical floor statement — other
+documents cite it rather than restating figures:**
 
 | Constraint | Consequence | Fallback |
 |---|---|---|
-| ROR floor — iOS < 18 / Safari < 18, Chrome/Edge < 128, Firefox < 152 | partner-origin ceremonies fail (`SecurityError`) | **redirect to the Passport PWA** (first-party onboarding over the C23 surface) — mandatory in every integration |
+| ROR floor — Safari < 18 (ships with iOS 18, so the ROR and PRF floors coincide on Apple), Chrome/Edge < 128, Firefox < 152 | partner-origin ceremonies fail (`SecurityError`) | **redirect to the Passport PWA** (first-party onboarding over the C23 surface) — mandatory in every integration; the same fallback catches a `SecurityError` on a capable browser (e.g. the well-known momentarily unreachable or the origin not yet listed) |
 | No PRF (e.g. Windows below 11 25H2) | no derivable device key at the partner origin | managed variant (§5), or redirect |
 | No largeBlob (Google Password Manager, Windows Hello) | no attached pointer | indexer/registry lookup by device commitment (§4) |
 | No passkeys at all (no platform authenticator enrolled) | nothing WebAuthn works | managed variant or redirect; the §2.2 password/KDF ceremony exists for exactly this population |
@@ -325,6 +334,12 @@ can choose the right door before prompting the user.
   the approval history. Residual risk (register): a user socially
   engineered into approving a remotely delivered, live attacker request —
   mitigated by the fingerprint match and the expiry, not eliminated.
+- **Enclave-key provenance on the direct path.** §2.5 assigns enclave
+  attestation to "the provider / upstream"; on the provider-less path that
+  duty is reassigned: the third-party service publishes its
+  attestation-backed enclave key and **Passport configuration pins it**
+  (provider-integration §5.1). Same accepted residual risk, explicit new
+  owner — recorded for the security register.
 - **The origins list is a governed security surface.** Every listed origin
   can run ceremonies against Passport credentials; the well-known file is
   fetched per ceremony, so listing is a security decision with a recorded

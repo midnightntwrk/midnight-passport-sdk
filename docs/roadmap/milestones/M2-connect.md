@@ -18,7 +18,9 @@
   types only, so `connect` stays free of `core`.
 - **In scope.** The C23 message schema: sign-in request/response and the profile
   `{ name, account }`; a wire version tag.
-- **Out of scope.** Any logic; anything beyond sign-in + profile.
+- **Out of scope.** Any logic. (Scope note: beyond the C23 sign-in +
+  profile types, the package also carries the §3.13 partner-onboarding
+  shared constants — RP ID, PRF salt, largeBlob schema types — per FS-2.3.)
 - **Backing.** requirements §3.9; architecture §4.4 (protocol package keeps
   `connect` core-free), §4.6 (wire version axis).
 - **Surface (indicative).** `SignInRequest`, `SignInResponse`,
@@ -82,24 +84,14 @@
   architecture §4.4 (the recorded facade exception, ADR 0005); beta-scope
   §2(5); `experiments/passkey-prf-linking/findings.md` (mechanism confirmed,
   compatibility floor).
-- **Surface (indicative).** `createPassport(opts) → { account, credentialId,
-  publicKey }`; `signIn(opts) → { account, publicKey }`;
-  `passkeyAuthoriser()` behind the FS-0.4 signer seam (the seam is where the
-  future managed authoriser slots in); `PASSPORT_RP_ID`,
-  `PRF_DEVICE_KEY_SALT`, `encodeBlob`/`decodeBlob`.
+- **Surface.** See FS-2.3 §4 (canonical): `createPassport`, `signIn`,
+  `capabilities`, plus the protocol constants and the `core` blob codec.
+  No signer handle is exported.
 - **Dependencies.** FS-0.3–0.8 (kernel + seams), FS-1.x rails for real
   integration (mocked until then), FS-2.1 wire types. **Gate:** the
   related-origins well-known deployment on the Passport domain.
-- **Acceptance.** Issue → recognise round-trip green in the harness (two
-  prompts to issue, one to sign in); blob miss degrades to the indexer path;
-  `connect` remains core-free; the facade exposes no lifecycle surface.
-- **Verify.** The `experiments/passkey-prf-linking` e2e harness lifted to
-  drive the real packages (virtual authenticator; ROR negative control).
-- **Tranches (proposed).** (1) protocol constants + `core` blob codec; (2)
-  `Platform.ceremony` extension + `adapter-browser` ceremonies; (3) `core`
-  onboard/sign-in flows against dev seams; (4) the facade + indexer
-  fallback; (5) direct third-party-service integration (sealed preimage,
-  sponsored settlement).
+- **Acceptance / verify / tranches.** Per FS-2.3 §7–§9 (canonical — this
+  brief deliberately does not restate them).
 - **Open questions.** Challenge-verification topology; production RP ID and
   origins-list governance; whether the PWA adopts the same bundled-ceremony
   shape (it should — one implementation in `core`).

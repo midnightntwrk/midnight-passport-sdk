@@ -262,11 +262,16 @@ the provider-free default always ships.
 - **`adapter-prover-wasm`** — the in-tab wasm prover (lifted from the prototype
   worker) for small-k circuits (§2.5).
 - **`adapter-prover-remote`** — the remote-proving client for high-k
-  circuits, two modes (§2.5): **provider-routed** (proof returned; Passport
-  balances and broadcasts) and **direct TEE** (the server proves *and
-  broadcasts*; Passport awaits confirmation). **Encrypts the preimage to
-  the prover's enclave key before sending** in both modes; enclave
-  attestation is the provider's responsibility, not the adapter's.
+  circuits, three modes (§2.5, provider-integration.md): **provider-routed**
+  (the provider routes the sealed payload; the service proves, balances,
+  sponsors, and binds in one process; the SDK broadcasts — the managed
+  path's decided topology), **direct service** (same wire contract, called
+  by Passport itself — the §3.13 partner-origin path, ADR 0005), and
+  **direct TEE prove-and-broadcast** (the server also submits; deferred).
+  **Encrypts the preimage to the prover's enclave key before sending** in
+  every mode; enclave attestation is the provider's responsibility on the
+  routed mode and a **Passport-pinned published key** on the direct mode
+  (provider-integration §5.1).
 - **`adapter-storage-vendor`** — native vendor-keystore sync adapter (§3.6).
 - **`adapter-storage-shared`** — the shared private-storage provider (#58)
   adapter; also the source for dApp witness provisioning (§3.9).
@@ -303,7 +308,8 @@ the provider-free default always ships.
   (`mn-passport-contract` is a foundation dependency, permitted).
 - **`@midnight-ntwrk/mn-passport-onboard`** — the partner-origin **issuance
   facade** (§3.13, [`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md)). A
-  narrow API (`createPassport`, `signIn`) that is composition only: it
+  narrow API (`createPassport`, `signIn`, `capabilities`) that is
+  composition only: it
   instantiates the `core` kernel with the browser platform adapter, the
   PRF-derived local signer (the provider-managed variant is a future
   iteration), the remote prover connected **directly** to the third-party
@@ -336,6 +342,8 @@ flowchart LR
   ONBOARD --> CORE
   ONBOARD --> BROW
   ONBOARD --> CAPS
+  ONBOARD --> PROTO
+  ONBOARD --> CONTRACT
 ```
 *Arrows read "depends on". `@midnight-ntwrk/mn-passport-connect` reaches only
 `@midnight-ntwrk/mn-passport-protocol` and `@midnight-ntwrk/mn-passport-contract`
@@ -459,6 +467,8 @@ flowchart TB
   DAPP --> ONBOARD
   ONBOARD --> CORE
   ONBOARD --> T2
+  ONBOARD --> CONTRACT
+  ONBOARD --> PROTO
   CORE --> T2
   CORE --> CONTRACT
   CORE --> PROTO
@@ -668,7 +678,8 @@ if (!cap.canIssueHere) {
 const passport = await createPassport({
   user: 'nightfi-user',            // display label for the passkey sheet
   // rpId: 'midnightpassport.com', // protocol default; override if the domain changes
-  // serviceUrl, indexerUrl:       // deployment configuration
+  // serviceUrl: '…',              // third-party proving & sponsorship endpoint
+  // indexerUrl: '…',              // all fields per FS-2.3 §4 OnboardConfig
 });
 console.log(passport.account);      // the deployed ACC address
 console.log(passport.credentialId); // remember it — helps providers that

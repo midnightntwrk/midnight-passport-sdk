@@ -46,11 +46,14 @@ that passkey is the presence gate on every managed-path action. The
 decentralised *use* of the passkey (deriving an in-circuit device key) lives
 only in the fallback adapter; as the default path it stays deferred.
 
-**(3) Proving via the provider's remote proof server only** — all proofs
-route to the provider's remote prover (§2.5 **path 2a**, provider-routed).
-Beta does **not** do in-tab WASM proving or a direct TEE prover, and it does
-**not** run the k-threshold router: everything goes to the provider
-regardless of circuit size. The SDK encrypts the witness to that prover's
+**(3) Proving via the provider's remote proof server only (PWA flows)** —
+all PWA-flow proofs route to the provider's remote prover (§2.5 **path 2a**,
+provider-routed). Beta does **not** do in-tab WASM proving and does **not**
+run the k-threshold router: every PWA-flow proof goes to the provider
+regardless of circuit size. The one disclosed exception is item (5): the
+partner-origin issuance facade reaches the **same third-party proving and
+DUST sponsorship service directly** (no provider in the loop) — a distinct,
+recorded decision (ADR 0005), not a second router. The SDK encrypts the witness to that prover's
 enclave (§2.5); the provider returns the proof. The same provider path also
 **sponsors the DUST fees** — including the account-setup transactions (item
 1) — so beta needs no separate fee/sponsor mechanism (Capacity Exchange,
@@ -73,9 +76,10 @@ the Passport RP ID (Related Origin Request), ACC deployed over the same
 provider rails as item (3) (fees sponsored), and the ACC address stamped
 onto the credential via largeBlob so the Passport app recognises the account
 in one ceremony. Sign-in with the existing passkey works at the partner
-origin and at Passport. The facade connects **directly** to the third-party
-proving and DUST sponsorship service (passkey/PRF path only for now — the
-managed provider-authoriser variant is deferred to a future iteration,
+origin and at Passport. The deploy uses the **same third-party proving and
+DUST sponsorship service as item (3), reached directly** — no provider in
+the loop (passkey/PRF path only for now; the managed provider-authoriser
+variant is deferred to a future iteration,
 [`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md) §5). The
 redirect-to-Passport fallback is mandatory below the compatibility floor. **Scope consequence:** the facade embeds the `core`
 kernel, so the kernel and seam foundations (FS-0.3–0.8) move onto the beta
@@ -85,8 +89,12 @@ critical path.
 `mn-passport-onboard` + `mn-passport-connect`: it can **issue a new Passport
 in place** (item 5), sign an existing user in, and read `{ name, account }`
 to personalise. It still never spends, never asks for a grant, and never
-touches witness state — issuance and recognition only, which keeps it a safe
-first integration and a good dogfooding partner for both packages.
+touches **stored** witness state — with one qualified moment: during
+issuance (item 5) the embedded kernel transiently holds the new account's
+device secret, the accepted residual risk recorded in
+[`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md) §8. Issuance and
+recognition only, which keeps it a safe first integration and a good
+dogfooding partner for both packages.
 
 ## 3. The active slice (packages and adapters)
 
@@ -136,7 +144,7 @@ flowchart TB
 | Deferred | Comes from |
 |---|---|
 | Decentralised / self-custody as the **default** path (the fallback adapter is in beta, §2 item 2) | §2.1 decentralised, §2.3 |
-| In-tab WASM proving; direct TEE prover | §2.5 paths 1 and 2b |
+| In-tab WASM proving; the k-threshold prover router; the direct TEE *prove-and-broadcast* path (the §2(5) facade's direct service connection is in scope and disclosed there) | §2.5 paths 1 and 2b |
 | Witness provisioning to dApps | #58 · §3.6 / §3.9 |
 | Scoped grants (issue / spend) beyond sign-in | §3.2 · C10–C12 |
 | Agents / OWS | §3.8 |

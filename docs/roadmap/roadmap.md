@@ -70,9 +70,11 @@ submit) runs through **BCW**. *Exit:* a zero-DUST user deploys an ACC and claims
 `mn-passport-protocol` (the C23 wire types + the §3.13 shared constants),
 `mn-passport-connect` (Sign-In-with-Passport + profile read only), and
 **`mn-passport-onboard`** (FS-2.3, the partner-origin issuance facade over
-`core` + adapters — passkey under the Passport RP ID via ROR, ACC deploy on
-the managed rails, largeBlob bootstrap, sign-in, managed-authoriser variant;
-see [`onboarding-and-key-authorisation.md`](../onboarding-and-key-authorisation.md)). Also **FS-2.4 — authorising additional keys**: a new platform's signed key
+`core` + adapters — passkey under the Passport RP ID via ROR, ACC deploy via
+a direct connection to the third-party proving and DUST sponsorship service,
+largeBlob bootstrap, sign-in; the managed-authoriser variant is a future
+iteration; see [`onboarding-and-key-authorisation.md`](../onboarding-and-key-authorisation.md)).
+Also **FS-2.4 — authorising additional keys**: a new platform's signed key
 request (QR) approved from the PWA into the ACC's authoriser key set via the
 existing `add_device` circuit — no contract change
 ([`onboarding-and-key-authorisation.md`](../onboarding-and-key-authorisation.md) §6).
@@ -104,12 +106,11 @@ register and docs are current.
 | `mn-passport-protocol` | C23 wire types (dApp ↔ wallet) + §3.13 shared constants | M2 |
 | `mn-passport-connect` | sign-in + profile read | M2 |
 | `mn-passport-onboard` | partner-origin issuance facade (FS-2.3) + key-authorisation requests (FS-2.4) | M2 |
-| `adapter-browser` | browser Platform: WebAuthn/ROR + largeBlob ceremonies | M1–M2 |
 | `adapter-signer-managed` | Dynamic authoriser signing | M1 |
 | `adapter-signer-local` | self-custody signer — contingency fallback (ADR 0001) | M1 |
 | `adapter-prover-remote` | BCW TEE proving (seal + `/prove`) | M1 |
 | `adapter-*` settlement seam | BCW DUST balancing + submit | M1 |
-| `adapter-browser` | platform target (the PWA) | M1 |
+| `adapter-browser` | platform target (the PWA) + WebAuthn/ROR and largeBlob ceremonies (FS-2.3) | M1–M2 |
 
 **Not built for beta:** `adapter-prover-wasm`, `adapter-agent-ows`,
 `adapter-wallet-connect`, `adapter-fee-capacity-exchange`, and the
