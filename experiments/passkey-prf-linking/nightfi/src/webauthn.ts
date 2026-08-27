@@ -98,6 +98,9 @@ export async function assertBundled(opts: {
   largeBlobWrite?: BufferSource;
   allowCredentialId?: BufferSource;
 }): Promise<AssertResult> {
+  // `unknown` values: the bundle is assembled field-by-field from the typed
+  // shapes above, then cast once at the get() call; the experiment owns
+  // narrowing this if it graduates (CLAUDE.md typing rule).
   const extensions: Record<string, unknown> = {};
   if (opts.prf) extensions.prf = { eval: { first: PRF_SALT } };
   if (opts.largeBlobWrite) extensions.largeBlob = { write: opts.largeBlobWrite };

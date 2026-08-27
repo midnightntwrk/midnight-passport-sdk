@@ -62,20 +62,32 @@ function versionPairs(file, lockText) {
   return file === 'pnpm-lock.yaml' ? pnpmVersionPairs(lockText) : npmVersionPairs(lockText);
 }
 
-const lockfile = LOCKFILES.find((f) => gitShow('HEAD', f) !== null);
-if (!lockfile) {
+// Discover EVERY tracked lockfile (root and nested — e.g. the standalone
+// experiments/ mini-workspaces), so a nested lockfile cannot bypass the
+// cooldown (CLAUDE.md non-negotiable).
+const tracked = execFileSync('git', ['ls-files'], { encoding: 'utf8' })
+  .split('\n')
+  .filter((f) => LOCKFILES.includes(f.split('/').pop()));
+if (tracked.length === 0) {
   console.log('No lockfile at HEAD — nothing to check.');
   process.exit(0);
 }
-const head = gitShow('HEAD', lockfile);
 for (const other of ['yarn.lock', 'bun.lock', 'bun.lockb']) {
   if (gitShow('HEAD', other) !== null) {
     console.log(`::warning::${other} present — the cooldown check reads ${LOCKFILES.join(' / ')} only.`);
   }
 }
 
-const before = versionPairs(lockfile, gitShow(base, lockfile));
-const added = [...versionPairs(lockfile, head)].filter((p) => !before.has(p));
+const added = [];
+for (const lf of tracked) {
+  const name = lf.split('/').pop();
+  const before = versionPairs(name, gitShow(base, lf));
+  for (const pair of versionPairs(name, gitShow('HEAD', lf))) {
+    // Guard against parser artefacts from lockfile-format drift: a valid
+    // pair is <name>@<version> with no whitespace in the name.
+    if (!before.has(pair) && /^[^\s]+@[^\s]+$/.test(pair)) added.push(pair);
+  }
+}
 
 if (added.length === 0) {
   console.log('No new package versions introduced.');

@@ -63,9 +63,11 @@ unavoidable follow-up `get()` (largeBlob writes are illegal at `create()`)
 carries **both** `prf.eval` and `largeBlob.write` — so onboarding is two
 prompts and sign-in (PRF + blob read) is one. A dropped PRF in a bundled
 ceremony is treated as a **measured finding** for that provider, not a
-reason to add ceremonies back; an interim one-extension-per-ceremony
-variant (create + three dedicated gets, kept in the branch history) is the
-diagnostic fallback if a provider misbehaves under bundling. Confirmed
+reason to add ceremonies back. An interim one-extension-per-ceremony
+variant (create + three dedicated gets) existed and was removed when
+bundling was adopted; it survives only in git history (commit a0cb2f8) —
+there is no runtime switch, so if a provider misbehaves under bundling the
+variant must be restored from there. Confirmed
 end-to-end both automated (virtual authenticator) and manually on a real
 macOS authenticator (below).
 

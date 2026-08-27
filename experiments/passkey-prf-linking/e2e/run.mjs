@@ -16,7 +16,13 @@
 // findings.md.
 import { spawn } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
+
+// A derived key is a compressed P-256 point: 33 bytes, 66 hex chars, 02/03
+// prefix. Guarding the match with this shape prevents the two apps' identical
+// "no PRF output" fallback strings from comparing equal as a false positive.
+const P256_COMPRESSED_HEX = /^0[23][0-9a-f]{64}$/u;
 
 const summary = {
   date: new Date().toISOString().slice(0, 10),
@@ -31,7 +37,7 @@ function step(name, value) {
 }
 
 // Start the host-routing HTTPS server unless one is already up.
-const server = spawn(process.execPath, [new URL('./serve.mjs', import.meta.url).pathname], {
+const server = spawn(process.execPath, [fileURLToPath(new URL('./serve.mjs', import.meta.url))], {
   stdio: 'inherit',
 });
 await sleep(700);
@@ -101,7 +107,8 @@ try {
   const readAddress = await page.textContent('[data-testid="acc-address"]');
   step('passport.attached-contract-address', readAddress);
 
-  const keysMatch = nightfiKey === passportKey && Boolean(nightfiKey);
+  const keysMatch =
+    nightfiKey === passportKey && P256_COMPRESSED_HEX.test(nightfiKey ?? '');
   const blobMatch = deployedAddress === readAddress && /^[0-9a-f]{64}$/u.test(readAddress ?? '');
   step('public-keys-match', keysMatch);
   step('contract-address-roundtrip', blobMatch);

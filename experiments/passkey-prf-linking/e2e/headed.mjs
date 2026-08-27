@@ -14,9 +14,10 @@
 // midnightpassport.test; a new tab has no authenticator).
 import { spawn } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
-const server = spawn(process.execPath, [new URL('./serve.mjs', import.meta.url).pathname], {
+const server = spawn(process.execPath, [fileURLToPath(new URL('./serve.mjs', import.meta.url))], {
   stdio: 'inherit',
 });
 await sleep(700);

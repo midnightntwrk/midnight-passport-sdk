@@ -89,3 +89,15 @@ keys / user verification / **PRF** / **large blob**) and repeat.
 RP-side assertion verification (challenge issuance/validation), registry or
 ACC integration, and the ~5-label limit on the ROR origins list — see the
 SDK evaluation notes in `findings.md` §Implications.
+
+## Accepted experiment-grade limitations
+
+This is a hypothesis-validation harness, not production software (review
+2026/08/27). Known and accepted: sign-in ceremonies lack the per-step error
+isolation onboarding has; the onboarding receipt shows the generated address
+even when the blob write failed (check the `blob written` row); the e2e
+scripts share no common module, poll the server with a fixed sleep, and
+(except `run.mjs`) do not guard cleanup with try/finally; `serve.mjs`
+assumes `pnpm build` ran first. The validation-critical checks (key-match
+shape guard, ROR negative control) are maintained; the rest is fixed only
+if it starts obscuring results.

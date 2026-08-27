@@ -14,6 +14,6 @@ mn-passport-skills/
 .github/
 .mn-passport-skills/
 packages/contract/artefact/
-experiments/
+/experiments/
 renovate.json
 CODEOWNERS

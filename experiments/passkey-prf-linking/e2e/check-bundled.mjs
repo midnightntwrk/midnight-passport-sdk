@@ -54,7 +54,9 @@ out.passportKey = await page.textContent('[data-testid="pubkey"]');
 out.passportAddr = await page.textContent('[data-testid="acc-address"]');
 out.passportSteps = await page.$$eval('[data-testid="steps"] li', (ls) => ls.map((l) => l.textContent));
 
-out.keysMatch = out.nightfiKey === out.passportKey && Boolean(out.nightfiKey);
+// Compressed-point shape guard: identical fallback strings must not match.
+out.keysMatch =
+  out.nightfiKey === out.passportKey && /^0[23][0-9a-f]{64}$/u.test(out.nightfiKey ?? '');
 out.addrRoundtrip = out.nightfiAddr === out.passportAddr && /^[0-9a-f]{64}$/u.test(out.passportAddr ?? '');
 
 console.log(JSON.stringify(out, null, 2));

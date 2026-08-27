@@ -18,7 +18,8 @@ gets driven.
    If the spec names none, STOP and ask the user for it before any planning —
    no untraceable work.
 2. **Tranche budget.** Each tranche targets **≤ ~400 net changed lines**
-   (insertions + deletions, excluding lockfiles, generated code, and test
+   (insertions + deletions, excluding lockfiles, generated code, the
+   standalone `experiments/` tree, and test
    fixtures); **hard split above 600**. Every tranche in the plan carries a
    size estimate (files touched, rough net lines). A plan containing an
    over-budget tranche is **invalid** — re-split before presenting it. The
