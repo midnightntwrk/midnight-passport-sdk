@@ -1,8 +1,8 @@
-# Onboarding and key authorisation — Passports issued, recognised, and extended outside the PWA
+# Onboarding and key authorisation — Passports issued and recognised at partner origins; authority granted only in the PWA
 
-> **Status:** draft · 2026/08/18
-> **Companion to:** [`sdk-requirements.md`](./sdk-requirements.md) (§3.13 is
-> the requirement this doc details), [`architecture.md`](./architecture.md)
+> **Status:** draft · 2026/08/27
+> **Companion to:** [`sdk-requirements.md`](./sdk-requirements.md) (§3.13 and
+> §3.5's key-authorisation rule are the requirements this doc details), [`architecture.md`](./architecture.md)
 > (§4.4 packaging), [`provider-integration.md`](./provider-integration.md)
 > (the proving and settlement rails every deploy rides), and
 > [`dapp-connection.md`](./dapp-connection.md) (the conversational surface
@@ -51,11 +51,13 @@ contract, or proving logic of its own:
 - It **links `mn-passport-core`** and instantiates the kernel with the
   browser adapters: `Passport.create({ signer, prover, settlement, storage,
   platform })` per the FS-0.3 kernel and the FS-0.4–0.8 seams.
-- It exposes a deliberately **narrow API** — `createPassport(...)` and
-  `signIn(...)` — issuance and recognition only. No grants, no recovery, no
-  device management, no asset surface: an externally issued account does
-  *less* at the partner origin by design; the full lifecycle lives in the
-  Passport PWA.
+- It exposes a deliberately **narrow API** — `createPassport`, `signIn`,
+  `capabilities` (issuance and recognition), plus the §6 **key-authorisation
+  request** pair (`createAuthoriserRequest`, `awaitApproval`) — requests
+  only, never approvals. No scoped grants, no recovery, no asset surface,
+  and no authority-changing operation: an externally issued account does
+  *less* at the partner origin by design; the full lifecycle, and every
+  approval, lives in the Passport PWA.
 - **The `connect` rule is unchanged**: the conversational dApp package
   (`mn-passport-connect`) still never links `core`. `onboard` is the one
   recorded exception, and the reason is honest: **issuance is custody work.**
@@ -210,28 +212,37 @@ writes (the "device set" in C1's terms) from an unauthorised caller.
 PWA.** Nothing about the *proposal* needs the chain at all — a public key
 is public data. So:
 
-1. **The platform generates its key** following the Passport signing
-   requirements (§2.3) and **exposes the public key, preferably as a QR
-   code** — a versioned payload (scheme tag, public key or commitment, an
-   optional display label), defined in `mn-passport-protocol` with its pure
-   codec in `core`, like the largeBlob schema. **Providers never use
-   passkey/PRF** — PRF is the self-custody passkey mechanism; a managed
-   provider signs with its **P-256 secure-signer key**, attached per §2.3
-   (the one-time binding today; the P-256 key directly as a typed
-   authoriser once in-circuit verification lands —
-   midnightntwrk/passport#117). QR is the primary transport (the
-   cross-device case); a copyable string / deep link covers the same-device
-   case, where a screen cannot scan itself.
-2. **The Passport PWA scans the QR**, shows the key fingerprint and label
-   under the §2.2 ceremony, and — with an **existing authorised key** —
-   **grants the public key as an authoriser on the ACC** through the
-   existing add-authoriser circuit. The PWA, through the full SDK, is the
-   only party that receives the key and the only party that signs the
-   grant.
-3. The platform learns the grant landed by watching for its public key in
-   the account's authoriser set (the same indexer lookup as §4's blob-miss
-   fallback), or simply by the user continuing on the platform, whose next
-   authorised call now verifies.
+1. **The platform generates (or already holds) its key** following the
+   Passport signing requirements (§2.3) and **exposes a signed authoriser
+   request, preferably as a QR code** — a versioned,
+   scheme-discriminated payload carrying the public key, the §2.3-derived
+   **device commitment** (what the ACC's existing `add_device` circuit
+   takes), an optional account hint, a **nonce**, an **expiry**, a bounded
+   label, and a **self-signature over all of it** (the §2.3 binding
+   message: proof the platform controls the key, and the anti-replay
+   anchor). Defined in `mn-passport-protocol` with its codec in `core`,
+   like the largeBlob schema. **Providers never use passkey/PRF** — PRF is
+   the self-custody passkey mechanism; a managed provider signs with its
+   **P-256 secure-signer key** (the private key never leaves the HSM — the
+   facade takes a signing callback), attached per §2.3: binding verified
+   by the PWA at approval time today, the typed on-chain entry once
+   in-circuit verification lands (midnightntwrk/passport#117). QR is the
+   primary transport (the cross-device case); a copyable string / deep
+   link covers the same-device case, where a screen cannot scan itself.
+2. **The Passport PWA scans the QR**, verifies the payload **before any
+   ceremony UI** (self-signature, nonce freshness, expiry, account match),
+   shows the scheme-correct key fingerprint and the untrusted label, and —
+   with an **existing authorised key** under the §2.2 ceremony —
+   **approves the key into the ACC's authoriser key set** through the
+   existing **`add_device(commitment)`** circuit. The PWA, through the full
+   SDK, is the only party that receives the request and the only party
+   that signs the approval.
+3. The platform learns the approval landed by watching for its **device
+   commitment** in the account's authoriser key set (the same
+   commitment-indexed lookup as §4's blob-miss fallback — the public key
+   itself never appears on chain), scoped by the account hint, or simply
+   by the user continuing on the platform, whose next authorised call now
+   verifies.
 
 ```mermaid
 sequenceDiagram
@@ -242,35 +253,46 @@ sequenceDiagram
   participant ACC as ACC contract
 
   User->>PLAT: "Add this platform to my Passport"
-  PLAT->>PLAT: generate key per §2.3
-  PLAT-->>User: QR — versioned payload (scheme, public key, label)
+  PLAT->>PLAT: generate or use held key per §2.3, self-sign the request
+  PLAT-->>User: QR — signed payload (scheme, key, commitment, nonce, expiry, label)
   User->>PWA: scan the QR
-  PWA->>User: ceremony — shows fingerprint + label (existing authorised key)
-  PWA->>ACC: grant authoriser (existing add-authoriser circuit)
-  Note over ACC: authoriser key set gains the typed entry —<br/>no new storage, no new circuits
-  PLAT->>PLAT: detect grant (indexer lookup by public key) → operate
+  PWA->>PWA: verify signature + nonce + expiry + account BEFORE any UI
+  PWA->>User: ceremony — scheme-correct fingerprint + untrusted label
+  PWA->>ACC: approve — existing add_device(commitment) circuit
+  Note over ACC: authoriser key set gains the entry —<br/>no new storage, no new circuits
+  PLAT->>PLAT: detect approval (commitment lookup, account-scoped) → operate
 ```
 
 **Why this shape wins:**
 
 - **No ACC contract change.** The proposal never touches the chain, so
-  there is no candidate storage, no cap, no expiry policy, and no new
-  circuits — the existing authorised add-key operation is the whole
-  on-chain surface. The contract-team gate disappears.
+  there is no candidate storage, no on-chain cap or expiry policy (the
+  payload carries its own expiry), and no new circuits — the existing
+  `add_device(commitment)` circuit is the whole on-chain surface. The
+  contract-team gate disappears.
 - **No spam surface.** Nothing unauthorised ever writes to the contract, so
   there is nothing to cap and nothing an attacker can fill.
-- **The trust channel is physical.** The QR scan is the out-of-band human
-  step: the user points their own device at the screen they intend to
-  authorise, and the ceremony shows the fingerprint before anything is
-  granted. An attacker must get their QR in front of the user’s deliberate
-  scanning act — and the fingerprint display is the check against even
-  that.
+- **The scan is deliberate — but QR codes travel.** A QR arrives by
+  screenshot, chat, or a phishing page as easily as by a screen in front
+  of the user ("quishing"), so the deliberate scanning act alone is not a
+  proximity proof. The defences are layered instead: the payload's
+  **self-signature** proves the key's controller composed it, the
+  **expiry** kills stale copies, the **account hint** stops wrong-account
+  approvals, and the approval UI shows the **fingerprint the platform
+  displays beside its QR** — the user matches the two before the ceremony.
+  What remains (a user talked into approving a remotely delivered, live,
+  attacker-controlled request) is recorded as a residual risk in §8.
 
 **SDK surfaces:** platform side — the `onboard` facade gains
-`createAuthoriserRequest()` (generate the key per §2.3, return the payload
-and its QR/string encoding) and the grant-detection helper; PWA side —
-`grantAuthoriser(payload)` joins `core`'s devices flow (ceremony-gated,
-`require_device`). Granting authority remains exclusively a PWA act.
+`createAuthoriserRequest()` (generate a key per §2.3 *or* wrap a caller-held
+provider key via a signing callback; returns the signed payload and its
+QR/string encoding) and `awaitApproval()` (commitment-indexed detection,
+bounded polling, expiry timeout); PWA side — `addAuthoriserKey(payload)`
+joins `core`'s devices flow (payload verification first, then ceremony +
+`require_device`, then `add_device`). The name avoids the §3.8 term of art
+"grant authoriser", which denotes a *lesser, scoped* key — this flow adds a
+full one. Approving authority remains exclusively a PWA act; the facade
+carries requests only.
 
 ## 7. Where this does not work — the fallback ladder
 
@@ -292,6 +314,17 @@ can choose the right door before prompting the user.
 
 ## 8. Security framing (normative)
 
+- **Authoriser approval is the highest-stakes ceremony in this document** —
+  it confers full 1-of-n authority. Normative rules: the PWA verifies the
+  payload (self-signature, nonce, expiry, account) **before** showing any
+  approval UI; the fingerprint the user confirms is displayed by the
+  platform **beside its QR** so there are two independent renderings to
+  match; the label is attacker-chosen data and is rendered as such (never
+  styled as a trusted identity); revocation is the existing
+  remove-authoriser flow (`remove_device`) and the PWA surfaces it beside
+  the approval history. Residual risk (register): a user socially
+  engineered into approving a remotely delivered, live attacker request —
+  mitigated by the fingerprint match and the expiry, not eliminated.
 - **The origins list is a governed security surface.** Every listed origin
   can run ceremonies against Passport credentials; the well-known file is
   fetched per ceremony, so listing is a security decision with a recorded

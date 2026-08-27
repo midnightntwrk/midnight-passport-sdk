@@ -145,7 +145,7 @@ flowchart TB
 | Deposit mechanism (paying a Passport account) | §3.12 |
 | Recovery (lost-device / total-loss) | §3.4 · C13–C15 |
 | DID (`did:midnight`) | §3.7 |
-| Multi-device beyond the provider's own | §3.5 |
+| Multi-device beyond the provider's own (except FS-2.4's authorising-additional-keys flow, specced against §3.5 — see [`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md) §6) | §3.5 |
 
 Beta leans on the **provider** for anything managed it happens to offer
 (recovery, multi-device); Passport's own versions of those come after beta.

@@ -406,12 +406,17 @@ The SDK is the client half of the dApp connection surface:
   the chain at all. The platform generates its key per the §2.3 signing
   requirements — a managed provider signs with its **P-256 secure-signer
   key**, never passkey/PRF (PRF is the self-custody passkey mechanism) —
-  and **exposes the public key out-of-band, preferably as a QR code** (a versioned payload: scheme tag, public key, optional label).
-  The **Passport app scans it**, shows the fingerprint under the §2.2
-  ceremony, and — with an existing authorised key — **grants the key as an
-  authoriser** through the existing add-authoriser circuit. The PWA is the
-  only party that receives the key and the only party that signs the
-  grant. No candidate storage, no cap, no new circuits — no ACC change.
+  and **exposes a signed authoriser request out-of-band, preferably as a
+  QR code** (versioned payload: scheme tag, public key, the §2.3-derived
+  device commitment, account hint, nonce, expiry, bounded label, and a
+  self-signature over all of it — proof of possession and anti-replay).
+  The **Passport app scans it**, verifies the payload before any ceremony
+  UI, shows the fingerprint under the §2.2 ceremony, and — with an
+  existing authorised key — **approves the key into the authoriser key
+  set** through the existing `add_device(commitment)` circuit. The PWA is
+  the only party that receives the request and the only party that signs
+  the approval. No candidate storage, no cap, no new circuits — no ACC
+  change.
   Full design: [`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md) §6.
 
 ### 3.6 Private local-storage management
@@ -775,9 +780,9 @@ Normative rules:
   ([`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md) §5).
 - **Authorising additional keys from new platforms.**
   When the existing credential cannot follow the user to a new platform,
-  the platform exposes its public key (QR) and the **Passport app grants
-  it** with an existing authorised key — per §3.5, never a platform-side
-  write to the authoriser key set
+  the platform exposes a signed authoriser request (QR) and the **Passport
+  app approves it** with an existing authorised key — per §3.5, never a
+  platform-side write to the authoriser key set
   ([`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md) §6).
 
 ## 4. Reference implementations (UI / App)

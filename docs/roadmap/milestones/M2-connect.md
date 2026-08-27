@@ -1,9 +1,11 @@
 # M2 — Connect (feature specs)
 
 > The dApp side: the thin connector (**Sign-In-with-Passport** returning the
-> profile `{ name, account }`) and the **partner-origin issuance facade**
-> (FS-2.3). No witness provisioning, no grants, no deposits.
-> Backing: [`sdk-requirements.md`](../../sdk-requirements.md) §3.9 & §3.13,
+> profile `{ name, account }`), the **partner-origin issuance facade**
+> (FS-2.3), and **authorising additional keys** (FS-2.4). No witness
+> provisioning, no scoped grants, no deposits.
+> Backing: [`sdk-requirements.md`](../../sdk-requirements.md) §3.9, §3.13 &
+> §3.5,
 > [`architecture.md`](../../architecture.md) §4.4 & §4.6,
 > [`beta-scope.md`](../../beta-scope.md) §2(4)–(5),
 > [`onboarding-and-key-authorisation.md`](../../onboarding-and-key-authorisation.md).
@@ -112,37 +114,28 @@
   account key): the platform generates its key per §2.3 — for a provider,
   its **P-256 secure-signer key**, never passkey/PRF — and **exposes the
   public key, preferably as a QR**; the **Passport PWA scans it** and, with
-  an existing authorised key under the ceremony, **grants the key as an
-  authoriser on the ACC** via the existing add-authoriser circuit. The
+  an existing authorised key under the ceremony, **approves the key into
+  the ACC's authoriser key set** via the existing `add_device` circuit. The
   proposal never touches the chain; only the PWA signs.
-- **In scope.** The authoriser-request payload types (`protocol`; codec in
-  `core`); the facade's `createAuthoriserRequest` (key generation per §2.3,
-  payload + QR/string encoding, grant detection via indexer); `core`'s
-  devices-flow `grantAuthoriser(payload)` (ceremony-gated,
-  `require_device`, fingerprint display data).
+- **In scope.** The signed authoriser-request payload types (`protocol`;
+  codec in `core`); the facade's `createAuthoriserRequest` (payload +
+  QR/string encoding; provider-held-key arm) and `awaitApproval`
+  (commitment-indexed detection); `core`'s devices-flow
+  `addAuthoriserKey(payload)` (verification, then ceremony +
+  `require_device` + `add_device`).
 - **Out of scope.** Any ACC change (none is needed — the win of this
   shape); recovery interactions; grant issuance; QR rendering itself (UI).
 - **Backing.** requirements §3.5 (out-of-band handoff) & §3.13;
   [`onboarding-and-key-authorisation.md`](../../onboarding-and-key-authorisation.md) §6.
-- **Surface (indicative).** `createAuthoriserRequest() → { payload,
-  encoded }`; `awaitGrant(payload) → { account }` (facade);
-  `grantAuthoriser(payload)` (core devices flow).
+- **Surface.** Per FS-2.4 §4 (canonical): `createAuthoriserRequest`,
+  `awaitApproval` (facade); `addAuthoriserKey(payload)` (core devices flow).
 - **Dependencies.** FS-2.3 (the facade), FS-0.3/0.4 (kernel + signer),
-  existing add-authoriser bindings (`mn-passport-contract`). **Gate:**
-  none beyond the kernel/seams — no contract-team change.
-- **Acceptance.** Handoff round-trip: platform key exposed → PWA scan →
-  ceremony-gated grant → platform's next authorised call verifies; the
-  grant requires an existing authorised key + ceremony; the payload codec
-  round-trips; fingerprint display data is exposed to the approval UI.
-- **Verify.** Flow tests with dev seams; devnet round-trip (two browser
-  profiles: platform generates + displays, PWA scans + grants, platform
-  detects and signs).
-- **Tranches (proposed).** (1) protocol payload types + core codec +
-  `grantAuthoriser` against dev seams; (2) facade `createAuthoriserRequest`
-  + grant detection; (3) devnet round-trip + fingerprint/display data.
-- **Open questions.** Payload encoding for QR (size, alphabet, deep-link
-  form for the same-device case); whether the payload carries the account
-  hint or the platform discovers it post-grant via the indexer; label
-  authenticity (the label is attacker-chosen data — display rules).
+  existing `add_device` + `derive_device_commitment` bindings
+  (`mn-passport-contract`). **Gate:** none beyond the kernel/seams — no
+  contract-team change.
+- **Acceptance / verify / tranches.** Per FS-2.4 §7–§9 (canonical — this
+  brief deliberately does not restate them).
+- **Open questions.** Per FS-2.4 §11 (QR ergonomics, account-hint policy,
+  scheme registry, revocation surfacing, the in-circuit graduation).
 - **Issue.** midnightntwrk/passport#77 — a dedicated SDK issue should
   replace it before planning.
