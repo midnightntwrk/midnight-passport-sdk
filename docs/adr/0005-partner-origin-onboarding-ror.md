@@ -57,6 +57,12 @@ Three shapes were considered for the packaging:
   (config-overridable — the domain may change), the PRF device-key salt
   (fixing FS-0.8's provisional convention), and the versioned largeBlob
   payload schema with its pure codec.
+- **The facade connects directly to the third-party proving and DUST
+  sponsorship service** — a new decision for the provider-less path,
+  distinct from the managed path's decided routing (provider-integration
+  §9: the provider routes). It reuses the service's §5 surface; the
+  enclave-key pinning duty moves from the provider to Passport
+  configuration (§5.1) — same accepted residual risk, new owner.
 - **The largeBlob is a cache, never the source of truth**; the redirect-to-
   Passport fallback is mandatory below the compatibility floor; the
   related-origins list is a governed, curated surface (~5-label cap).
@@ -66,8 +72,10 @@ Three shapes were considered for the packaging:
 
 ## Consequences
 
-- The kernel and seam foundations (FS-0.3–0.8) move from parallel groundwork
-  to the **beta critical path** — they need issues and plans before FS-2.3
+- The kernel and seam foundations (FS-0.3–0.8) are confirmed on the **beta
+  critical path** — making explicit what the roadmap's M0 → M1 ordering
+  already implied; the new fact is only that FS-2.3 *also* depends on them,
+  so they gate both beta pillars. They need issues and plans before FS-2.3
   can be planned. The redirect fallback keeps the reference dApp shippable
   if the facade slips (beta-scope §5).
 - `scripts/dependency-graph.mjs` gains `onboard` (edges: `core`, adapters,

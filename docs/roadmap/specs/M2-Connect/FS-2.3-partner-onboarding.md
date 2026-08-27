@@ -68,13 +68,13 @@ path only**: the managed provider-authoriser variant is a future iteration
 
 | # | Decision | Rationale | Source |
 |---|---|---|---|
-| D-1 | `mn-passport-onboard` is a **facade over `core` + adapters** — it links the kernel and exposes only `createPassport`/`signIn`. | Issuance is custody work: one kernel implementation, no duplicated secret handling; reduced scope is API narrowness, not reimplementation. | ADR 0005; architecture §4.4 |
+| D-1 | `mn-passport-onboard` is a **facade over `core` + adapters** — it links the kernel and exposes exactly **`createPassport`, `signIn`, and `capabilities`** (the canonical surface; acceptance 6 enforces it). | Issuance is custody work: one kernel implementation, no duplicated secret handling; reduced scope is API narrowness, not reimplementation. | ADR 0005; architecture §4.4 |
 | D-2 | The `connect` rule is untouched: the conversational package stays core-free; `onboard` is the recorded exception. | Different threat models deserve different packages; embedding the kernel is honest for issuance, wrong for conversation. | architecture §4.4 |
 | D-3 | RP ID, PRF salt, and blob schema live in `protocol`. | Partner and Passport must agree on all three or recognition breaks; `protocol` is the no-logic shared-contract home. | requirements §3.13 |
-| D-4 | Ceremony budget is the spec floor: issuance = `create()` (bundled `prf.eval`) + one `get()` (`prf.eval` + `largeBlob.write`); sign-in = one bundled `get()`. A dropped extension is a measured finding, not a reason to add prompts. | Confirmed automated + on a real authenticator; largeBlob writes are illegal at `create()`. | findings.md, ceremony-discipline note |
+| D-4 | Ceremony budget: issuance = `create()` (bundled `prf.eval`) + one `get()` (`prf.eval` + `largeBlob.write`); sign-in = one bundled `get()`. **On authenticators that withhold PRF at `create()`, one dedicated `prf.eval` assertion is inserted before the deploy — three prompts, capability-determined and disclosed.** A dropped extension is a measured finding, never a silent extra prompt beyond that rule. | Confirmed automated + on a real authenticator; largeBlob writes are illegal at `create()`; the deploy consumes the PRF-derived secret, so PRF-at-create cannot be assumed. | findings.md, ceremony-discipline note |
 | D-5 | **largeBlob is a cache, never the source of truth**: blob miss → indexer lookup by device commitment; blob hit → verified against chain state before trust. | GPM and Windows Hello lack largeBlob; the ACC is the identity (P8, chain-only). | findings.md compatibility floor; requirements §1.1 |
 | D-6 | Capability detection + the mandatory redirect fallback are part of the facade's public surface. | Below the ROR/PRF floor the partner must route users to first-party onboarding, not fail. | partner-onboarding.md §6 |
-| D-7 | The facade connects **directly** to the third-party proving and DUST sponsorship service (sealed preimage → the service proves/balances/sponsors/binds in one process → SDK broadcasts); no provider in the loop on this path. | Passkey/PRF issuance has no provider by definition; the service's surface is the same one the managed rails use, so nothing is invented. The provider-routed managed variant is deferred. | partner-onboarding.md §3, §5; provider-integration.md §5 |
+| D-7 | The facade connects **directly** to the third-party proving and DUST sponsorship service (sealed preimage → the service proves/balances/sponsors/binds in one process → SDK broadcasts); no provider in the loop on this path. **This is a new decision for the provider-less path, recorded in ADR 0005** — distinct from the managed path's decided routing (provider-integration §9: the provider routes). The service *surface* reused is provider-integration §5's; the enclave-key pinning duty moves to Passport configuration (§5.1, requirements §3.13). | Passkey/PRF issuance has no provider by definition; the endpoints exist independently of who calls them. The provider-routed managed variant is deferred. | ADR 0005; partner-onboarding.md §3, §5; provider-integration.md §5, §9 |
 
 ## 4. Surface and interfaces
 
@@ -83,7 +83,7 @@ path only**: the managed provider-authoriser variant is a future iteration
 ```ts
 // ── mn-passport-protocol (types + constants only, zero logic) ──
 export const PASSPORT_RP_ID: string;                 // default; every API takes rpId?
-export const PRF_DEVICE_KEY_SALT: Uint8Array;        // 'mn-passport/prf/device-key/v1'
+export const PRF_DEVICE_KEY_SALT: Uint8Array;        // canonical value: partner-onboarding.md §2
 export interface PassportBlobV1 { v: 1; acc: Uint8Array /* 32 */; binding: string }
 
 // ── core: the blob codec (pure; protocol ships no logic) ──
@@ -94,18 +94,29 @@ export function decodeBlob(bytes: Uint8Array): PassportBlobV1;
 interface CeremonyPrimitives {
   prfEvaluate(salt: Uint8Array): Promise<Uint8Array>;
   kdfFromPassword(prompt: CeremonyPrompt): Promise<Uint8Array>;
-  createCredential(opts: { rpId: string; user: string; prfSalt: Uint8Array }): Promise<CreatedCredential>;
+  createCredential(opts: { rpId: string; user: string; prfSalt: Uint8Array; largeBlob: 'preferred' | 'required' }): Promise<CreatedCredential>; // largeBlob support is requestable ONLY at registration (WebAuthn L3)
   assertBundled(opts: { rpId: string; prfSalt?: Uint8Array; blob?: 'read' | { write: Uint8Array }; credentialId?: Uint8Array }): Promise<BundledAssertion>;
   capabilities(): { prf: boolean; largeBlob: boolean; relatedOrigins: boolean };
 }
 
-// ── mn-passport-onboard (facade) ──
-export interface OnboardConfig { rpId?: string; authoriser?: Authoriser; indexerUrl?: string }
+// ── mn-passport-onboard (facade) — the canonical surface is exactly these three ──
+export interface OnboardConfig {
+  rpId?: string;                 // protocol default
+  user?: string;                 // display label for the passkey sheet
+  authoriser?: 'passkey';        // config token, not a handle — selects the
+                                 // FS-0.4 Signer fill internally ('provider'
+                                 // joins in the managed future iteration)
+  serviceUrl?: string;           // third-party proving & sponsorship endpoint
+  indexerUrl?: string;
+}
 export function createPassport(cfg?: OnboardConfig): Promise<{ account: AccAddress; credentialId: Uint8Array; publicKey: Uint8Array }>;
 export function signIn(cfg?: OnboardConfig): Promise<{ account: AccAddress; publicKey: Uint8Array }>;
-export function capabilities(): { canIssueHere: boolean; reasons: string[] };   // drives the redirect fallback
-export function passkeyAuthoriser(): Authoriser;      // adapter-signer-local (FS-0.4 seam)
-// The managed providerAuthoriser(...) fills the same seam in a future iteration.
+export function capabilities(): { canIssueHere: boolean; reasons: string[] };
+// capabilities() gates on BROWSER capability only (ROR/PRF support); it
+// cannot see the live related-origins listing, so a ceremony-time
+// SecurityError still routes to the redirect fallback.
+// No signer handle is ever exported: the FS-0.4 `Signer` stays internal to
+// the composition — exporting it would bypass the §2.2 ceremony gate.
 ```
 
 ## 5. Flow
@@ -127,7 +138,8 @@ for this spec; §5's managed variant is a recorded TODO, out of scope here).
 
 ## 7. Acceptance criteria
 
-1. Issue → recognise round-trip green in the harness: two prompts to issue,
+1. Issue → recognise round-trip green in the harness: two prompts to issue
+   (three where the authenticator withholds PRF at `create()`, per D-4),
    one to sign in; identical derived key both sides; blob round-trips.
 2. Blob miss degrades to the indexer lookup; a stale blob never wins over
    chain state.

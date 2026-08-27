@@ -360,8 +360,10 @@ End-to-end account creation from a single ceremony:
 4. **Anchor the DID** — create the account's `did:midnight` identifier
    (§3.7).
 
-The same orchestration is also reachable **from a partner dApp** — issuance
-at the partner origin via a Related Origin Request, detailed in §3.13.
+A reduced form of this orchestration is also reachable **from a partner
+dApp** — steps 1–2 only (credential + ACC deploy; the name claim and DID
+anchor follow at the Passport app) via a Related Origin Request, detailed
+in §3.13.
 
 ### 3.2 dApp authentication and authorisation
 
@@ -719,8 +721,10 @@ the contract package is a foundation dependency, not the custody core.
 
 A partner dApp can **issue a Passport itself**: create a passkey under the
 Passport RP ID via a WebAuthn **Related Origin Request**, deploy the user's
-ACC over the managed proving and settlement rails (fees sponsored, so a
-zero-DUST user onboards from the partner origin), and stamp the deployed ACC
+ACC via a **direct connection to the third-party proving and DUST
+sponsorship service** (fees sponsored, so a zero-DUST user onboards from the
+partner origin; no provider in the loop — the provider-routed topology is
+the managed path's), and stamp the deployed ACC
 address onto the credential via the **largeBlob** extension so the Passport
 app later *recognises* the account from one ceremony. Detailed design:
 [`partner-onboarding.md`](./partner-onboarding.md); mechanism validated in
@@ -745,7 +749,16 @@ Normative rules:
   a blob hit is verified against chain state before it is trusted.
 - **The redirect fallback is mandatory.** Below the ROR/PRF compatibility
   floor the integration MUST fall back to first-party onboarding in the
-  Passport app (the C23 surface); capability detection is part of the facade.
+  Passport app (the C23 surface); capability detection is part of the facade
+  — noting it can gate only on browser capability, not on the live
+  related-origins listing, so a `SecurityError` at ceremony time still
+  routes to the same fallback.
+- **Enclave-key provenance on the direct path.** §2.5 delegates enclave
+  attestation to "the provider / upstream"; with no provider in this loop,
+  **the service publishes its attestation-backed enclave key and the
+  Passport deployment pins it** (provider-integration §5.1) — the same
+  accepted residual risk, with the pinning duty reassigned from the
+  provider to Passport configuration.
 - **The related-origins list is governed.** Every listed origin can exercise
   Passport credentials; listing is a recorded security decision, bounded by
   the ~5-label client cap — the partner set is curated by design.
