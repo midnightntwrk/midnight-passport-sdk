@@ -71,7 +71,7 @@ scoped-grant issuance or spending, no deposits.
 
 **(5) Partner-origin onboarding** — a partner dApp can **issue the Passport
 itself** via `mn-passport-onboard` (§3.13,
-[`partner-onboarding.md`](./partner-onboarding.md)): passkey created under
+[`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md)): passkey created under
 the Passport RP ID (Related Origin Request), ACC deployed over the same
 provider rails as item (3) (fees sponsored), and the ACC address stamped
 onto the credential via largeBlob so the Passport app recognises the account
@@ -80,7 +80,7 @@ origin and at Passport. The deploy uses the **same third-party proving and
 DUST sponsorship service as item (3), reached directly** — no provider in
 the loop (passkey/PRF path only for now; the managed provider-authoriser
 variant is deferred to a future iteration,
-[`partner-onboarding.md`](./partner-onboarding.md) §5). The
+[`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md) §5). The
 redirect-to-Passport fallback is mandatory below the compatibility floor. **Scope consequence:** the facade embeds the `core`
 kernel, so the kernel and seam foundations (FS-0.3–0.8) move onto the beta
 critical path.
@@ -92,7 +92,7 @@ to personalise. It still never spends, never asks for a grant, and never
 touches **stored** witness state — with one qualified moment: during
 issuance (item 5) the embedded kernel transiently holds the new account's
 device secret, the accepted residual risk recorded in
-[`partner-onboarding.md`](./partner-onboarding.md) §7. Issuance and
+[`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md) §8. Issuance and
 recognition only, which keeps it a safe first integration and a good
 dogfooding partner for both packages.
 
@@ -153,7 +153,7 @@ flowchart TB
 | Deposit mechanism (paying a Passport account) | §3.12 |
 | Recovery (lost-device / total-loss) | §3.4 · C13–C15 |
 | DID (`did:midnight`) | §3.7 |
-| Multi-device beyond the provider's own | §3.5 |
+| Multi-device beyond the provider's own (except FS-2.4's authorising-additional-keys flow, specced against §3.5 — see [`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md) §6) | §3.5 |
 
 Beta leans on the **provider** for anything managed it happens to offer
 (recovery, multi-device); Passport's own versions of those come after beta.

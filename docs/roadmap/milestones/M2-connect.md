@@ -1,12 +1,14 @@
 # M2 — Connect (feature specs)
 
 > The dApp side: the thin connector (**Sign-In-with-Passport** returning the
-> profile `{ name, account }`) and the **partner-origin issuance facade**
-> (FS-2.3). No witness provisioning, no grants, no deposits.
-> Backing: [`sdk-requirements.md`](../../sdk-requirements.md) §3.9 & §3.13,
+> profile `{ name, account }`), the **partner-origin issuance facade**
+> (FS-2.3), and **authorising additional keys** (FS-2.4). No witness
+> provisioning, no scoped grants, no deposits.
+> Backing: [`sdk-requirements.md`](../../sdk-requirements.md) §3.9, §3.13 &
+> §3.5,
 > [`architecture.md`](../../architecture.md) §4.4 & §4.6,
 > [`beta-scope.md`](../../beta-scope.md) §2(4)–(5),
-> [`partner-onboarding.md`](../../partner-onboarding.md).
+> [`onboarding-and-key-authorisation.md`](../../onboarding-and-key-authorisation.md).
 > FS-2.1/2.2 are mostly parallel with M1 (build against a fixture ACC);
 > FS-2.3 depends on the kernel and seams (FS-0.3–0.8) and the M1 rails.
 
@@ -74,11 +76,11 @@
   third-party proving and DUST sponsorship service (sealed preimage).
 - **Out of scope.** The managed (provider authoriser + routing) variant —
   future iteration, TODO recorded in
-  [`partner-onboarding.md`](../../partner-onboarding.md) §5; grants,
+  [`onboarding-and-key-authorisation.md`](../../onboarding-and-key-authorisation.md) §5; grants,
   recovery, device management, assets, witness provisioning; the redirect
   fallback's PWA half (it is the existing first-party onboarding);
   origins-list hosting/governance implementation.
-- **Backing.** requirements §3.13; [`partner-onboarding.md`](../../partner-onboarding.md);
+- **Backing.** requirements §3.13; [`onboarding-and-key-authorisation.md`](../../onboarding-and-key-authorisation.md);
   architecture §4.4 (the recorded facade exception, ADR 0005); beta-scope
   §2(5); `experiments/passkey-prf-linking/findings.md` (mechanism confirmed,
   compatibility floor).
@@ -95,3 +97,37 @@
   shape (it should — one implementation in `core`).
 - **Issue.** midnightntwrk/passport#77 (C27 · Passport Facade) — a dedicated
   issue may replace it before spec-driver plans.
+
+## FS-2.4 — Authorising additional keys (`mn-passport-onboard` + `core`)
+
+- **Objective.** An existing Passport user joins a **new external platform**
+  (a Passport-embedding environment or managed provider needing its own
+  authoriser key — never a dApp, which uses the connector and holds no
+  account key): the platform generates its key per §2.3 — for a provider,
+  its **P-256 secure-signer key**, never passkey/PRF — and **exposes the
+  public key, preferably as a QR**; the **Passport PWA scans it** and, with
+  an existing authorised key under the ceremony, **approves the key into
+  the ACC's authoriser key set** via the existing `add_device` circuit. The
+  proposal never touches the chain; only the PWA signs.
+- **In scope.** The signed authoriser-request payload types (`protocol`;
+  codec in `core`); the facade's `createAuthoriserRequest` (payload +
+  QR/string encoding; provider-held-key arm) and `awaitApproval`
+  (commitment-indexed detection); `core`'s devices-flow
+  `addAuthoriserKey(payload)` (verification, then ceremony +
+  `require_device` + `add_device`).
+- **Out of scope.** Any ACC change (none is needed — the win of this
+  shape); recovery interactions; grant issuance; QR rendering itself (UI).
+- **Backing.** requirements §3.5 (out-of-band handoff) & §3.13;
+  [`onboarding-and-key-authorisation.md`](../../onboarding-and-key-authorisation.md) §6.
+- **Surface.** Per FS-2.4 §4 (canonical): `createAuthoriserRequest`,
+  `awaitApproval` (facade); `addAuthoriserKey(payload)` (core devices flow).
+- **Dependencies.** FS-2.3 (the facade), FS-0.3/0.4 (kernel + signer),
+  existing `add_device` + `derive_device_commitment` bindings
+  (`mn-passport-contract`). **Gate:** none beyond the kernel/seams — no
+  contract-team change.
+- **Acceptance / verify / tranches.** Per FS-2.4 §7–§9 (canonical — this
+  brief deliberately does not restate them).
+- **Open questions.** Per FS-2.4 §11 (QR ergonomics, account-hint policy,
+  scheme registry, revocation surfacing, the in-circuit graduation).
+- **Issue.** midnightntwrk/passport#77 — a dedicated SDK issue should
+  replace it before planning.
