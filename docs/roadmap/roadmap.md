@@ -17,8 +17,10 @@ Two things, done well (from [`beta-scope.md`](../beta-scope.md) §1):
 1. **Full account setup** on the managed path — deploy the Account Custody
    Contract (ACC) and claim the name (`alice.passport.night`), with fees
    sponsored so a zero-DUST user can onboard.
-2. **A first reference dApp** — a **marketing experience, fully off-chain** —
-   that signs a user in and reads their profile (`{ name, account }`).
+2. **A first reference dApp** — a **marketing experience** — that **issues a
+   new Passport in place** (partner-origin onboarding, FS-2.3 /
+   [`onboarding-and-key-authorisation.md`](../onboarding-and-key-authorisation.md)), signs a user in,
+   and reads their profile (`{ name, account }`).
 
 Everything else is deferred (§9). Beta is deliberately **managed-path first**
 — with `adapter-signer-local` built as the self-custody contingency fallback
@@ -39,8 +41,8 @@ brief into a full spec in [`specs/`](./specs/), which
 |---|---|---|---|
 | **M0** | Foundations | scaffolding, dev workflow, ACC-artefact wiring, seam interfaces | — (start now) |
 | **M1** | Managed onboarding | deploy ACC + claim name end-to-end, fees sponsored | M0 · Dynamic · BCW · deployed ACC |
-| **M2** | Connect | Sign-In-with-Passport returning `{ name, account }` | M0 (soft: a deployed ACC to read) |
-| **M3** | Reference dApp | the off-chain marketing experience wired to `connect` | M2 |
+| **M2** | Connect | Sign-In-with-Passport returning `{ name, account }`; the partner-origin issuance facade (FS-2.3); authorising additional keys (FS-2.4) | M0 (soft: a deployed ACC to read) · FS-2.3 also: FS-0.3–0.8 + M1 rails |
+| **M3** | Reference dApp | the marketing experience wired to `connect` + `onboard` (issues Passports in place) | M2 |
 | **M4** | Hardening & demo | audit, conformance, privacy disclosure, beta demo | M1 · M2 · M3 |
 
 ### M0 — Foundations
@@ -65,16 +67,28 @@ submit) runs through **BCW**. *Exit:* a zero-DUST user deploys an ACC and claims
 `alice.passport.night` end-to-end on the managed path.
 
 ### M2 — Connect
-`mn-passport-protocol` (the C23 wire types) and `mn-passport-connect`
-(Sign-In-with-Passport + profile read only). No witness provisioning, no grants,
-no deposits (§4 of beta-scope). *Exit:* a dApp signs a user in and reads
-`{ name, account }`.
+`mn-passport-protocol` (the C23 wire types + the §3.13 shared constants),
+`mn-passport-connect` (Sign-In-with-Passport + profile read only), and
+**`mn-passport-onboard`** (FS-2.3, the partner-origin issuance facade over
+`core` + adapters — passkey under the Passport RP ID via ROR, ACC deploy via
+a direct connection to the third-party proving and DUST sponsorship service,
+largeBlob bootstrap, sign-in; the managed-authoriser variant is a future
+iteration; see [`onboarding-and-key-authorisation.md`](../onboarding-and-key-authorisation.md)).
+Also **FS-2.4 — authorising additional keys**: a new platform's signed key
+request (QR) approved from the PWA into the ACC's authoriser key set via the
+existing `add_device` circuit — no contract change
+([`onboarding-and-key-authorisation.md`](../onboarding-and-key-authorisation.md) §6).
+No witness provisioning, no scoped grants, no deposits (§4 of beta-scope).
+*Exit:* a dApp signs a user in and reads `{ name, account }`; a dApp issues
+a new Passport that the Passport app recognises from one ceremony; and a
+platform key is approved from the PWA and then authorises.
 
 ### M3 — Reference dApp
-Install `mn-passport-connect` into the **marketing experience** (fully
-off-chain): sign-in and personalisation only, never spends, never asks for a
-grant, never touches witness state. *Exit:* the reference dApp runs the sign-in
-flow end-to-end.
+Install `mn-passport-onboard` + `mn-passport-connect` into the **marketing
+experience**: it issues a new Passport in place, signs existing users in,
+and personalises — never spends, never asks for a grant, never touches
+witness state. *Exit:* the reference dApp runs issuance and sign-in
+end-to-end.
 
 ### M4 — Hardening & demo
 Run the review lenses (`security-audit`, `conformance`, `verify`) and `doc-sync`;
@@ -89,13 +103,14 @@ register and docs are current.
 |---|---|---|
 | `mn-passport-core` (slim) | kernel, onboarding flow, connect answer, seams | M0–M1 |
 | `mn-passport-contract` | ACC bindings: deploy + name claim | M0–M1 |
-| `mn-passport-protocol` | C23 wire types (dApp ↔ wallet) | M2 |
+| `mn-passport-protocol` | C23 wire types (dApp ↔ wallet) + §3.13 shared constants | M2 |
 | `mn-passport-connect` | sign-in + profile read | M2 |
+| `mn-passport-onboard` | partner-origin issuance facade (FS-2.3) + key-authorisation requests (FS-2.4) | M2 |
 | `adapter-signer-managed` | Dynamic authoriser signing | M1 |
 | `adapter-signer-local` | self-custody signer — contingency fallback (ADR 0001) | M1 |
 | `adapter-prover-remote` | BCW TEE proving (seal + `/prove`) | M1 |
 | `adapter-*` settlement seam | BCW DUST balancing + submit | M1 |
-| `adapter-browser` | platform target (the PWA) | M1 |
+| `adapter-browser` | platform target (the PWA) + WebAuthn/ROR and largeBlob ceremonies (FS-2.3) | M1–M2 |
 
 **Not built for beta:** `adapter-prover-wasm`, `adapter-agent-ows`,
 `adapter-wallet-connect`, `adapter-fee-capacity-exchange`, and the
@@ -160,7 +175,11 @@ private `../mn-passport-sdk-debts` sibling).
 - A zero-DUST user onboards end-to-end on the managed path: ACC deployed, name
   claimed, fees sponsored by BCW, authorised by Dynamic, proven in BCW's TEE.
 - A dApp completes Sign-In-with-Passport and reads `{ name, account }`.
-- The reference marketing experience runs that flow for a real user.
+- A dApp issues a new Passport in place (passkey under the Passport RP ID,
+  ACC deployed, largeBlob bootstrap) and the Passport app recognises the
+  account from one ceremony — or, below the compatibility floor, the
+  redirect fallback carries the user to first-party onboarding.
+- The reference marketing experience runs those flows for a real user.
 - The reduced-privacy posture is disclosed and reminded (requirements §2.5).
 - Security audit, conformance, and doc-sync have run; the risk register is
   current.

@@ -360,6 +360,11 @@ End-to-end account creation from a single ceremony:
 4. **Anchor the DID** — create the account's `did:midnight` identifier
    (§3.7).
 
+A reduced form of this orchestration is also reachable **from a partner
+dApp** — steps 1–2 only (credential + ACC deploy; the name claim and DID
+anchor follow at the Passport app) via a Related Origin Request, detailed
+in §3.13.
+
 ### 3.2 dApp authentication and authorisation
 
 The SDK is the client half of the dApp connection surface:
@@ -395,6 +400,26 @@ The SDK is the client half of the dApp connection surface:
   including the 1-of-n / last-device guard ([C1], [C9], [C13]).
 - On the decentralised path, device authorisations are verified in-circuit
   by the ACC; on the managed path they are delegated to the provider.
+- **Authorising additional keys (platforms and providers).** A
+  new platform — a Passport-embedding environment or a managed provider
+  needing its own authoriser key for the user; never a dApp, which
+  integrates through the connector (§3.9) and holds no account key — MUST
+  NOT write to the **authoriser key set**, and the proposal never touches
+  the chain at all. The platform generates its key per the §2.3 signing
+  requirements — a managed provider signs with its **P-256 secure-signer
+  key**, never passkey/PRF (PRF is the self-custody passkey mechanism) —
+  and **exposes a signed authoriser request out-of-band, preferably as a
+  QR code** (versioned payload: scheme tag, public key, the §2.3-derived
+  device commitment, account hint, nonce, expiry, bounded label, and a
+  self-signature over all of it — proof of possession and anti-replay).
+  The **Passport app scans it**, verifies the payload before any ceremony
+  UI, shows the fingerprint under the §2.2 ceremony, and — with an
+  existing authorised key — **approves the key into the authoriser key
+  set** through the existing `add_device(commitment)` circuit. The PWA is
+  the only party that receives the request and the only party that signs
+  the approval. No candidate storage, no cap, no new circuits — no ACC
+  change.
+  Full design: [`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md) §6.
 
 ### 3.6 Private local-storage management
 
@@ -711,6 +736,67 @@ C23 wallet message — it rides the typed contract bindings
 (`mn-passport-contract`), not the kernel. Surfacing it through the dApp
 connector does not breach the "connector never links the core" rule (§3.9):
 the contract package is a foundation dependency, not the custody core.
+
+### 3.13 Partner-origin onboarding
+
+A partner dApp can **issue a Passport itself**: create a passkey under the
+Passport RP ID via a WebAuthn **Related Origin Request**, deploy the user's
+ACC via a **direct connection to the third-party proving and DUST
+sponsorship service** (fees sponsored, so a zero-DUST user onboards from the
+partner origin; no provider in the loop — the provider-routed topology is
+the managed path's), and stamp the deployed ACC
+address onto the credential via the **largeBlob** extension so the Passport
+app later *recognises* the account from one ceremony. Detailed design:
+[`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md); mechanism validated in
+`experiments/passkey-prf-linking/` (2026/08/18, including on a real
+authenticator).
+
+Normative rules:
+
+- **One implementation.** The capability ships as the
+  `@midnight-ntwrk/mn-passport-onboard` **facade over `mn-passport-core`**
+  and the adapters — issuance is custody work, so the kernel is embedded,
+  never reimplemented. The facade exposes **issuance and recognition only**
+  (`createPassport`, `signIn`); the full account lifecycle stays in the
+  Passport app. The §3.9 rule is unchanged: `mn-passport-connect` never
+  links the core.
+- **Shared constants come from `mn-passport-protocol`**: the Passport RP ID
+  (config-overridable — the domain may change), the PRF device-key salt, and
+  the versioned largeBlob payload schema. Partner and Passport MUST agree on
+  all three or recognition breaks.
+- **The largeBlob is a cache, never the source of truth.** A blob miss or a
+  stale blob degrades to an indexer/registry lookup by device commitment;
+  a blob hit is verified against chain state before it is trusted.
+- **The redirect fallback is mandatory.** Below the ROR/PRF compatibility
+  floor the integration MUST fall back to first-party onboarding in the
+  Passport app (the C23 surface); capability detection is part of the facade
+  — noting it can gate only on browser capability, not on the live
+  related-origins listing, so a `SecurityError` at ceremony time still
+  routes to the same fallback.
+- **Enclave-key provenance on the direct path.** §2.5 delegates enclave
+  attestation to "the provider / upstream"; with no provider in this loop,
+  **the service publishes its attestation-backed enclave key and the
+  Passport deployment pins it** (provider-integration §5.1) — the same
+  accepted residual risk, with the pinning duty reassigned from the
+  provider to Passport configuration.
+- **The related-origins list is governed.** Every listed origin can exercise
+  Passport credentials; listing is a recorded security decision, bounded by
+  the ~5-label client cap — the partner set is curated by design.
+- **Direct service connection (passkey/PRF path).** The facade connects
+  **directly** to the third-party proving and DUST sponsorship service — the
+  deploy preimage sealed to the service's enclave key (§2.5) — with no
+  provider in the loop; provider *routing* belongs to the managed path.
+- **Managed variant — future iteration.** Behind the same signer seam, a
+  wallet-infrastructure provider may supply the authoriser and presence gate
+  (§2.6) instead of the PRF-derived key — same ACC, migration per §2.1. Its
+  partner-origin flow is not yet documented
+  ([`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md) §5).
+- **Authorising additional keys from new platforms.**
+  When the existing credential cannot follow the user to a new platform,
+  the platform exposes a signed authoriser request (QR) and the **Passport
+  app approves it** with an existing authorised key — per §3.5, never a
+  platform-side write to the authoriser key set
+  ([`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md) §6).
 
 ## 4. Reference implementations (UI / App)
 

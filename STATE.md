@@ -4,7 +4,7 @@
 > `mn-passport-skills:spec-driver` per [`docs/development-workflow.md`](./docs/development-workflow.md) §3.
 > Every entry carries its GitHub issue
 > ([midnightntwrk/passport](https://github.com/midnightntwrk/passport/issues)).
-> Last updated: 2026/07/30.
+> Last updated: 2026/08/24.
 
 ## Done
 
@@ -95,3 +95,21 @@
 - **FS-0.3–FS-0.8** (`#TBD`) — authored specs in
   [`docs/roadmap/specs/M0-Foundations/`](./docs/roadmap/specs/M0-Foundations/);
   not planned — each still needs its GitHub issue (no issue, no plan).
+  **Promoted to the beta critical path** by FS-2.3 (ADR 0005): the onboard
+  facade embeds the kernel and seams.
+- **FS-2.3 — partner-origin onboarding** (#77) — authored 2026/08/18:
+  design in [`docs/onboarding-and-key-authorisation.md`](./docs/onboarding-and-key-authorisation.md),
+  spec in
+  [`docs/roadmap/specs/M2-Connect/FS-2.3-partner-onboarding.md`](./docs/roadmap/specs/M2-Connect/FS-2.3-partner-onboarding.md),
+  ADR 0005; beta scope amended (§2 item 5). Not planned — blocked on
+  FS-0.3–0.8 issues/plans; a dedicated issue may replace #77.
+- **FS-2.4 — authorising additional keys** (#77) — authored 2026/08/24
+  (supersedes the same-day candidate-registry draft: no on-chain candidates
+  store, cap, or new circuits): the platform exposes a **signed authoriser
+  request** (QR — proof of possession, nonce, expiry, account hint) and
+  the PWA approves it with an existing authorised key via the existing
+  `add_device` circuit. Design in
+  [`docs/onboarding-and-key-authorisation.md`](./docs/onboarding-and-key-authorisation.md) §6, spec in
+  [`docs/roadmap/specs/M2-Connect/FS-2.4-authorising-additional-keys.md`](./docs/roadmap/specs/M2-Connect/FS-2.4-authorising-additional-keys.md),
+  requirements §3.5 amended. **No contract-team gate.** Not planned — needs
+  its own SDK issue.
