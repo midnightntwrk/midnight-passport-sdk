@@ -15,7 +15,7 @@
     "build:artefact": "node scripts/build-acc-artefact.mjs"
   },
   "devDependencies": {
-    "@midnight-ntwrk/compact-runtime": "0.16.0",
+    "@midnight-ntwrk/compact-runtime": "0.19.0",
     "@types/node": "22.20.1",
     "prettier": "3.9.6",
     "typescript": "6.0.3"
