@@ -330,10 +330,48 @@ can choose the right door before prompting the user.
   platform **beside its QR** so there are two independent renderings to
   match; the label is attacker-chosen data and is rendered as such (never
   styled as a trusted identity); revocation is the existing
-  remove-authoriser flow (`remove_device`) and the PWA surfaces it beside
-  the approval history. Residual risk (register): a user socially
-  engineered into approving a remotely delivered, live attacker request —
-  mitigated by the fingerprint match and the expiry, not eliminated.
+  remove-authoriser flow (`remove_device`), which the PWA surfaces beside
+  the approval history, subject to the limits in the next bullet. Residual
+  risk (register): a user socially engineered into approving a remotely
+  delivered, live attacker request — mitigated by the fingerprint match and
+  the expiry, not eliminated.
+- **Revocation is incomplete today, and that bounds what an added
+  authoriser should be trusted with.** The authoriser key set holds
+  single-use rolling entries and carries no per-device identity, so nothing
+  binds one key to exactly one live entry. Two limits are recorded against
+  the reference contract:
+  - **`remove_device` retires an entry, not a device** (erratum 8, proven
+    on-node). An enrolled key can enrol a second entry for its own key: the
+    seam consumes its current entry and inserts the successor, then the add
+    path inserts the planted one. Removal retires a single element, and
+    resolving which element belongs to a key returns the first live counter,
+    so the key keeps authorising on the other entry. Demonstrated on the
+    JubJub arm: after the owner revoked it, the device signed a gated call
+    that advanced the authorisation nonce and enrolled a further key of its
+    own choosing. Deriving the entry in-circuit is not a fix, because the
+    planted entry is bit-identical to what an in-circuit derivation emits
+    for the caller's own key.
+  - **An epoch bump does not evict a key that anticipated it** (erratum 7).
+    Nothing in the add path binds the epoch the contract observed, so an
+    authorised key can enrol an entry at `device_epoch + 1` that matches
+    nothing today and authorises the moment the epoch advances, defeating
+    the bulk-revocation property the bump exists to provide.
+
+  Closing either needs a per-device identity the contract maintains, which
+  is a ledger-schema change and therefore a redeploy; erratum 8 carries the
+  proposed shape. **What this means here:** revocation today is a hygiene
+  mechanism, not a containment mechanism. It reliably retires a key that is
+  not resisting (a lost platform, a rotation, a tidy-up); it does not
+  reliably evict a key that planted a spare entry before removal. Because §6
+  confers full 1-of-n authority, an integration MUST NOT treat revocation as
+  the safety valve for a platform or agent key it would not otherwise trust
+  with the account, and until the fix lands the durable remedy against a
+  hostile authoriser is migration to a fresh account rather than removal.
+  Two further limits are recorded: entries are planted at a counter of the
+  planter's choosing, so beyond the client's entry-rescan window an owner
+  cannot enumerate them in order to remove them; and the device count is a
+  bounded integer whose increment range-checks, so repeated planting can
+  reach a state in which no further key can be enrolled.
 - **Enclave-key provenance on the direct path.** §2.5 assigns enclave
   attestation to "the provider / upstream"; on the provider-less path that
   duty is reassigned: the third-party service publishes its
