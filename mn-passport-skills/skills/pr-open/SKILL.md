@@ -17,7 +17,7 @@ confirmation prompt. Do not attempt to route around it.
 bash mn-passport-skills/scripts/check-diff-size.sh   # same script and numbers as CI
 ```
 
-- **> 600** net changed lines (lockfiles/generated/fixtures excluded):
+- **> 600** net changed lines (lockfiles/generated/fixtures/experiments excluded):
   stop and split. Propose a split along reviewable concerns — by layer
   (foundation / core / adapter), by flow, or by file group — such that each
   part builds and tests green on its own.
@@ -49,7 +49,7 @@ bash mn-passport-skills/scripts/check-diff-size.sh   # same script and numbers a
 - verify: <flows run end-to-end and against what; register entries added>
 
 ## Size
-<N net changed lines (excl. lockfiles/generated/fixtures)>
+<N net changed lines (excl. lockfiles/generated/fixtures/experiments)>
 <justification if over 400>
 ```
 

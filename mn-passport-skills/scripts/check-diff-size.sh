@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Tranche budget check — 400 soft / 600 hard net changed lines
 # (docs/development-workflow.md §4–5). Counts insertions + deletions against a
-# base ref, excluding lockfiles, generated code, and test fixtures. Rename
-# detection is on, so pure moves cost nothing.
+# base ref, excluding lockfiles, generated code, test fixtures, and the
+# standalone experiments/ tree (not tranche work). Rename detection is on,
+# so pure moves cost nothing.
 #
 # Usage: check-diff-size.sh [base-ref] [--ci]
 #   base-ref  defaults to origin/main (falls back to main)
@@ -24,12 +25,13 @@ EXCLUDES=(
   ':!**/dist/**' ':!**/build/**' ':!**/generated/**' ':!*.generated.*'
   ':!**/managed/**'
   ':!**/fixtures/**' ':!**/__snapshots__/**' ':!**/*.snap'
+  ':!experiments'
 )
 
 CHANGED=$(git diff -M --numstat "$BASE"...HEAD -- . "${EXCLUDES[@]}" \
   | awk '{ add += $1; del += $2 } END { print add + del + 0 }')
 
-echo "Net changed lines vs $BASE (lockfiles/generated/fixtures excluded): $CHANGED"
+echo "Net changed lines vs $BASE (lockfiles/generated/fixtures/experiments excluded): $CHANGED"
 
 if [ "$CHANGED" -gt "$HARD" ]; then
   MSG="Diff is $CHANGED lines — over the 600-line hard budget. Tranches must split (mn-passport-skills:pr-open); merging an exceptional PR (e.g. a migration) is a human decision."

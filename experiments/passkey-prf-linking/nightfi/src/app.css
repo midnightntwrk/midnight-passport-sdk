@@ -1,0 +1,377 @@
+/* NightFi — "finance that's open at midnight". A warm neon storefront: the
+   after-hours consulate that issues you a Midnight Passport. Plum-black night,
+   hot amber and rose neon, condensed signage type, an OPEN sign that flickers
+   on, and output printed as a torn-off issuance receipt. The deliberate warm,
+   asymmetric, boutique counterpoint to Midnight Passport's cold document. */
+
+:root {
+  color-scheme: dark;
+
+  --night: #150913;
+  --night-2: #1e0d1c;
+  --frame: #2c1730;
+  --hairline: #3c2040;
+  --amber: #ffb23e;
+  --rose: #ff4d9d;
+  --cream: #f6e9d8;
+  --dim: #c39bb4;
+  --ink: #2a1420; /* ink on the receipt paper */
+
+  --font-sign: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
+  --font-body: 'Manrope', system-ui, sans-serif;
+  --font-data: 'DM Mono', ui-monospace, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  color: var(--cream);
+  background:
+    radial-gradient(80% 50% at 15% 0%, rgba(255, 178, 62, 0.14), transparent 60%),
+    radial-gradient(70% 50% at 100% 30%, rgba(255, 77, 157, 0.12), transparent 55%),
+    var(--night);
+  min-height: 100vh;
+}
+
+.night {
+  min-height: 100vh;
+  padding: clamp(1.25rem, 4vw, 3.5rem);
+  display: flex;
+  justify-content: center;
+}
+
+/* the shopfront window */
+.frame {
+  width: 100%;
+  max-width: 46rem;
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  padding: clamp(1.5rem, 4vw, 3rem);
+  background:
+    linear-gradient(180deg, rgba(255, 178, 62, 0.05), transparent 30%),
+    var(--night-2);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 50px 100px -60px rgba(0, 0, 0, 0.9);
+}
+
+/* the neon sign — the signature */
+.marquee {
+  text-align: left;
+}
+.sign {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-family: var(--font-sign);
+  font-weight: 800;
+  font-size: clamp(3rem, 12vw, 5.5rem);
+  line-height: 0.85;
+  letter-spacing: 0.01em;
+  animation: flicker 2.4s steps(1) 1 both;
+}
+.sign__night {
+  color: #fff2dc;
+  text-shadow:
+    0 0 4px rgba(255, 255, 255, 0.6),
+    0 0 12px var(--amber),
+    0 0 26px var(--amber),
+    0 0 52px rgba(255, 178, 62, 0.5);
+}
+.sign__fi {
+  color: #ffe1ee;
+  text-shadow:
+    0 0 4px rgba(255, 255, 255, 0.6),
+    0 0 12px var(--rose),
+    0 0 26px var(--rose),
+    0 0 52px rgba(255, 77, 157, 0.5);
+}
+.sign__open {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5ch;
+  margin: 1rem 0 0;
+  font-family: var(--font-data);
+  font-size: 0.72rem;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+.sign__open::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--rose);
+  box-shadow: 0 0 8px var(--rose);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+.marquee__eyebrow {
+  margin: 1.75rem 0 0;
+  font-family: var(--font-data);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.marquee__eyebrow code {
+  color: var(--amber);
+}
+.marquee__headline {
+  margin: 0.5rem 0 0;
+  font-family: var(--font-sign);
+  font-weight: 700;
+  font-size: clamp(1.9rem, 6vw, 3rem);
+  line-height: 0.98;
+  letter-spacing: 0.005em;
+  color: var(--cream);
+  max-width: 18ch;
+}
+.marquee__lede {
+  margin: 1.1rem 0 0;
+  color: #e6d3c9;
+  font-size: 1rem;
+  line-height: 1.65;
+  max-width: 46ch;
+}
+.marquee__lede code {
+  font-family: var(--font-data);
+  font-size: 0.85em;
+  color: var(--rose);
+}
+
+/* issuing desk — the actions */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  margin: 2rem 0 0;
+}
+.btn {
+  font-family: var(--font-body);
+  font-size: 0.98rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0.85rem 1.5rem;
+  cursor: pointer;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+.btn--issue {
+  color: #35110b;
+  background: linear-gradient(180deg, #ffc766, var(--amber));
+  box-shadow:
+    0 0 0 1px rgba(255, 178, 62, 0.5),
+    0 10px 30px -10px rgba(255, 178, 62, 0.7);
+}
+.btn--issue:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 1px rgba(255, 178, 62, 0.6),
+    0 16px 40px -10px rgba(255, 178, 62, 0.9);
+}
+.btn--ghost {
+  color: var(--cream);
+  border-color: var(--hairline);
+  background: rgba(255, 255, 255, 0.02);
+}
+.btn--ghost:hover:not(:disabled) {
+  border-color: var(--rose);
+  color: #ffd9e8;
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: wait;
+}
+
+/* receipt tape — the processing ledger, a warm print feed */
+.tape {
+  list-style: none;
+  margin: 2rem 0 0;
+  padding: 1rem 1.1rem;
+  border: 1px dashed var(--hairline);
+  border-radius: 8px;
+  background: rgba(255, 178, 62, 0.03);
+  font-family: var(--font-data);
+  font-size: 0.78rem;
+  color: #d9b9c9;
+}
+.tape li {
+  padding: 0.2rem 0;
+  overflow-wrap: anywhere;
+}
+.tape li::before {
+  content: '• ';
+  color: var(--amber);
+}
+
+.notice {
+  margin: 2rem 0 0;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid rgba(255, 77, 157, 0.5);
+  border-radius: 8px;
+  background: rgba(255, 77, 157, 0.08);
+  color: #ffc4dd;
+  font-family: var(--font-data);
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+/* the issuance receipt — a torn-off printed ticket on warm paper */
+.receipt {
+  margin: 2.25rem 0 0;
+  background: var(--cream);
+  color: var(--ink);
+  border-radius: 6px;
+  padding: 1.5rem 1.5rem 1.75rem;
+  box-shadow: 0 24px 50px -24px rgba(0, 0, 0, 0.7);
+  animation: print 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.receipt__title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  font-family: var(--font-sign);
+  font-weight: 800;
+  font-size: 1.5rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.receipt__title span {
+  font-family: var(--font-data);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  color: #9c6a55;
+}
+.receipt__perf {
+  position: relative;
+  margin: 1.1rem -1.5rem;
+  border-top: 2px dashed rgba(42, 20, 32, 0.28);
+}
+.receipt__perf::before,
+.receipt__perf::after {
+  content: '';
+  position: absolute;
+  top: -9px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--night-2);
+}
+.receipt__perf::before {
+  left: -9px;
+}
+.receipt__perf::after {
+  right: -9px;
+}
+.receipt__row {
+  padding: 0.7rem 0;
+  border-bottom: 1px dotted rgba(42, 20, 32, 0.18);
+}
+.receipt__row:last-child {
+  border-bottom: none;
+}
+.receipt__row dt {
+  font-family: var(--font-data);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #9c6a55;
+}
+.receipt__row dd {
+  margin: 0.3rem 0 0;
+}
+.receipt__row code {
+  font-family: var(--font-data);
+  font-size: 0.82rem;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+.receipt__row .tag {
+  font-family: var(--font-data);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+.tag--yes {
+  color: #12784f;
+}
+.tag--no {
+  color: #b5324f;
+}
+.tag--muted {
+  color: #9c6a55;
+}
+.receipt__stamp {
+  margin-top: 1.25rem;
+  text-align: center;
+  font-family: var(--font-sign);
+  font-weight: 800;
+  font-size: 1.1rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: #b5324f;
+  border: 2px solid #b5324f;
+  border-radius: 6px;
+  padding: 0.5rem;
+  transform: rotate(-1.5deg);
+  opacity: 0.85;
+}
+
+@keyframes flicker {
+  0%,
+  8%,
+  14%,
+  22% {
+    opacity: 0.2;
+  }
+  4%,
+  11%,
+  18%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes print {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
