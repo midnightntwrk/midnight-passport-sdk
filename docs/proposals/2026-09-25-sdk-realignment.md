@@ -64,7 +64,7 @@ registry.
 
 **Every key is authored by whoever holds it and registered by Passport.** That is
 the single method this proposal builds around: the same interface serves a
-passkey, the provider's embedded wallet, an Ethereum-style wallet, a dApp's
+passkey, the provider's embedded wallet, a Midnight connector wallet, a dApp's
 per-origin key, and an agent's OWS key. What differs is only whether Passport
 registers the key as a device or as a grant.
 
@@ -195,7 +195,7 @@ sign an ACC challenge:
 // Indicative shape; signatures are fixed when the package is specced.
 interface KeyProvider {
   readonly scheme: 'jubjub' | 'k256' | 'p256';
-  readonly envelope?: 0 | 1;          // k256 only: raw digest, or the connector's signData framing
+  readonly envelope?: 0 | 1;          // k256 only: raw digest, or the Midnight dApp connector's signData framing
   publicKey(): Promise<Uint8Array>;
   sign(challenge: Challenge): Promise<Authorisation>;
 }
@@ -220,7 +220,7 @@ flowchart TB
         direction LR
         PK[Passkey<br/>JubJub from PRF]
         PV[Provider's embedded wallet<br/>k256, envelope 0]
-        EW[Ethereum-style wallet<br/>k256 via signData]
+        EW[Midnight connector wallet<br/>k256 via signData]
         DK[dApp per-origin key<br/>software, or passkey on the dApp origin]
         OK[Agent key in OWS<br/>JubJub or k256]
     end
@@ -251,7 +251,8 @@ flowchart TB
 | Passkey | JubJub, derived from the passkey's PRF output | Device | `core` (Passport app) | Signs in the tab, no third party. The demo's device model. |
 | Passkey on secp256r1 | p256 through the WebAuthn envelope | Device or grant | `core`, `connect` | Waits on the ACC's p256 arm (the secp256r1 surface). |
 | The provider's embedded wallet | k256, envelope 0 | Device | `core` | Signs ACC challenges through the provider's raw-signing call; enrolled once from a signature over a known digest, because the provider exposes no public-key read. |
-| Ethereum-style wallet | k256 through the connector's `signData` framing (envelope 1) | Grant (read-only) | `connect` | The MIP refuses envelope-1 keys on the spend seam, so such grants are read-only by construction. |
+| Midnight connector wallet | k256 through the Midnight dApp connector's `signData` framing (envelope 1, `midnight_signed_message:32:`) | Device, or a read-only grant | `core`, `connect` | The ACC admits envelope-1 keys as devices; the scoped-grants MIP refuses them on the spend seam, so as grants they are read-only by construction. |
+| Ethereum-style wallet (e.g. MetaMask) | secp256k1 under EIP-191 (a keccak-256 digest) | — | — | **Not supported today.** The ACC accepts envelopes 0 and 1 only, and such wallets cannot sign a raw digest. It needs a new envelope, which is a contract change needing keccak-256 in-circuit, or signing through a provider wallet that exposes raw signing (roadmap R10; open question 13). |
 | dApp per-origin key | JubJub or k256 (envelope 0), or p256 on the dApp origin | Grant | `connect` | One key per account per origin; never reused (MIP §3.2). |
 | Agent key in OWS | JubJub or k256 (envelope 0) | Grant | `mn-passport-agent` (OWS side) | OWS signs; the SDK builds the challenge. |
 
@@ -352,7 +353,7 @@ redefines two.
 |---|---|---|---|---|
 | `adapter-agent-ows` | Wraps `ows-core`; maps OWS onto grants | **Retire** | OWS is not something Passport wraps. It authors the agent's key; Passport registers it like any grantee key; OWS reads the grant from the ACC as its policy. | The OWS key provider inside `mn-passport-agent`, plus agent grant handling in `core`. |
 | `adapter-dapp-connection` | Answers C23 discovery, sign-in, and grant requests | **Retire** | There is no C23 channel to answer. Connection is the MIP §9 ceremony. | Grant issuance in `core`: the authoriser page, validation of the request and its proof, consent, `issue_grant`, and the redirect. |
-| `adapter-wallet-connect` | Passport connecting out to external wallets | **Retire as an adapter** | An external wallet is a key provider (k256 through the connector's `signData`), registered as a device or a read-only grant. | The Ethereum-style wallet key provider (§4). |
+| `adapter-wallet-connect` | Passport connecting out to external wallets | **Retire as an adapter** | An external wallet is a key provider (k256 through the Midnight connector's `signData`), registered as a device or a read-only grant. | The Midnight connector wallet key provider (§4). Ethereum-style wallets need a new envelope first. |
 | `adapter-storage-vendor` | Native vendor-keystore sync | **Retire** | A PWA cannot write to it; it does not cross ecosystems; WPP covers the durable copy. | `adapter-storage-wpp`. |
 | `adapter-storage-shared` (#58) | Portable sealed-backup service; source of dApp witness provisioning | **Replace** (pending open question 7) | WPP claims the same job, with a fuller design: packages, catalogs, conflict retention, and a Passport integration contract. Provisioning moves to the private-state seam. | `adapter-storage-wpp`: WPP's storage adapters behind the storage seam, Google Drive first. |
 | `adapter-signer-managed` | The provider as a presence gate over a local device secret | **Merge into key providers** | The provider's key is now a k256 device that signs ACC challenges. | The provider's embedded-wallet key provider (§4). |
@@ -362,7 +363,7 @@ redefines two.
 | Settlement adapter | Balancing, DUST, submit through the proving & settlement service | **Keep** | Unchanged in purpose. | Moves under `mn-passport-account`. |
 | `adapter-fee-capacity-exchange` | Sponsored DUST through liquidity-provider quotes | **Keep, deferred** | Still the route for users without DUST. Contract-held NIGHT cannot generate DUST, which makes it more important, not less. | — |
 | `adapter-recovery` | Guardians and paper keys for total-loss recovery (C14/C15) | **Keep** | Account recovery is unchanged. WPP key recovery is a separate operation and does not replace it. | — |
-| `adapter-did` | `did:midnight` create and resolve | **Keep, deferred** | Unaffected. | — |
+| `adapter-did` | `did:midnight` create and resolve | **Keep, and define** (initial work Q4) | A DID is its own contract with its own JubJub controller key, so grants do not apply and it needs no new adapter — only this one, filled in. | Q4: a wrapper over `midnight-did-api` behind `core` — create at account creation, link to the ACC, hold the controller and recovery keys, sign, and resolve in-process. Target: a DID controlled by the ACC, which needs a DID contract change, a new ACC circuit, and a MIP extension (§8.6). |
 | `adapter-browser` | Browser wiring | **Keep** | Unchanged. Load the two WASM runtimes in order (the demo found Safari fails otherwise). | — |
 | `adapter-node` | Node wiring | **Keep** | Now also the platform for `mn-passport-agent`. | — |
 | Registry adapter | — | **Add** | Agents need a dApp's artefacts at run time. | Behind the registry seam: content-addressed fetch, verification, local cache. |
@@ -516,6 +517,72 @@ folder under `drive.file` (the hidden `appDataFolder` may only ever be a cache),
 retaining conflicting histories instead of letting the last write win, and
 reporting when a backup's freshness is unknown.
 
+### 8.6 Identity (DID)
+
+A `did:midnight` identifier is not a dApp that the user grants. It is its own
+contract, one deployed per DID, controlled by a JubJub Schnorr key that its
+circuits check against a `controllerPublicKey` stored in the DID contract's own
+ledger, plus a separate recovery key. The ACC cannot be its controller, a grant
+key means nothing to it, and it cannot be driven from the ACC in a call between
+contracts: every one of its update circuits reads the `currentTimestamp` witness,
+so it can only ever start a transaction.
+
+So the DID fits the existing `adapter-did` slot as one more thing the Passport
+app operates for the user, with a key only the Passport app holds:
+
+- **Create** the DID when the account is created (roadmap R39), through
+  `midnight-did-api` (`initPrivateState`, `createDID`).
+- **Link it to the account**: the DID document's `alsoKnownAs` carries the
+  Passport name, and a service entry names the ACC, so either can be found from
+  the other.
+- **Hold the controller and recovery keys.** The API generates both as random
+  32-byte secrets, which makes them irreplaceable. Either derive the controller key
+  from the passkey's PRF output under a separate label — so it is regenerable, as
+  the device key already is — or keep it in WPP; the recovery key belongs with
+  account recovery, in colder custody (open question 12).
+- **Sign each operation** over (contract, version, operation, arguments). The API
+  signs with the raw secret and has no external-signer interface, so for now the
+  signing happens inside the Passport app's core. A pluggable signer upstream
+  would let it use the key-provider interface (§12).
+- **Resolve in-process**: `MidnightDIDResolver` reads the DID contract's state
+  from the indexer directly; the resolver service is optional.
+
+Credentials (roadmap R40) live in a separate project (`midnight-verifiable-credentials`)
+and build on this: the DID is the anchor, and the Passport app holds and presents
+them.
+
+**The target: a DID controlled by the ACC.** Holding a separate DID key is the Q4
+answer, not the end state. The direction is for the DID to authenticate through
+Passport the way every dApp does, so that the ACC is the one authority behind both
+the account and the identity. The DID contract stores the user's ACC address as its
+controller instead of a key, and each DID update calls into the ACC, which checks
+that the signer holds a grant allowing it to act for that DID.
+
+The direction of that call matters. The DID's update circuit starts the
+transaction, so it can still read its timestamp witness; the ACC is the contract
+being called, which works because the check it runs needs no witness. Getting
+there needs three changes:
+
+| Where | Change needed | Owner |
+|---|---|---|
+| DID contract | A **controller mode where the controller is an account contract**: store the ACC address, and on each update call the ACC's authorisation check with a challenge over (DID contract, version, operation, arguments), instead of verifying a signature against `controllerPublicKey`. Recovery then follows the account's own recovery rather than a separate recovery key. The contract also moves from ledger 8 to ledger 9, which calls between contracts need. This is a new contract version; the DID team's docs currently place contract and multi-controller support out of scope, so it needs their agreement. | DID team |
+| ACC | A new **exported authorisation circuit, with no witness**, that checks a device or grant signature for an operation that is not a payment, bound to the calling contract's address. Today the authorisation check is internal to each circuit and grants cover only the three spend operations and read. | Passport (contract) |
+| Scoped-grants MIP | A **grant operation for acting on another contract**, roughly "may authorise operations on contract X", with that address pinned in the scope. | Passport (standards) |
+
+It works before `kernel.caller()` reaches a release: the signed challenge carries
+the DID contract's address, so a signature cannot be replayed on another contract
+(the same "authority travels in the arguments" pattern the cross-contract-calls
+experiment proved). Once `kernel.caller()` is available, the ACC can also assert
+that the caller is that DID contract, which makes the DID the first use of
+caller-identity grants.
+
+What it gives: adding a device, recovering the account, or revoking a grant then
+applies to the DID too, and the DID's own controller and recovery keys disappear
+(open question 12 closes). What it costs: every DID update becomes a call between
+two contracts, so two proofs, one of them the ACC's (size class 15–17). A grant
+keeps its own nonce, so DID updates do not contend with the account's other
+operations.
+
 ---
 
 ## 9. Normative rules to amend
@@ -551,7 +618,8 @@ one grantee key per account per origin.
 | | §3.2, §3.9 | Rewrite: grant ceremony, per-origin key, private-state provider, joiner. |
 | | §3.6 | Rebuild around WPP and the tiers in §8.5; add the viewing key. |
 | | §3.8 | Rewrite: agents as key providers, the agent grant ceremony (delivery chosen by the agent provider), registry. |
-| | §3.10 | Fold into key providers. |
+| | §3.7 | Rewrite: the DID as its own contract operated by the Passport app in Q4, with the ACC-controlled DID as the target (§8.6); keep the one-signing-primitive rule, which the DID's JubJub key satisfies. |
+| | §3.10 | Fold into key providers; record that Ethereum-style wallets need a new envelope. |
 | | §3.11 | Note that contract-held NIGHT cannot generate DUST. |
 | | §3.12 | Extend with §8.4. |
 | `architecture.md` | §1 | Three entry libraries over a shared foundation; `core` is the Passport app. |
@@ -608,6 +676,11 @@ one grantee key per account per origin.
 | Key generation exposed in the zkir WASM package | Proving small circuits in the tab | Requested |
 | Contract-held NIGHT generating DUST | Accounts whose funds live in the ACC | Not supported; an upstream ask |
 | The ACC's p256 arm | Passkeys on secp256r1 | Waits on the secp256r1 surface |
+| An EIP-191 envelope on the ACC's k256 arm | Ethereum-style wallets as devices or grants (roadmap R10) | Not specified; needs keccak-256 in-circuit |
+| `midnight-did` on the ACC's toolchain | Running the DID and the ACC in one app | `midnight-did` pins ledger 8, midnight-js `4.0.2`, and compact-runtime `0.16.0`; the ACC is on ledger 9 and midnight-js 5. Either the DID packages move to ledger 9, or Passport relies on midnight-js 5's support for the older ledger era |
+| A pluggable signer in `midnight-did-api` | Signing DID operations through the key-provider interface (Q4 path) | The API signs with the raw controller secret today |
+| A DID contract whose controller is an account contract | The ACC-controlled DID (§8.6) | Not specified; needs the DID team's agreement and a ledger 9 version of the DID contract |
+| An exported, witness-free authorisation circuit on the ACC, and a grant operation for acting on another contract | The ACC-controlled DID, and any other contract that wants to authenticate through Passport | Not specified; a contract change and a scoped-grants MIP extension |
 | A midnight-js version to build on | Every package | The demo pins `5.0.0-beta.7`. `main` has moved on with breaking changes: both ledger eras dispatched through a protocol facade (#1194, #1218), the offer composer (#1309), and compact-js `3.0.0-rc.0` (#1341). The SDK should pin one version and state which behaviour it relies on. |
 | An on-chain reference for dApp artefacts | Trusting fetched artefacts without a published hash | The capsule MIP's governed reference; not yet specified |
 
@@ -639,6 +712,14 @@ one grantee key per account per origin.
     local to the dApp?
 11. **The provider's key scheme.** FS-2.4 specifies P-256; the ACC has no p256 arm
     yet and the demo uses k256. Which does the provider enrol with for V1?
+12. **DID keys (until the ACC controls the DID).** Is the DID controller key
+    derived from the passkey (regenerable) or stored in WPP, and where does its
+    recovery key live?
+13. **Ethereum-style wallets.** Is an EIP-191 envelope worth a contract change, or
+    do such users come in through a provider wallet with raw signing?
+14. **The ACC-controlled DID.** Will the DID team take on a controller mode for
+    account contracts, and is the new ACC authorisation circuit general enough to
+    serve other contracts that want to authenticate through Passport?
 
 ---
 
@@ -666,6 +747,12 @@ one grantee key per account per origin.
 - Proving-key sizes and regeneration: servicedesk issue #203 and its comments;
   passport PR #170.
 - Capsule runtime: shieldedtech/product PR #155 (`capsule-runtime/MIP.md`).
+- `did:midnight`: midnight-did `4e7f6b0` (`packages/contract/src/did.compact`,
+  `packages/api`, `w3c-spec/midnight-method.md` draft v0.7.0,
+  `docs-site/architecture/adr-controller-authorization-signatures.md`) and
+  midnight-did-resolver `49912b2` (resolver and manager services).
+- The ACC's k256 envelopes: planning workspace `contract/contracts/account.compact`
+  (`envelope_digest`: 0 raw, 1 connector).
 - Witness Protection Program: `docs/integrations.md`, `docs/security-and-recovery.md`,
   and `docs/explanation/application.md` in its repository.
 - midnight-js, checked at `v5.0.0-beta.7` and `main` (2026/09/24):
