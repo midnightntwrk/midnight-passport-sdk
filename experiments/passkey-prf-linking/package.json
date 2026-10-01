@@ -10,6 +10,6 @@
     "e2e": "node e2e/run.mjs"
   },
   "devDependencies": {
-    "playwright": "1.62.1"
+    "playwright": "1.63.0"
   }
 }
