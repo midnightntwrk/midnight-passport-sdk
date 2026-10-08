@@ -1,31 +1,34 @@
 # SDK deliverables — working draft
 
 > **Status:** working draft · 2026/09/25
-> **Purpose:** the SDK's deliverables as functional buckets, in dependency order,
-> mapped to the Passport product roadmap, as input to the SDK statement of work.
-> **Builds on:** [`2026-09-25-sdk-realignment.md`](./2026-09-25-sdk-realignment.md),
-> the proposal that defines the packages, adapters, and flows named here.
-> **Roadmap:** item IDs (R01–R41) and quarters follow the product roadmap as of
-> 2026/09/25 (Q3 2026 is the current demo; Q4 2026 runs to mid-December).
+> **Purpose:** this file lists the SDK's deliverables as functional groups, in the
+> order of their dependencies. It maps them to the Passport product roadmap. It is
+> input to the SDK statement of work.
+> **Builds on:** [`2026-09-25-sdk-realignment.md`](./2026-09-25-sdk-realignment.md).
+> That proposal defines the packages, adapters, and flows that this file names.
+> **Roadmap:** the item IDs (R01–R41) and the quarters come from the product
+> roadmap of 2026/09/25. Q3 2026 is the current demo. Q4 2026 continues to
+> mid-December.
 
 ---
 
 ## 1. How to read this
 
-A **deliverable** is an SDK capability that can be built, tested, and handed over
-on its own. Each has an ID (D1–D20 and D23, with D12 in two parts), a package, the roadmap items it serves, what
-it depends on, and what it needs from outside the SDK.
+A **deliverable** is an SDK capability that a team can build, test, and deliver
+independently. Each deliverable has an ID (D1–D20 and D23, with D12 in two parts).
+Each deliverable also has a package, the roadmap items that it serves, its
+dependencies, and the items that it needs from outside the SDK.
 
-Deliverables fall into four lanes. The foundation lane comes first, because
-everything else depends on it. After that the other three lanes can run in
-parallel, by different teams if need be:
+The deliverables are in four lanes. The foundation lane is first, because all
+other work depends on it. After the foundation, the other three lanes can run in
+parallel. Different teams can do them, if necessary:
 
 | Lane | Package | Serves |
 |---|---|---|
-| Foundation | `mn-passport-contract`, `mn-passport-account`, `mn-passport-protocol`, adapters | Everything |
-| Passport app | `mn-passport-core` | The user's own account: creation, devices, grants, private data, recovery, payments, identity |
+| Foundation | `mn-passport-contract`, `mn-passport-account`, `mn-passport-protocol`, adapters | All other lanes |
+| Passport app | `mn-passport-core` | The user's own account: creation, devices, grants, private data, recovery, payments, and identity |
 | dApps | `mn-passport-connect` | Sign-in, grants, private data, and payments for apps |
-| Agents | `mn-passport-agent` | Agent onboarding, execution, and on-chain grant status for OWS |
+| Agents | `mn-passport-agent` | Agent onboarding, execution, and the on-chain grant status for OWS |
 
 ---
 
@@ -33,7 +36,7 @@ parallel, by different teams if need be:
 
 | ID | Deliverable | Lane | Roadmap | Target | Depends on |
 |---|---|---|---|---|---|
-| D1 | Contract binding v2 | Foundation | all | Q4 (first) | ACC v2 artefact |
+| D1 | Contract binding v2 | Foundation | all | Q4 (first) | ACC v2 artifact |
 | D2 | ACC client | Foundation | all | Q4 (first) | D1 |
 | D3 | Proving and broadcast clients | Foundation | all | Q4 (first) | D2 |
 | D4 | Protocol v2 | Foundation | R05, R12, R37 | Q4 (first) | — |
@@ -45,16 +48,16 @@ parallel, by different teams if need be:
 | D10 | Recovery | Passport app | R08 | Q4 | D6, D9 |
 | D11 | Payments | Passport app | R04 | Q4 | D2, D3 |
 | D12a | DID, held by the Passport app | Passport app | R39 | Q4 (initial) | D6 |
-| D12b | DID controlled by the ACC | Passport app | R39, R40 | Q1 | D12a, D2; DID contract change, ACC circuit, MIP extension |
+| D12b | DID controlled by the ACC | Passport app | R39, R40 | Q1 | D12a, D2; a DID contract change, an ACC circuit, and a MIP extension |
 | D13 | Sign-in and grants for dApps | dApps | R05, R12 | Q4 | D2–D4, D8 |
 | D14 | Private data for dApps | dApps | R05, R09 | Q4 | D9, D13 |
 | D15 | Pay with Passport | dApps | R05, R04 | Q4 | D11, D13 |
 | D16 | Onboarding kit for apps | dApps | R11 | Q4 | D6, D13 |
 | D17 | Onboarding measurements | dApps | R14 | Q4 | D6, D16 |
 | D18 | Agent onboarding | Agents | R37 | Q4 | D4, D8 |
-| D19 | Agent execution | Agents | R15, R22 | Q1 | D2, D3, D18; registry |
+| D19 | Agent execution | Agents | R15, R22 | Q1 | D2, D3, D18; a registry |
 | D20 | On-chain grant status for OWS | Agents | R19, R22 | Q1 | D2, D18 |
-| D23 | Credentials | Passport app | R40, R23–R27 | Q1 onwards | D12a |
+| D23 | Credentials | Passport app | R40, R23–R27 | Q1 and later | D12a |
 
 ```mermaid
 flowchart LR
@@ -124,15 +127,16 @@ flowchart LR
 
 | Wave | When | Deliverables | What it proves |
 |---|---|---|---|
-| **0 — Foundation** | Start now | D1–D5 | A client can build, prove, and submit an ACC call without the Passport app's core |
+| **0 — Foundation** | Start now | D1–D5 | A client can build, prove, and submit an ACC call without the core of the Passport app |
 | **1 — The account** | Q4, early | D6, D7, D8, D11, D12a | A user creates a Passport, adds devices, approves and revokes grants, and pays, all in the Passport app |
-| **2 — Apps and agents join** | Q4, late | D9, D13, D14, D15, D18, D10 | A dApp signs a user in through a grant and uses their private data; an agent is granted on the ACC |
-| **3 — Adoption** | Q4 end / Q1 | D16, D17 | Apps integrate in a few lines; onboarding numbers can be published |
-| **4 — Agents act** | Q1 | D19, D20, D12b, D23 (start) | Agents run dApps' circuits; OWS enforces each grant as read from the chain; the DID answers to the ACC |
+| **2 — Apps and agents join** | Q4, late | D9, D13, D14, D15, D18, D10 | A dApp signs a user in through a grant and uses the private data of that user. The ACC records a grant for an agent |
+| **3 — Adoption** | Q4 end / Q1 | D16, D17 | Apps integrate Passport in a few lines. The onboarding numbers are ready for publication |
+| **4 — Agents act** | Q1 | D19, D20, D12b, D23 (start) | Agents run the circuits of dApps. OWS enforces each grant as it reads it from the chain. The DID answers to the ACC |
 | **5 — Richer rules** | Q2 | D23 (proofs) | Proofs without documents |
 
-Agent execution (D19) is the step that most depends on something outside the
-SDK: a registry where dApps publish their code, so an agent can fetch it (§5).
+Agent execution (D19) is the step that depends most on something outside the
+SDK. It needs a registry where dApps publish their code, so that an agent can
+get it (§5).
 
 ---
 
@@ -141,256 +145,399 @@ SDK: a registry where dApps publish their code, so an agent can fetch it (§5).
 ### Foundation
 
 **D1 — Contract binding v2** (`mn-passport-contract`)
-Typed bindings for the ACC at `spec_version = 2` (scoped grants), the version
-registry and artefact integrity checks, detection of a partly deployed account,
-the client artefact set (compiled module, ledger decoder, manifest; ZKIR goes to the
-prover only), the ACC's interface for dApp circuits (so a dApp's contract can call
-into the ACC), and loading a dApp's artefacts with integrity checks.
-*Needs:* the reference ACC v2 artefact, published and deployed on the target network.
+
+D1 contains these items:
+
+- typed bindings for the ACC at `spec_version = 2` (scoped grants);
+- the version registry and the integrity checks for artifacts, with the exact
+  zkir and midnight-zk crate revisions, because the keys change with them;
+- the detection of an account that is only partly deployed;
+- the client artifact set: the compiled module, the ledger decoder, and the
+  manifest (ZKIR goes only to the prover);
+- the ACC's interface for dApp circuits, so that the contract of a dApp can call
+  the ACC;
+- a loader for the artifacts of a dApp, with integrity checks. For a circuit,
+  the loader makes the verifier key again from the ZKIR and compares it with the
+  verifier key on chain (passport PR #170).
+
+*Needs:* the reference ACC v2 artifact, published and deployed on the target
+network.
 
 **D2 — ACC client** (`mn-passport-account`)
-The code every client shares: the key-provider interface; challenge builders and
-grant signatures for the JubJub and k256 arms (envelopes 0 and 1); the
-grant-ceremony client that dApps and agents share; on-chain grant reads; the coin
-store, including reading a coin's position from the chain; the inbox codec (seal
-and open); payments (full shielded addresses, and sealing to a recipient
-Passport's key at the moment of payment); the transaction joiner, a helper the
-caller may use to join two intents into one transaction; and grant-scope helpers.
+
+D2 is the code that all clients share:
+
+- the key-provider interface;
+- challenge builders and grant signatures for the JubJub and k256 arms
+  (envelopes 0 and 1);
+- the grant-ceremony client, which dApps and agents share;
+- on-chain grant reads;
+- the coin store, which also reads the position of a coin from the chain;
+- the inbox codec (seal and open);
+- payments: full shielded addresses, and the seal to the key of a recipient
+  Passport at the time of payment;
+- the transaction joiner, a helper that the caller can use to join two intents
+  into one transaction;
+- grant-scope helpers.
+
 *Depends on:* D1.
 
 **D3 — Proving and broadcast clients** (`mn-passport-account`, adapters)
-A prover interface that takes an unproven transaction and returns it proven, and
-the broadcast client (`adapter-broadcast`): it hands the proven transaction to the
-sponsor, which pays the fees and broadcasts it, and tracks it until it is final,
-with bounded waits and resubmission. A user never handles DUST: fees are sponsored,
-or swapped through the Capacity Exchange.
-*Needs:* a proving service that holds or rebuilds proving keys itself, so clients
-never upload them; fee sponsorship.
+
+D3 has two clients:
+
+- A prover interface. It takes an unproven transaction and returns the proven
+  transaction.
+- The broadcast client (`adapter-broadcast`). It gives the proven transaction to
+  the sponsor, which pays the fees and broadcasts the transaction. The client
+  then monitors the transaction until it is final, with bounded waits and
+  resubmission.
+
+A user never handles DUST. Either a sponsor pays the fees, or the fees come from
+a swap through the Capacity Exchange.
+
+*Needs:* a proving service that holds or rebuilds the proving keys itself, so
+that clients never upload them; fee sponsorship. Passport PR #170 shows that the
+service can make each key again from the ZKIR and the on-chain verifier key.
 
 **D4 — Protocol v2** (`mn-passport-protocol`)
-The messages dApps, agents, and the Passport app exchange: the grant request and
-response of the scoped-grants MIP (§9), the possession proof, the sign-in message,
-and the signed out-of-band request for keys and grants (FS-2.4, extended). The
-grant request is one message for dApps and agents, carried as a redirect, a QR
-code, or a link. Versioned.
+
+D4 defines the messages that dApps, agents, and the Passport app exchange:
+
+- the grant request and the response of the scoped-grants MIP (§9);
+- the possession proof;
+- the sign-in message;
+- the signed out-of-band request for keys and grants (FS-2.4, extended).
+
+The grant request is one message for dApps and agents. It can travel as a
+redirect, a QR code, or a link. D4 gives the messages a version.
 
 **D5 — Platform adapters** (`adapter-browser`, `adapter-nodejs`)
-The browser runtime for web apps (passkeys with PRF, WASM runtimes loaded in
-order) and the Node.js runtime for backends, the agent library among them.
+
+D5 has two runtimes:
+
+- the browser runtime for web apps: passkeys with PRF, and WASM runtimes that
+  load in the correct order;
+- the Node.js runtime for backends, which the agent library also uses.
 
 ### Passport app
 
 **D6 — Account creation** (R01, R02, R03)
-A passkey becomes the first device (JubJub, derived from the passkey's PRF
-output); the ACC is deployed in its three waves; the name is claimed; fees and the
-opening balance are sponsored.
+
+A passkey becomes the first device (JubJub, from the PRF output of the passkey).
+The Passport app deploys the ACC in its three waves and claims the name. A
+sponsor pays the fees and the opening balance.
+
 *Needs:* the name service and fee sponsorship on the target network.
 
 **D7 — Devices and existing wallets** (R07, R10)
-Add and remove devices through FS-2.4's signed request (shown as a QR code or a
-link); the provider's wallet key as a device; a Midnight connector wallet as a
-device. States the limits of device revocation (errata 7 and 8).
-*Gap:* Ethereum-style wallets such as MetaMask cannot sign for the ACC today (§5).
+
+D7 contains these items:
+
+- add and remove devices through the signed request of FS-2.4, which shows as a
+  QR code or a link;
+- the key of the provider's wallet as a device;
+- a Midnight connector wallet as a device.
+
+D7 also states the limits of device revocation (errata 7 and 8).
+
+*Gap:* Ethereum-style wallets, for example MetaMask, cannot sign for the ACC
+today (§5).
 
 **D8 — Grants: approve, review, revoke** (R12, R16, R37, R41 basic)
-The approval page for dApp and agent requests; consent; `issue_grant`; the list of
-granted dApps and agents with their limits; revoking one grant or all of them in
-one action. A key for a family member with a spending limit (the basic form of
-R41) is a grant like any other.
+
+D8 contains these items:
+
+- the approval page for requests from dApps and agents;
+- consent;
+- `issue_grant`;
+- the list of dApps and agents that have grants, with their limits;
+- the revocation of one grant, or of all grants in one action.
+
+A key for a family member, with a limit on what the member can spend, is a
+grant the same as all other grants. This is the basic form of R41.
 
 **D9 — Private data and backup** (R06, R09)
-The Witness Protection Program (WPP) integrated into the Passport app: encrypted
-backup to the user's own cloud storage, restore, the backup states the user sees,
-and the account details every client needs (ACC address, viewing key).
-*Needs:* WPP's storage adapters and package format.
+
+D9 adds the Witness Protection Program (WPP) to the Passport app. It contains
+these items:
+
+- encrypted backup to the user's own cloud storage;
+- restore;
+- the backup states that the user sees;
+- the account details that all clients need (the ACC address and the viewing
+  key).
+
+*Needs:* the storage adapters and the package format of WPP.
 
 **D10 — Recovery** (R08)
-Recovery through trusted people or services when every device is lost, composed
-with WPP so private records come back with the account.
+
+D10 recovers the account through trusted persons or services when the user
+loses all devices. It works with WPP, so that the private records return with
+the account.
+
 *Needs:* the recovery design from the research team.
 
 **D11 — Payments** (R04)
-Send to a shielded address, to another Passport by name, and NIGHT to an ordinary
-address; receive deposits.
+
+D11 lets the user send to a shielded address and to another Passport by name,
+and send NIGHT to an ordinary address. It also lets the user receive deposits.
 
 **D12a — DID, held by the Passport app** (R39, initial work)
-Create the account's `did:midnight` identifier at account creation, link it to the
-Passport name and the ACC, hold its controller and recovery keys, sign its
-updates, and resolve it. As built, the DID is its own contract with its own key,
-so in Q4 the Passport app operates it with a key only the app holds (realignment
-proposal §8.6).
+
+D12a contains these items:
+
+- create the `did:midnight` identifier of the account when the user creates the
+  account;
+- link the identifier to the Passport name and the ACC;
+- hold its controller key and its recovery key;
+- sign its updates;
+- resolve it.
+
+In its current design, the DID is its own contract, with its own key. Thus in Q4
+the Passport app operates the DID with a key that only the app holds
+(realignment proposal §8.6).
+
 *Needs:* the DID packages on the same toolchain as the ACC (§5).
 
 **D12b — DID controlled by the ACC** (R39, R40)
-The DID authenticates through Passport the way every dApp does: its controller is
-the user's ACC, and each update calls into the ACC, which checks a grant allowing
-the signer to act for that DID. The DID's separate keys disappear, and device
-changes, recovery, and revocation on the account apply to the identity too.
-*Needs — the DID contract adapted to Passport:* a controller mode whose controller
-is an account contract, with recovery following the account's; the DID contract
-on ledger 9. That is the DID team's change and needs their agreement.
-*Needs — on the Passport side:* a new exported ACC circuit, with no witness, that
-checks a device or grant signature for an operation that is not a payment; and a
-scoped-grants MIP extension for a grant that may act on another contract.
-`kernel.caller()` in a release adds a check on the caller, but is not required.
+
+The DID authenticates through Passport in the same way as all dApps. Its
+controller is the user's ACC. Each update calls the ACC, which checks for a grant
+that lets the signer act for that DID. The DID then has no separate keys. Device
+changes, recovery, and revocation on the account also apply to the identity.
+
+*Needs — the DID contract, adapted to Passport:*
+
+- a controller mode in which the controller is an account contract, and the
+  recovery follows the recovery of the account;
+- the DID contract on ledger 9.
+
+This change belongs to the DID team, and it needs the agreement of that team.
+
+*Needs — on the Passport side:*
+
+- a new exported ACC circuit, with no witness, that checks a device or grant
+  signature for an operation that is not a payment;
+- a scoped-grants MIP extension for a grant that can act on another contract.
+
+With `kernel.caller()` in a release, the ACC can also check the caller. But this
+check is not necessary.
 
 **D23 — Credentials** (R40, then R23–R27)
-Receive, hold, and present credentials anchored to the DID; later, prove a single
-fact without handing over the document.
+
+The user can receive, hold, and present credentials with an anchor to the DID.
+Later, the user can prove one fact and not give the full document.
+
 *Needs:* the verifiable-credentials project; issuer integrations.
 
 ### dApps
 
 **D13 — Sign-in and grants for dApps** (R05, R12)
-The dApp library: the grant ceremony, the same as agents' (the dApp's key for its
-own website, the request to the Passport app, checking the grant on-chain), and
-sign-in backed by the grant. The dApp builds the circuit that composes the user's
-ACC; the library supplies the ACC's interface for that circuit, the challenge, and
-the grant key's signature, and the joiner helper for a shielded spend that must
-start its own intent.
+
+D13 is the dApp library. It contains these items:
+
+- the grant ceremony, the same as for agents: the key of the dApp for its own
+  website, the request to the Passport app, and a check of the grant on chain;
+- sign-in that uses the grant.
+
+The dApp builds the circuit that composes the user's ACC. The library supplies
+these items for that circuit:
+
+- the ACC's interface;
+- the challenge;
+- the signature of the grant key;
+- the joiner helper, for a shielded spend that must start its own intent.
 
 **D14 — Private data for dApps** (R05, R09)
-A private-state provider for the dApp whose store is Passport: release of that
-dApp's data after consent, and write-back after each confirmed transaction.
+
+D14 gives the dApp a private-state provider, with Passport as its store.
+Passport releases the data of that dApp after consent. The provider stores the
+updated data in Passport after each confirmed transaction.
 
 **D15 — Pay with Passport** (R05, R04)
-Checkout, payouts, and refunds: paying a Passport user by name and taking payment
-under a grant.
+
+D15 gives dApps checkout, payouts, and refunds. A dApp can pay a Passport user by
+name and take payment under a grant.
 
 **D16 — Onboarding kit for apps** (R11)
-Drop-in pieces so an app adds Passport in a few lines: the sign-in button, sending
-a user without a Passport to create one and straight back to the grant request,
-sponsored first fees, and a starter project as an AI-agent skill. It also covers
-onboarding a new user inside the app through a WaaS provider that supports
-metadata attached to the user's key (§6).
+
+D16 gives an app ready parts, so that the app can add Passport in a few lines:
+
+- the sign-in button;
+- a flow that sends a user without a Passport to create one, and then directly
+  back to the grant request;
+- sponsored first fees;
+- a starter project as an AI-agent skill.
+
+D16 also lets an app onboard a new user inside the app, through a WaaS provider
+that supports metadata attached to the user's key (§6). The entry point
+`mn-passport-connect/onboard` does these steps:
+
+- it deploys the ACC and activates the key of the provider as the first device;
+- it claims the name;
+- it issues a grant to the per-origin key of the app, up to a fixed ceiling;
+- it writes the account metadata to the key of the user at the provider.
+
+`adapter-waas` supplies the key of the provider and the metadata. A wider grant
+needs the usual grant ceremony in the Passport app.
 
 **D17 — Onboarding measurements** (R14)
-Privacy-preserving counts of sign-up completion, time to first action, and
-retention, emitted by the Passport app and the dApp library, so the numbers can be
-published.
+
+The Passport app and the dApp library send counts of sign-up completion, time to
+first action, and retention. The counts keep the privacy of users, so that the
+numbers are ready for publication.
 
 ### Agents
 
 **D18 — Agent onboarding** (R37)
-The agent's side: create its key in OWS, build the grant request — the same one a
-dApp sends — and present it as a QR code or a link (the agent provider chooses). The user approves it in the
-Passport app (D8). The agent receives its readable scope, so OWS can check limits
-before signing. No execution yet.
+
+D18 is the side of the agent:
+
+- The agent creates its key in OWS.
+- The agent builds the grant request. This is the same request that a dApp
+  sends.
+- The agent shows the request as a QR code or a link. The agent provider selects
+  the form.
+
+The user approves the request in the Passport app (D8). The agent receives its
+readable scope, so that OWS can check limits before it signs. D18 has no
+execution yet.
 
 **D19 — Agent execution** (R15, R22)
-The agent library fetches a dApp's circuit and code from the registry and checks
-them, runs the dApp's circuit (which composes the ACC), asks OWS for the signature,
-has it proved, and broadcasts it.
-*Needs:* a registry of dApp code (§5); a decision on whether agents may receive a
-dApp's private data.
+
+The agent library does these steps:
+
+1. It gets the circuit and the code of a dApp from the registry, and checks them.
+2. It runs the circuit of the dApp, which composes the ACC.
+3. It asks OWS for the signature.
+4. It sends the transaction to the prover for a proof.
+5. It broadcasts the transaction.
+
+*Needs:* a registry of dApp code (§5); a decision: can agents receive the private
+data of a dApp?
 
 **D20 — On-chain grant status for OWS** (R19, R22)
-The agent library reads the agent's grant from the ACC on chain — whether it is
-live, and the commitments its readable scope opens — so OWS enforces the grant as
-its policy before it signs. This is a read of the chain, not a server-side
-verifier: the ACC is the source of truth, and its scope is the hard limit.
+
+The agent library reads the grant of the agent from the ACC on chain. It reads
+the status of the grant (live or not), and the commitments that its readable
+scope opens. OWS then enforces the grant as its policy before it signs. This is a
+read of the chain, not a server-side verifier. The ACC is the source of truth,
+and its scope is the hard limit.
 
 ---
 
 ## 5. What the roadmap adds to the SDK plan
 
-Checking the roadmap against the realignment proposal, these are the capabilities
-it asks for that the proposal did not yet name, or that need work outside the SDK.
+This section compares the roadmap with the realignment proposal. It shows the
+capabilities that the roadmap needs and the proposal does not name yet. It also
+shows the capabilities that need work outside the SDK.
 
 **New SDK functionality:**
 
 | Roadmap | What the SDK needs | Deliverable |
 |---|---|---|
-| R19, R22 | The grant's on-chain status, read from the ACC by the agent library so OWS enforces it | D20 |
-| R14 | Privacy-preserving onboarding measurements | D17 |
-| R39 | A defined DID module (create, link, hold keys, resolve) | D12a |
-| R40, R23–R27 | Holding and presenting credentials | D23 |
-| R11 | Drop-in onboarding pieces and a starter project | D16 |
-| R05 | A starter app and an app directory. The directory is a natural first form of the registry agents need (D19). | D13, D19 |
+| R19, R22 | The on-chain status of the grant. The agent library reads it from the ACC, so that OWS enforces it | D20 |
+| R14 | Onboarding measurements that keep the privacy of users | D17 |
+| R39 | A defined DID module (create, link, hold keys, and resolve) | D12a |
+| R40, R23–R27 | Hold and present credentials | D23 |
+| R11 | Ready parts for onboarding, and a starter project | D16 |
+| R05 | A starter app and an app directory. The directory can be the first form of the registry that agents need (D19). | D13, D19 |
 
-**Needs work beyond the SDK:**
+**Needs work outside the SDK:**
 
-| Roadmap | Why | What is needed |
+| Roadmap | Why | What is necessary |
 |---|---|---|
-| R10 (Ethereum-style wallets) | The ACC's k256 arm accepts a raw digest (envelope 0) and the Midnight connector's framing (envelope 1). Ethereum wallets sign under EIP-191 with a keccak-256 digest and cannot sign a raw digest. | A new envelope (a contract change needing keccak-256 in-circuit), or bringing such users in through a provider wallet with raw signing. Midnight connector wallets work today. |
-| R15 ("contracts, assets, amount") | A grant covers one token and at most one pinned recipient. A list of contracts is a list of grants — one per contract and token — which works but is clumsy. A grant that lists callable contracts is a non-goal of the current MIP. | Many grants per agent now; a list-valued scope is a MIP extension, and checking the caller needs `kernel.caller()` in a release. |
-| R18, R41 full (authority down a chain) | Only a device can issue a grant, so a grantee cannot pass on a narrower one, and revoking a parent does not end grants beneath it. | A MIP extension for chained grants. |
-| R39, R40 (a DID that authenticates through Passport) | The DID contract checks only its own stored key, so the ACC cannot control it today. | A DID contract controller mode for account contracts, on ledger 9 (the DID team); a witness-free authorisation circuit on the ACC; a MIP extension for grants that act on another contract (D12b). |
-| R17 (the agent's own identity) | Nothing gives an agent an identity today, and "one agent per service per person" needs a nullifier scheme. | A design: an agent DID, a name subdomain, or both. |
-| R41 (a child account under the parent's name) | A family member's own account under a subdomain needs subdomains in the name service, on top of a grant. | Name-service subdomains. |
-| R13 (assets from other chains) | Depends on the cross-chain signing partner adapting to Passport accounts. | Partner work, then an SDK adapter. |
-| R19 (one agent per service) and R24 (unlinkable reuse) | Need privacy-preserving proofs beyond grants. | Cryptographic design. |
-| R30–R36 (organisations and operators) | Officer sets and seats need threshold or m-of-n control, which the ACC does not have. | A contract extension (H2 2027). |
+| R10 (Ethereum-style wallets) | The k256 arm of the ACC accepts a raw digest (envelope 0) and the framing of the Midnight connector (envelope 1). Ethereum wallets sign under EIP-191 with a keccak-256 digest, and cannot sign a raw digest. | A new envelope (a contract change that needs keccak-256 in the circuit). Or, the users of these wallets join through a provider wallet that can sign raw digests. Midnight connector wallets work today. |
+| R15 ("contracts, assets, amount") | A grant covers one token and a maximum of one pinned recipient. A list of contracts is a list of grants, one for each contract and token. This works, but it is not easy to use. A grant that lists contracts to call is a non-goal of the current MIP. | Many grants for each agent now. A scope with a list of values is a MIP extension. A check of the caller needs `kernel.caller()` in a release. |
+| R18, R41 full (authority down a chain) | Only a device can issue a grant. Thus a grantee cannot give a narrower grant to a different key, and the revocation of a parent does not stop the grants below it. | A MIP extension for chained grants. |
+| R39, R40 (a DID that authenticates through Passport) | The DID contract checks only its own stored key, so the ACC cannot control it today. | A controller mode in the DID contract for account contracts, on ledger 9 (the DID team). A witness-free authorization circuit on the ACC. A MIP extension for grants that act on another contract (D12b). |
+| R17 (the agent's own identity) | Nothing gives an agent an identity today. Also, "one agent per service per person" needs a nullifier scheme. | A design: an agent DID, a name subdomain, or both. |
+| R41 (a child account under the parent's name) | The own account of a family member under a subdomain needs subdomains in the name service, in addition to a grant. | Subdomains in the name service. |
+| R13 (assets from other chains) | It depends on the partner for cross-chain signatures, which must adapt its work to Passport accounts. | Work by the partner, then an SDK adapter. |
+| R19 (one agent per service) and R24 (unlinkable reuse) | These items need proofs that keep privacy, which grants cannot give. | A cryptographic design. |
+| R30–R36 (organizations and operators) | Officer sets and seats need threshold control or m-of-n control. The ACC does not have this control. | A contract extension (H2 2027). |
 
 **External dependencies for the Q4 set:**
 
 | Dependency | Blocks | Status |
 |---|---|---|
-| ACC v2 (scoped grants) deployed on the target network | D1, D8, D13, D18 | Reference implementation and evidence exist; deployment pending |
-| A proving service that holds or rebuilds proving keys | D3 and everything after | The demo's fee sponsor does this; server-side artefact loading and key regeneration are upstream |
-| Fee sponsorship and the name service | D6 | Working in the demo |
-| WPP storage adapters and package format | D9, D14 | Prototype; Google Drive first |
-| The DID packages on the ACC's toolchain | D12a | DID pins ledger 8 and midnight-js 4; the ACC is on ledger 9 and midnight-js 5 |
-| The DID contract adapted to Passport | D12b (Q1) | Not started; needs the DID team's agreement |
-| A registry of dApp code | D19 | Not built; the capsule work points the same way |
+| ACC v2 (scoped grants) deployed on the target network | D1, D8, D13, D18 | The reference implementation and the evidence exist. The deployment is not done yet |
+| A proving service that holds or rebuilds proving keys | D3 and all later deliverables | The fee sponsor of the demo does this. Passport PR #170 shows that the keys come again, byte-identical, from the ZKIR and the on-chain verifier key. A proof-server mode that does this is upstream work |
+| Fee sponsorship and the name service | D6 | They work in the demo |
+| WPP storage adapters and package format | D9, D14 | A prototype exists. Google Drive is the first storage |
+| The DID packages on the ACC's toolchain | D12a | The DID packages pin ledger 8 and midnight-js 4. The ACC is on ledger 9 and midnight-js 5 |
+| The DID contract adapted to Passport | D12b (Q1) | There is no work on it yet. It needs the agreement of the DID team |
+| A registry of dApp code | D19 | It does not exist yet. The capsule work goes in the same direction. For circuits, a registry entry needs only the ZKIR, the verifier key, and the crate revisions (passport PR #170) |
 
 ---
 
 ## 6. Decided: where a new user creates their Passport
 
-The 2026/09/25 product review raised the concern that apps will not integrate if a
-new user has to leave the app to create a Passport. It is settled: a new user can
-create their Passport inside the app, as long as the app onboards them through a
-wallet-as-a-service (WaaS) provider and that provider supports metadata attached
-to the user's key.
+The product review of 2026/09/25 identified a risk: apps will not integrate
+Passport if a new user must leave the app to create a Passport. The decision is:
+a new user can create a Passport inside the app. The condition is that the app
+onboards the user through a wallet-as-a-service (WaaS) provider. That provider
+must support metadata attached to the user's key.
 
-| Route | New user's experience | What it costs |
+The app also gets a grant for its own key in the same flow. The user approves
+that grant in the UI of the app, not in the Passport app. Thus, the grant has a
+fixed ceiling, and the team confirms the ceiling during the implementation. A
+wider scope needs the usual grant ceremony in the Passport app.
+
+| Route | Experience of a new user | What it costs |
 |---|---|---|
-| **In the app, through a WaaS provider** | Signs in with the provider inside the app; the Passport is created there, with no hand-off | The provider's key for the user is the account's first device, held for the user, not by the app's code. The account's metadata (its address and viewing key) is attached to that key at the provider, so the user finds and recovers the account wherever they sign in with the same provider, the Passport app included. The provider can read that metadata: it can see what the account is paid, never move it. |
-| **In the Passport app, then return** | Taps "Continue with Passport"; the Passport app opens, creates the account, and goes straight back to the app's grant request | One hand-off. The route for an app without a WaaS provider. |
+| **In the app, through a WaaS provider** | The user signs in with the provider inside the app. The app creates the Passport there, with no hand-off | The key of the provider for the user is the first device of the account. The provider holds it for the user, and the code of the app does not hold it. The provider attaches the metadata of the account (its address and viewing key) to that key. Thus the user finds and recovers the account anywhere they sign in with the same provider, also in the Passport app. The provider can read that metadata: it can see the payments to the account, but it can never move them. |
+| **In the Passport app, then return** | The user taps "Continue with Passport". The Passport app opens, creates the account, and goes directly back to the grant request of the app | One hand-off. This is the route for an app without a WaaS provider. |
 
-What stays ruled out is the app creating the Passport with a device secret in its
-own code (the superseded partner-origin facade): device revocation cannot reliably
-take such a key back (errata 7 and 8), and the app would have to set up backup and
-metadata itself. The reference demo already recovers an account on a new device
-from the metadata on the user's key at its provider. D16 can now be scoped.
+One route stays forbidden: the app creates the Passport with a device secret in
+its own code (the superseded partner-origin facade). Device revocation cannot
+reliably remove such a key (errata 7 and 8). Also, the app must then configure
+backup and metadata itself. The reference demo already recovers an account on a
+new device from the metadata on the user's key at its provider. The team can now
+define the scope of D16.
 
 ---
 
-## 7. Where the roadmap and this plan differ on timing
+## 7. Where the dates in the roadmap and this plan differ
 
-- **R37 (agent onboarding)** sits in the roadmap's current-demo column. In the SDK
-  it is D18, a Q4 deliverable after grants (D8).
-- **R41 (an account delegates to another under its name)** is in Q4 on the
-  roadmap. The basic form — a key with a limit, granted like any other — is Q4
-  (D8). The form with its own account under a subdomain needs name-service
-  subdomains, and the form where revoking the parent ends everything beneath needs
-  chained grants (§5).
+- **R37 (agent onboarding)** is in the current-demo column of the roadmap. In the
+  SDK it is D18, a Q4 deliverable after grants (D8).
+- **R41 (an account delegates to another account under its name)** is in Q4 in
+  the roadmap. The basic form is a key with a limit, which the user grants the
+  same as all other keys. This form is in Q4 (D8). The form with its own account
+  under a subdomain needs subdomains in the name service. The form in which the
+  revocation of the parent ends all grants below it needs chained grants (§5).
 - **R12 (one permission model)** and **R19 (check a grant from the outside)** are
-  distinct in the SDK: R12 is the grant mechanism (D8, D13), R19 is reading the
-  grant's status from the ACC on chain (D20). There is no server-side verifier.
+  different items in the SDK. R12 is the grant mechanism (D8, D13). R19 is a read
+  of the grant status from the ACC on chain (D20). There is no server-side
+  verifier.
 - **R20 (agent tools: an MCP server and a skill)** and **R38 (an off-chain policy
-  hook)** are not SDK deliverables. OWS enforces the grant it reads from the chain
-  (D20).
-- **Package name.** The roadmap names the dApp library `@midnight-passport/connect`;
-  the SDK publishes `@midnight-ntwrk/mn-passport-connect`. One should change.
+  hook)** are not SDK deliverables. OWS enforces the grant that it reads from the
+  chain (D20).
+- **Package name.** The roadmap names the dApp library
+  `@midnight-passport/connect`. The SDK publishes
+  `@midnight-ntwrk/mn-passport-connect`. One of the two names must change.
 
 ---
 
 ## 8. Open questions
 
-1. Which package runs onboarding from a dApp through a WaaS provider (§6;
-   realignment open question 15)?
-2. Who builds the registry of dApp code, and in what form (§5, D19)?
-3. May an agent receive a dApp's private data (D19)?
-4. Ethereum-style wallets: a new envelope, or through a provider wallet (D7)?
-5. Until the ACC controls the DID, is its controller key derived from the passkey
-   or stored in WPP (D12a)?
-6. Do the DID packages move to ledger 9 before D12a, or does Passport run both eras?
-   D12b needs ledger 9 in any case.
-7. Will the DID team take on a controller mode for account contracts (D12b)?
-8. Which roadmap items (R17, R18, R41 full, and the grant for acting on another
-   contract that D12b needs) should start MIP work now, so they are ready for Q1?
-9. Is a grant proof for third parties (R21, R25: a proof that travels in a payment
-   field) still wanted, and if so, where does it sit now that there is no
-   server-side verifier?
+1. When an app creates a Passport, which grant can it get (§6; realignment open
+   question 15)? The team confirms the ceiling during the implementation.
+2. Who builds the registry of dApp code, and in which form (§5, D19)?
+3. Can an agent receive the private data of a dApp (D19)?
+4. Ethereum-style wallets: do they need a new envelope, or do they join through a
+   provider wallet (D7)?
+5. Until the ACC controls the DID, does the controller key of the DID come from
+   the passkey, or does WPP store it (D12a)?
+6. Do the DID packages move to ledger 9 before D12a, or does Passport run both
+   eras? D12b needs ledger 9 in all cases.
+7. Does the DID team agree to add a controller mode for account contracts
+   (D12b)?
+8. Which roadmap items must start MIP work now, so that they are ready for Q1?
+   The candidates are R17, R18, R41 full, and the grant that D12b needs to act on
+   another contract.
+9. Does the team still want a grant proof for third parties (R21, R25: a proof
+   that travels in a payment field)? If yes, where does it go, now that there is
+   no server-side verifier?

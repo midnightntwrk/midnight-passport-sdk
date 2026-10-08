@@ -1,75 +1,100 @@
 # SDK realignment — proposal of changes
 
 > **Status:** proposal for decision · 2026/09/25
-> **Scope:** the SDK's packages, core seams, adapters, normative rules, and the
-> docs that describe them.
-> **When accepted:** each change lands through `mn-passport-skills:doc-sync` with
-> an ADR, as `CLAUDE.md` requires. Until then the existing docs remain the source
-> of truth and this file records what should change in them and why.
-> **Inputs:** the Passport direction (planning workspace `docs/passport-direction.md`),
-> the scoped-grants MIP (`docs/mps-mip/mips/mip-xxxx-scoped-grants.md`),
-> MPS-0040 (cross-contract call provenance), the reference ACC
-> (`contract/contracts/account.compact`), the demo's account-custody work
-> (passport-demo `main`, 2026/09/18–24), the Witness Protection Program (WPP)
-> integration notes, and the architecture call of 2026/09/25. Every midnight-js
-> behaviour cited was checked against the source at `v5.0.0-beta.7` (the version the
-> demo pins) and at `main` as of 2026/09/24. The SDK docs it amends were read at
-> `main` `5dff89f` (2026/09/03). Sources are listed in §14.
+> **Scope:** the SDK packages, the core seams, the adapters, the normative rules,
+> and the documents that describe them.
+> **When accepted:** each change goes into the docs through
+> `mn-passport-skills:doc-sync`, with an ADR, as `CLAUDE.md` specifies.
+> Until then, the current docs stay the source of truth.
+> This file records the necessary changes to them, and the reasons.
+> **Inputs:**
+>
+> - the Passport direction (planning workspace `docs/passport-direction.md`);
+> - the scoped-grants MIP (`docs/mps-mip/mips/mip-xxxx-scoped-grants.md`);
+> - MPS-0040 (cross-contract call provenance);
+> - the reference ACC (`contract/contracts/account.compact`);
+> - the account-custody work of the demo (passport-demo `main`, 2026/09/18–24);
+> - the integration notes of the Witness Protection Program (WPP);
+> - the architecture call of 2026/09/25.
+>
+> **Checks:** we checked each cited midnight-js behavior against the source at
+> `v5.0.0-beta.7` (the version that the demo pins) and at `main` on 2026/09/24.
+> We read the SDK docs that this file amends at `main` `5dff89f` (2026/09/03).
+> §14 lists the sources.
 
 ---
 
 ## 1. Why this proposal
 
-The SDK docs were written for a model in which Passport is the place where
-transactions happen: it builds, proves, signs, and submits on the user's behalf,
-and dApps ask it to do so through a wallet-connector protocol. They also assume
-that proving in the browser will be the normal path.
+The SDK docs describe a model in which Passport is the place where transactions
+occur. In that model, Passport builds, proves, signs, and submits transactions
+for the user. A dApp asks Passport to do these steps through a wallet-connector
+protocol. The docs also assume that the browser will usually make the proofs.
 
-Both assumptions no longer hold. The direction has changed: dApps and agents run
-their own circuits, the ACC enforces what each of them may do, and Passport
-becomes the place where accounts are created, keys are approved, and private data
-is kept. The evidence has changed too: the ACC's proving keys run to hundreds of
-megabytes per circuit, and calls from one contract into another have limits the
-docs do not mention.
+These two assumptions are no longer correct. The direction changed. Now dApps
+and agents run their own circuits, and the ACC enforces what each of them can
+do. Passport becomes the place where the user creates accounts, approves keys,
+and keeps private data.
 
-This proposal sets out what to keep, change, add, and retire. It gives most of
-its attention to the adapters, because that is where the old model is most
-visible: several adapters exist only to let Passport act on behalf of a dApp or
-an agent, and in the new model neither needs Passport to act for it.
+The evidence also changed. The proving keys of the ACC are hundreds of
+megabytes for each circuit. Also, calls from one contract into another have
+limits that the docs do not mention.
+
+This proposal gives the items to keep, change, add, and retire. Most of it is
+about the adapters, because the old model is most visible there. Some adapters
+exist only to let Passport act for a dApp or an agent. In the new model, a dApp
+or an agent does not need Passport to act for it.
 
 ---
 
 ## 2. The model in one page
 
-**The ACC** holds the user's funds and enforces the rules. Every key that acts on
-it is registered in it, either as a *device* (full authority) or as a *grant*
-(scoped authority: operations, one token colour, per-call and total caps, a coin
-bound, an optional recipient pin, and an expiry).
+**The ACC** holds the funds of the user and enforces the rules. Each key that
+acts on the ACC has a registration in it, as a _device_ or as a _grant_. A
+device has full authority. A grant has scoped authority, with these limits:
 
-**The Passport app** is where an account is created, where device keys live, where
-grants are approved and revoked, where private data is kept, and where recovery
-happens. It is the only place that holds full authority. It is not where dApp or
-agent transactions are built.
+- the permitted operations;
+- one token color;
+- a cap for each call, and a total cap;
+- a coin bound;
+- an optional recipient pin;
+- an expiry.
 
-**A dApp** connects through the grant ceremony, receives a scoped key of its own,
-and builds its own circuit, which composes the user's ACC, and runs it in its own
-UI. Passport supplies what the dApp cannot have by itself: the ACC's interface and
-client code, the user's private data for that dApp, and the viewing key if the
-grant includes read access.
+**The Passport app** is where the user creates an account, keeps device keys,
+approves and revokes grants, keeps private data, and does recovery. It is the
+only place with full authority. The Passport app does not build the
+transactions of dApps or agents.
 
-**An agent** is set up through the same ceremony. dApps and agents send the same
-request; whoever sends it decides how it reaches the user — a redirect, a QR code
-printed by a command-line tool, or a link or button in its own app — and the
-Passport app handles it the same way every time. The agent's key is held by its
-own wallet engine (OWS), which reads the grant from the ACC on chain and enforces
-it as its policy. The agent then runs each dApp's circuit without any UI, fetching
-the dApp's client code from a registry.
+**A dApp** connects through the grant ceremony and gets a scoped key of its own.
+The dApp builds its own circuit, which composes the ACC of the user, and runs it
+in its own UI. Passport supplies the items that the dApp cannot have by itself:
 
-**Every key is authored by whoever holds it and registered by Passport.** That is
-the single method this proposal builds around: the same interface serves a
-passkey, the provider's embedded wallet, a Midnight connector wallet, a dApp's
-per-origin key, and an agent's OWS key. What differs is only whether Passport
-registers the key as a device or as a grant.
+- the interface and the client code of the ACC;
+- the private data of the user for that dApp;
+- the viewing key, if the grant includes read access.
+
+**An agent** uses the same ceremony. A dApp and an agent send the same request.
+The sender decides how the request gets to the user:
+
+- a redirect;
+- a QR code from a command-line tool;
+- a link or a button in its own app.
+
+The Passport app does the same steps for each form. The wallet engine of the
+agent (OWS) holds the key of the agent. OWS reads the grant from the ACC on
+chain and enforces it as its policy. The agent then runs the circuit of each
+dApp without a UI. It gets the client code of the dApp from a registry.
+
+**The holder of a key makes the key, and Passport registers it.** This proposal
+uses that one method for all keys. The same interface serves these keys:
+
+- a passkey;
+- the embedded wallet of the provider;
+- a Midnight connector wallet;
+- the per-origin key of a dApp;
+- the OWS key of an agent.
+
+The only difference is if Passport registers the key as a device or as a grant.
 
 ```mermaid
 flowchart LR
@@ -101,123 +126,155 @@ flowchart LR
 
 ## 3. Decisions this proposal records
 
-These were settled in the direction work and the architecture call. The proposal
-treats them as fixed inputs.
+The direction work and the architecture call settled these decisions. This
+proposal uses them as fixed inputs.
 
-1. **Onboarding happens in the Passport app, or in a dApp through a
-   wallet-as-a-service (WaaS) provider.** The passkey created in the Passport app
-   is a full-authority device. A dApp may onboard a new user only through a WaaS
-   provider: the provider's embedded key for that user becomes the account's first
-   device, and the provider must support metadata attached to the user's key, which
-   carries what the account needs to be found and recovered elsewhere (§8.1). The
-   dApp's own code never holds a device secret, and no dApp or agent ever receives
-   a device key of its own. This supersedes ADR 0005 (§3.1).
-2. **dApps and agents use the same grant mechanism.** Each holds one scoped key
-   registered on the ACC. The ACC checks what the key may do, not which dApp is
-   calling: one grant to an agent covers every dApp that agent calls.
-3. **The dApp connector protocol (C23) is retired.** Connection is the grant
-   ceremony defined by the scoped-grants MIP (§9); there is no request/response
-   channel through which Passport acts for a dApp.
-4. **Circuits run where the caller is.** A dApp runs its circuits in its UI; an
-   agent runs them in its backend; the Passport app runs only its own operations
-   (onboarding, devices, grants, recovery).
-5. **The OWS adapter is retired.** OWS authors the agent's key; Passport registers
-   it through the grant ceremony, delivered however the agent provider chooses (a
-   QR code in a command-line tool, or its own app); OWS reads the grant from the
-   ACC to decide what it will sign.
-6. **Clients carry about 1 MB per contract** — the compiled contract module, the
-   ledger decoder, and the manifest. ZKIR goes to the prover only. Proving keys
-   stay with the prover and can be rebuilt there from the ZKIR and the verifier
-   key.
-7. **dApps publish their own client code; agents fetch it.** Each dApp bundles its
-   own app; the SDK provides a project template as an AI-agent skill.
-8. **Private data is kept by Passport and backed up through WPP.** A dApp receives
-   its own private data through the SDK and returns updates the same way.
+1. **Onboarding occurs in the Passport app, or in a dApp through a
+   wallet-as-a-service (WaaS) provider.** The passkey that the user makes in the
+   Passport app is a device with full authority. A dApp can onboard a new user only through a WaaS provider, and the embedded key of that provider becomes the first device. The provider must support metadata on the key of the user, which holds the data to find and recover the account (§8.1). The code of the dApp never holds a device secret, and no dApp or agent gets a device key of its own. This
+   decision replaces ADR 0005 (§3.1).
+
+   In the same flow, the dApp gets a grant for its own per-origin key. The scope
+   of that grant has a fixed ceiling, and the team confirms the ceiling during
+   the implementation (open question 15). A wider scope needs the usual grant
+   ceremony in the Passport app. `connect` does this onboarding, with
+   `adapter-waas` (§5, §7).
+2. **A dApp and an agent use the same grant mechanism.** Each one holds one
+   scoped key, with a registration on the ACC. The ACC checks what the key can
+   do, not which dApp calls. Thus, one grant to an agent covers all the dApps
+   that the agent calls.
+3. **This proposal retires the dApp connector protocol (C23).** The grant
+   ceremony of the scoped-grants MIP (§9) replaces it. Passport has no request
+   and response channel through which it acts for a dApp.
+4. **Circuits run where the caller is.** A dApp runs its circuits in its UI. An
+   agent runs them in its backend. The Passport app runs only its own
+   operations: onboarding, devices, grants, and recovery.
+5. **This proposal retires the OWS adapter.** OWS makes the key of the agent.
+   Passport registers that key through the grant ceremony. The agent provider
+   chooses the delivery: a QR code in a command-line tool, or its own app. OWS
+   reads the grant from the ACC to decide what it will sign.
+6. **Clients carry about 1 MB for each contract.** This is the compiled contract
+   module, the ledger decoder, and the manifest. Only the prover gets the ZKIR.
+   The proving keys stay with the prover. The verifier key of each circuit is
+   on chain, so the prover needs only the ZKIR to make the proving key again,
+   byte for byte (passport PR #170).
+7. **A dApp publishes its own client code, and agents get it.** Each dApp
+   bundles its own app. The SDK supplies a project template as an AI-agent
+   skill.
+8. **Passport keeps the private data and makes backups through WPP.** A dApp
+   gets its own private data through the SDK, and returns updates in the same
+   way.
 9. **One grant ceremony for dApps and agents.** Both send the same request, with
-   the same possession proof and the same validation; only its delivery differs (a
-   redirect, a QR code, or a link), and the SDK offers every form to both.
-10. **The dApp builds the circuit that composes the user's ACC.** Composing the
-    ACC into a call is the dApp's responsibility. The SDK supplies the ACC's
-    interface for the dApp's circuit, the challenge, and the grant key's signature;
-    it does not compose the call for the dApp.
-11. **A Passport user never handles DUST.** Fees are sponsored, or swapped through
-    the Capacity Exchange. No SDK path assumes user-held DUST.
+   the same possession proof and the same validation. Only the delivery is
+   different: a redirect, a QR code, or a link. The SDK supplies each form to
+   both.
+10. **The dApp builds the circuit that composes the ACC of the user.** The dApp
+    is responsible for the composition of the ACC into a call. The SDK supplies
+    the interface of the ACC for the circuit of the dApp, the challenge, and the
+    signature of the grant key. The SDK does not compose the call for the dApp.
+11. **A Passport user never holds or pays with DUST.** A sponsor pays the fees,
+    or the user swaps for them through the Capacity Exchange. No SDK path
+    assumes that the user holds DUST.
 
 ### 3.1 What this changes in designs already on `main`
 
-Two designs merged to `main` in August and September meet this proposal head-on.
+Two designs on `main`, merged in August and September, conflict with this
+proposal.
 
-**Partner-origin onboarding is superseded in its current form.** ADR 0005
-(accepted 2026/08/18), requirements §3.13, FS-2.3, and architecture example 6 let
-a partner dApp issue a Passport through the `mn-passport-onboard` facade, which
-links `core` into the dApp's bundle and mints a passkey device in the partner
-origin. Decision 1 keeps onboarding from a dApp but replaces that mechanism with a
-WaaS provider, and the reasons for dropping the facade are already recorded on
-`main`:
+**This proposal replaces partner-origin onboarding in its current form.** ADR
+0005 (accepted 2026/08/18), requirements §3.13, FS-2.3, and architecture example
+6 let a partner dApp issue a Passport. The dApp uses the `mn-passport-onboard`
+facade for this. The facade links `core` into the bundle of the dApp and makes a
+passkey device in the partner origin. Decision 1 keeps onboarding from a dApp,
+but a WaaS provider replaces that mechanism. The reasons to remove the facade
+are already on `main`:
 
-- the facade holds the plaintext device secret in the partner origin during
-  issuance (ADR 0005's own residual risk), and the key it creates is a
-  full-authority device;
-- errata 7 and 8 (`onboarding-and-key-authorisation.md` §8) show that removing a
-  device cannot evict a key that planted a spare entry, so a full-authority key
-  issued at a dApp cannot reliably be taken back.
+- The facade holds the plaintext device secret in the partner origin during
+  issuance. ADR 0005 records this as a residual risk. The key that the facade
+  makes is a device with full authority.
+- Errata 7 and 8 (`onboarding-and-key-authorisation.md` §8) show that the
+  removal of a device cannot remove a key that added a spare entry. Thus, the
+  user cannot reliably revoke a full-authority key that a dApp issued.
 
-What survives is the experiment behind it: Related Origin Requests work, the PRF
-output is identical across origins, and a largeBlob written at one origin reads
-back at another, with the rule that the largeBlob is a cache and never the source
-of truth. Those findings serve the Passport app's own recognition of an account,
-and make the largeBlob a candidate carrier for account metadata (open question 4),
-bearing in mind that among platform authenticators only Apple's support it.
+The experiment behind the facade stays valid. It showed these results:
 
-With a WaaS provider, neither objection applies. The device key is the user's own
-embedded key, held by the provider for the user and not by the dApp's code, which
-is FS-2.4's rule for a platform that genuinely acts as the user's own device. The
-account's metadata (the ACC address and the viewing key) is attached to that key
-at the provider, so the account can be found and recovered wherever the user signs
-in with the same provider, the Passport app included. The reference demo already
-does this for recovery on a new device. The redirect fallback in §3.13, which
-sends the user to the Passport app, stays as the route for a dApp without a WaaS
-provider.
+- Related Origin Requests work.
+- The PRF output is the same across origins.
+- A largeBlob that one origin writes, another origin can read. The rule is that
+  the largeBlob is a cache and never the source of truth.
 
-**Authorising additional keys (FS-2.4) is kept and generalised.** FS-2.4 already
-has the shape §4 argues for. The holder generates its key and exposes a signed
-request out of band, preferably as a QR code (scheme tag, public key, commitment,
-account hint, nonce, expiry, label, and a self-signature); only the Passport app
-verifies it and signs the approval, through the existing `add_device` circuit.
-This proposal keeps that as the device path and extends the same request to the
-grant path: the request also carries a requested scope, and the approval is
-`issue_grant`. dApps (§8.2) and agents (§8.3) send that one request (decision 9);
-only its delivery differs — the MIP §9 redirect, a QR code, or a link — and the
-SDK offers every form to both. Two amendments:
+The Passport app uses these results to recognize an account. They also make the
+largeBlob a possible carrier for account metadata (open question 4). But among
+platform authenticators, only the Apple authenticators support it.
 
-- FS-2.4 has a managed provider sign with a P-256 secure-signer key. The ACC has
-  no p256 arm yet (it waits on the secp256r1 surface), and the demo enrols the
-  provider's key on the k256 arm (envelope 0). FS-2.4 should say k256 until the
-  p256 arm lands (open question 11).
-- FS-2.4 gives the platform full authority. Given errata 7 and 8, only a platform
-  that genuinely acts as the user's own device should receive that; any other
-  platform, agent, or dApp gets a grant. A grant key cannot plant a spare —
-  issuing a grant needs a device — so revoking it retires it, and
-  `revoke_all_grants` retires every grant at once.
+With a WaaS provider, neither objection applies. The device key is the embedded
+key of the user. The provider holds it for the user, and the code of the dApp
+does not hold it. This agrees with the FS-2.4 rule for a platform that acts as
+the device of the user. The metadata of the account (the ACC address and the
+viewing key) is on that key at the provider. Thus, the user can find and recover
+the account at each place where they sign in with the same provider, the
+Passport app included.
 
-**The embedded (iframe) transport** in `dapp-connection.md` (Passport top-level,
-the dApp in a full-page iframe, `postMessage` between them) loses its role as an
-RPC carrier but is a candidate channel for the private-data handoff (open
-question 2). It makes Passport the host of the dApp, which is a product choice as
-much as a technical one.
+The reference demo already does this for recovery on a new device. The redirect
+fallback in §3.13 sends the user to the Passport app. It stays as the route for
+a dApp without a WaaS provider.
+
+**This proposal keeps FS-2.4 (authorization of more keys) and makes it
+general.** FS-2.4 already has the form that §4 recommends. The holder makes its
+key and shows a signed request out of band, as a QR code if possible. The
+request contains these items:
+
+- a scheme tag;
+- a public key;
+- a commitment;
+- an account hint;
+- a nonce;
+- an expiry;
+- a label;
+- a self-signature.
+
+Only the Passport app verifies the request and signs the approval, through the
+current `add_device` circuit. This proposal keeps that as the device path. It
+also uses the same request for the grant path. On that path, the request also
+carries a requested scope, and the approval is `issue_grant`.
+
+A dApp (§8.2) and an agent (§8.3) send that one request (decision 9). Only the
+delivery is different: the MIP §9 redirect, a QR code, or a link. The SDK
+supplies each form to both. This proposal makes two amendments to FS-2.4:
+
+- In FS-2.4, a managed provider signs with a P-256 secure-signer key. The ACC
+  has no p256 arm yet, because it waits on the secp256r1 surface. The demo
+  enrolls the key of the provider on the k256 arm (envelope 0). FS-2.4 must
+  specify k256 until the p256 arm is available (open question 11).
+- FS-2.4 gives full authority to the platform. Because of errata 7 and 8, only a
+  platform that acts as the device of the user can get full authority. Each
+  other platform, agent, or dApp gets a grant. A grant key cannot add a spare,
+  because only a device can issue a grant. Thus, revocation retires a grant key,
+  and `revoke_all_grants` retires all grants at the same time.
+
+**The embedded (iframe) transport** in `dapp-connection.md` puts Passport at the
+top level and the dApp in a full-page iframe. The two use `postMessage` between
+them. It is no longer an RPC carrier, but it is a possible channel for the
+private-data handoff (open question 2). It makes Passport the host of the dApp.
+This is a product decision and also a technical decision.
 
 ---
 
-## 4. Key authoring: one method for every principal
+## 4. Key creation: one method for each principal
 
-Today the docs describe five separate ways a key reaches the ACC:
-`adapter-signer-managed`, `adapter-signer-local`, `adapter-agent-ows`,
-`adapter-wallet-connect`, and the dApp grantee key inside `mn-passport-connect`.
-They are the same thing seen from five places. This proposal replaces them with
-one interface and two registration paths.
+Now the docs describe five different ways for a key to get to the ACC:
 
-**The interface.** A *key provider* is anything that holds a private key and can
-sign an ACC challenge:
+- `adapter-signer-managed`;
+- `adapter-signer-local`;
+- `adapter-agent-ows`;
+- `adapter-wallet-connect`;
+- the dApp grantee key in `mn-passport-connect`.
+
+These five are the same thing, seen from five places. This proposal replaces
+them with one interface and two registration paths.
+
+**The interface.** A _key provider_ is a component that holds a private key and
+can sign an ACC challenge:
 
 ```ts
 // Indicative shape; signatures are fixed when the package is specced.
@@ -229,18 +286,18 @@ interface KeyProvider {
 }
 ```
 
-`Challenge` is the ACC's per-circuit challenge (a finished digest for k256, a
-builder for JubJub's grinding rule). `Authorisation` is the argument tuple the
-circuit takes. The demo already has this split: `custodyJubjubSigner.ts` and the
-k256 signer behind `custodyContractSigning.ts` feed one send engine through
-`authArgs`.
+`Challenge` is the challenge of the ACC for each circuit. For k256 it is a
+finished digest, and for JubJub it is a builder for the grinding rule.
+`Authorisation` is the argument tuple that the circuit takes. The demo already
+has this split. `custodyJubjubSigner.ts` and the k256 signer in
+`custodyContractSigning.ts` feed one send engine through `authArgs`.
 
 **The two registration paths.**
 
-| Path | Circuits | Authority | Who may perform it | Where |
-|---|---|---|---|---|
-| **Device** | `activate_initial_device_with_*`, `add_device_with_*` | Full | The user, with an existing device | Passport app; or a dApp through a WaaS provider, for the provider's key as the first device |
-| **Grant** | `issue_grant_with_*` | Scoped | The user, approving a request | Passport app, via the grant ceremony |
+| Path       | Circuits                                              | Authority | Who can do it                      | Where                                                                                      |
+| ---------- | ----------------------------------------------------- | --------- | ---------------------------------- | ------------------------------------------------------------------------------------------ |
+| **Device** | `activate_initial_device_with_*`, `add_device_with_*` | Full      | The user, with a current device    | The Passport app, or a dApp through a WaaS provider (the key of the provider as the first device) |
+| **Grant**  | `issue_grant_with_*`                                  | Scoped    | The user, who approves a request   | The Passport app, through the grant ceremony                                               |
 
 ```mermaid
 flowchart TB
@@ -272,23 +329,23 @@ flowchart TB
     class DEV,GR store
 ```
 
-**The key providers the SDK ships.**
+**The key providers that the SDK supplies.**
 
-| Key provider | Scheme | Typical registration | Lives in | Notes |
+| Key provider | Scheme | Usual registration | Lives in | Notes |
 |---|---|---|---|---|
-| Passkey | JubJub, derived from the passkey's PRF output | Device | `core` (Passport app) | Signs in the tab, no third party. The demo's device model. |
-| Passkey on secp256r1 | p256 through the WebAuthn envelope | Device or grant | `core`, `connect` | Waits on the ACC's p256 arm (the secp256r1 surface). |
-| The provider's embedded wallet | k256, envelope 0 | Device | `core` | Signs ACC challenges through the provider's raw-signing call; enrolled once from a signature over a known digest, because the provider exposes no public-key read. |
-| Midnight connector wallet | k256 through the Midnight dApp connector's `signData` framing (envelope 1, `midnight_signed_message:32:`) | Device, or a read-only grant | `core`, `connect` | The ACC admits envelope-1 keys as devices; the scoped-grants MIP refuses them on the spend seam, so as grants they are read-only by construction. |
-| Ethereum-style wallet (e.g. MetaMask) | secp256k1 under EIP-191 (a keccak-256 digest) | — | — | **Not supported today.** The ACC accepts envelopes 0 and 1 only, and such wallets cannot sign a raw digest. It needs a new envelope, which is a contract change needing keccak-256 in-circuit, or signing through a provider wallet that exposes raw signing (roadmap R10; open question 13). |
-| dApp per-origin key | JubJub or k256 (envelope 0), or p256 on the dApp origin | Grant | `connect` | One key per account per origin; never reused (MIP §3.2). |
-| Agent key in OWS | JubJub or k256 (envelope 0) | Grant | `mn-passport-agent` (OWS side) | OWS signs; the SDK builds the challenge. |
+| Passkey | JubJub, from the PRF output of the passkey | Device | `core` (Passport app) | Signs in the tab, with no third party. This is the device model of the demo. |
+| Passkey on secp256r1 | p256 through the WebAuthn envelope | Device or grant | `core`, `connect` | Waits on the p256 arm of the ACC (the secp256r1 surface). |
+| The embedded wallet of the provider | k256, envelope 0 | Device | `core` | Signs ACC challenges through the raw-signing call of the provider. The SDK enrolls it one time from a signature over a known digest. The reason is that the provider has no call to read the public key. |
+| Midnight connector wallet | k256 through the `signData` framing of the Midnight dApp connector (envelope 1, `midnight_signed_message:32:`) | Device, or a read-only grant | `core`, `connect` | The ACC accepts envelope-1 keys as devices. The scoped-grants MIP refuses them on the spend seam. Thus, as grants, they can only read. |
+| Ethereum-style wallet (for example MetaMask) | secp256k1 under EIP-191 (a keccak-256 digest) | — | — | **The ACC does not support it today.** The ACC accepts envelopes 0 and 1 only, and these wallets cannot sign a raw digest. Support needs a new envelope, which is a contract change with keccak-256 in the circuit. The other option is to sign through a provider wallet that can sign a raw digest (roadmap R10; open question 13). |
+| dApp per-origin key | JubJub or k256 (envelope 0), or p256 on the dApp origin | Grant | `connect` | One key for each account and each origin. The dApp never uses the same key again (MIP §3.2). |
+| Agent key in OWS | JubJub or k256 (envelope 0) | Grant | `mn-passport-agent` (OWS side) | OWS signs, and the SDK builds the challenge. |
 
-**Why this matters beyond tidiness.** It removes the idea that the provider is
-only a presence gate (requirements §2.6), which the demo has overtaken: the
-provider's key is now a k256 device that signs ACC challenges. It makes OWS an
-ordinary key provider rather than something Passport wraps. And it gives dApps and
-agents one code path, which is what decision 2 asks for.
+**Why this is more than a clean-up.** It removes the idea that the provider is
+only a presence gate (requirements §2.6). The demo made that idea out of date:
+the key of the provider is now a k256 device that signs ACC challenges. OWS
+becomes a usual key provider, not a component that Passport wraps. Also, a dApp
+and an agent get one code path, as decision 2 asks.
 
 ---
 
@@ -296,22 +353,22 @@ agents one code path, which is what decision 2 asks for.
 
 | Package | Today | Proposal |
 |---|---|---|
-| `mn-passport-protocol` | C23 wire types: EIP-6963 discovery, CAIP-25-shaped requests, Sign-In-with-Passport | **Change.** Carry the MIP §9 messages instead: `GrantRequest`, the possession proof, the redirect response (`grant_id`, `scope_salt`, approved scope, `view`), and the sign-in message (MIP §10). The grant request is one message for dApps and agents, carried as a redirect, a QR code, or a link (decision 9). Keeps the wire version axis. |
-| `mn-passport-contract` | Typed ACC bindings, version registry, artefact integrity; loads ZKIR, binary ZKIR, and verifier keys | **Change.** Keep bindings, registry, and integrity. Load only what a client needs to build a call (compiled module, ledger decoder, manifest); ZKIR is for the prover. Accept a partly deployed account (§7, wave rule). Publish the ACC's interface for dApp circuits, so a dApp's contract can call into the ACC (decision 10). Generalise the loader to dApp artefacts. |
-| **`mn-passport-account`** | — | **New foundation package.** The ACC client that `core`, `connect`, and the agent library all need, so `connect` still never links `core`: per-arm challenge builders and grant signatures for calls into the ACC, the grant-ceremony client that `connect` and the agent library share, on-chain grant reads, the coin store and position lookup, the inbox codec (seal and open), payments, the transaction joiner (a helper the caller may use, §8.2), grant-scope helpers, and the seam interfaces the three entry libraries share (key provider, prover, broadcast). The demo's `custodyContractClient.ts`, `custodyInbox.ts`, `custodyInboxIndex.ts`, and `k1CoinStore.ts` are the quarry. |
-| `mn-passport-core` | The kernel for every face: onboarding, connect answer, witness lifecycle, grants, agents | **Narrow.** The Passport app's engine: onboarding, devices, grant issuance and revocation (the authoriser page of MIP §9), private-data custody through WPP, recovery, and distribution of the viewing key. No longer on the dApp or agent path. |
-| `mn-passport-connect` | Thin dApp connector over C23: sign-in, grant requests, witness provisioning, deposit | **Change.** The dApp library: the grant ceremony (the same as agents', through `mn-passport-account`), the dApp per-origin key provider, the ACC challenge signed with the dApp's grant key for the dApp's own circuit, a Passport-backed private-state provider, Pay with Passport, onboarding through a WaaS provider, and a project-template skill. The dApp composes the ACC in its own circuit (decision 10). Still never links `core`. |
-| `mn-passport-onboard` | Planned facade over `core` for partner-origin issuance (ADR 0005, FS-2.3) | **Retire before it is built** (§3.1). Onboarding from a dApp goes through a WaaS provider as key provider, over `mn-passport-account`, so `connect` still never links `core` (open question 15). Recognising an account from the passkey and its largeBlob moves into `core`; the shared constants ADR 0005 placed in `mn-passport-protocol` (RP ID, PRF salt, largeBlob schema) stay there. |
-| **`mn-passport-agent`** | — (was `adapter-agent-ows`) | **New entry package** (Node.js). The grant ceremony (the same as dApps'), a registry client that fetches a dApp's circuit and runs it, the grant's on-chain status read from the ACC so OWS can enforce it as its policy, OWS as key provider, and the private-data channel (open question 3). Never links `core`. |
+| `mn-passport-protocol` | C23 wire types: EIP-6963 discovery, CAIP-25-shaped requests, Sign-In-with-Passport | **Change.** Carry the MIP §9 messages instead. These are `GrantRequest`, the possession proof, the redirect response (`grant_id`, `scope_salt`, approved scope, `view`), and the sign-in message (MIP §10). The grant request is one message for dApps and agents. It travels as a redirect, a QR code, or a link (decision 9). Keep the wire version axis. |
+| `mn-passport-contract` | Typed ACC bindings, version registry, artifact integrity; loads ZKIR, binary ZKIR, and verifier keys | **Change.** Keep the bindings, the registry, and the integrity checks. The version registry records the exact zkir and midnight-zk crate revisions, because the keys change with them (passport PR #170). Load only what a client needs to build a call: the compiled module, the ledger decoder, and the manifest. The ZKIR is for the prover. Accept a partly deployed account (§7, wave rule). Publish the interface of the ACC for dApp circuits, so that a dApp contract can call into the ACC (decision 10). Make the loader general, for dApp artifacts too. |
+| **`mn-passport-account`** | — | **New foundation package.** It is the ACC client that `core`, `connect`, and the agent library all need. With it, `connect` still never links `core`. It contains the challenge builders for each arm and the grant signatures for calls into the ACC. It contains the grant-ceremony client that `connect` and the agent library share, and the on-chain grant reads. It also contains the coin store and the position lookup, the inbox codec (seal and open), and payments. It also has the transaction joiner, a helper that the caller can use (§8.2), and the grant-scope helpers. Last, it has the seam interfaces that the three entry libraries share: key provider, prover, and broadcast. The demo files `custodyContractClient.ts`, `custodyInbox.ts`, `custodyInboxIndex.ts`, and `k1CoinStore.ts` are the source for this code. |
+| `mn-passport-core` | The kernel for every face: onboarding, connect answer, witness lifecycle, grants, agents | **Narrow.** It becomes the engine of the Passport app. It does onboarding, devices, grant issuance and revocation (the authorizer page of MIP §9), and recovery. It also keeps private data through WPP and gives out the viewing key. It is no longer on the path of a dApp or an agent. |
+| `mn-passport-connect` | Thin dApp connector over C23: sign-in, grant requests, witness provisioning, deposit | **Change.** It becomes the dApp library. It does the grant ceremony, the same as for agents, through `mn-passport-account`. It holds the per-origin key provider of the dApp. It signs the ACC challenge with the grant key of the dApp, for the circuit of the dApp. It also supplies a private-state provider that uses Passport, Pay with Passport, and a project-template skill. A separate entry point, `mn-passport-connect/onboard`, creates a Passport through a WaaS provider (§8.1). It deploys the ACC, activates the key of the provider as the first device, and claims the name. Then it issues the grant of the dApp up to the ceiling and writes the account metadata. A dApp that only signs in users does not load this code. The dApp composes the ACC in its own circuit (decision 10). It still never links `core`. |
+| `mn-passport-onboard` | Planned facade over `core` for partner-origin issuance (ADR 0005, FS-2.3) | **Retire it before the build** (§3.1). Onboarding from a dApp goes into `connect`, as the entry point `mn-passport-connect/onboard`, over `mn-passport-account` and `adapter-waas` (§8.1). Thus, `connect` still never links `core`. `core` gets the function that recognizes an account from the passkey and its largeBlob. The shared constants that ADR 0005 put in `mn-passport-protocol` stay there: the RP ID, the PRF salt, and the largeBlob schema. |
+| **`mn-passport-agent`** | — (was `adapter-agent-ows`) | **New entry package** (Node.js). It does the grant ceremony, the same as for dApps. Its registry client gets the circuit of a dApp and runs it. It reads the on-chain status of the grant from the ACC, so that OWS can enforce it as its policy. It uses OWS as the key provider, and it has the private-data channel (open question 3). It never links `core`. |
 
 ![Midnight Passport SDK package map](./assets/2026-09-25-sdk-packages.svg)
 
-*The entry libraries depend on the foundation. The shared adapters (proving,
-broadcast, fees, registry, and the browser and Node.js runtimes) implement
-interfaces from `mn-passport-account`, because the dApp and agent libraries need
-them and must not reach `core`. Storage, recovery, and DID stay behind `core`,
-because only the Passport app uses them.
-([PNG](./assets/2026-09-25-sdk-packages.png))*
+_The entry libraries depend on the foundation. The shared adapters implement
+interfaces from `mn-passport-account`: the prover, broadcast, fees, the
+registry, and the browser and Node.js runtimes. The dApp and agent libraries
+need these adapters and must not reach `core`. Storage, recovery, and DID stay
+behind `core`, because only the Passport app uses them.
+([PNG](./assets/2026-09-25-sdk-packages.png))_
 
 ---
 
@@ -319,42 +376,45 @@ because only the Passport app uses them.
 
 | Seam | Today | Proposal |
 |---|---|---|
-| Signer (FS-0.4) | `requestAuthorisation(bundle) → { R, s, scheme }` | **Becomes the key provider** (§4), moved to `mn-passport-account`. `core` uses only the device path. |
-| Prover (FS-0.5) | `prove(preimage, keyLocation)`, `check(…)`; preimage sealed to the enclave | **Change the shape to transaction in, proof out:** `prove(unprovenTx, circuitIds) → provenTx`. The demo's fee sponsor does exactly this (`POST /prove-account-custody`), with the proving keys on its disk. Moved to `mn-passport-account`. |
-| Settlement (FS-0.6) | `balanceAndSubmit`, `awaitFinalised`; user-held DUST as the default | **Rename to broadcast**, moved to `mn-passport-account`. It hands the proven transaction to the proving & settlement service, which pays the fees and broadcasts it, and tracks it until it is final. Drop the user-held-DUST default (decision 11): fees are sponsored, or swapped through the Capacity Exchange. Add the bounded waits and resubmission the demo learnt it needs. |
-| Storage (FS-0.7) | Ciphertext-at-rest `get`/`put`; IndexedDB, vendor keystore, and #58 behind it | **Rebuild around WPP.** Keep "no plaintext crosses the seam"; adopt WPP's package and catalog model, conflict retention, and backup states (§8.5). |
+| Signer (FS-0.4) | `requestAuthorisation(bundle) → { R, s, scheme }` | **It becomes the key provider** (§4), in `mn-passport-account`. `core` uses only the device path. |
+| Prover (FS-0.5) | `prove(preimage, keyLocation)`, `check(…)`; seals the preimage to the enclave | **Change the shape to transaction in, proof out:** `prove(unprovenTx, circuitIds) → provenTx`. The fee sponsor of the demo does exactly this (`POST /prove-account-custody`), with the proving keys on its disk. It moves to `mn-passport-account`. |
+| Settlement (FS-0.6) | `balanceAndSubmit`, `awaitFinalised`; DUST that the user holds is the default | **Change the name to broadcast**, and move it to `mn-passport-account`. It gives the proven transaction to the proving & settlement service. The service pays the fees and broadcasts the transaction. The seam then monitors the transaction until it is final. Remove the default that the user holds DUST (decision 11). A sponsor pays the fees, or the user swaps for them through the Capacity Exchange. Add the bounded waits and the resubmission that the demo found necessary. |
+| Storage (FS-0.7) | Ciphertext-at-rest `get`/`put`; IndexedDB, vendor keystore, and #58 behind it | **Rebuild it on WPP.** Keep the rule "no plaintext crosses the seam". Use the package and catalog model of WPP, conflict retention, and backup states (§8.5). |
 | Platform (FS-0.8) | Network and ceremony primitives | **Keep.** |
-| Agent | OWS access mapped onto grants | **Remove.** Replaced by the agent package and the key provider. |
-| dApp connection | Wallet side of C23 | **Remove.** Replaced by grant issuance in `core`. |
-| Private state | — | **Add**, in `mn-passport-account`: a `PrivateStateProvider` that `connect` and the agent library implement against Passport (§8.5). |
-| Registry | — | **Add**, in `mn-passport-contract`: fetch a dApp's artefacts by content hash and verify them before use (§8.3). |
+| Agent | Maps OWS access onto grants | **Remove.** The agent package and the key provider replace it. |
+| dApp connection | Wallet side of C23 | **Remove.** Grant issuance in `core` replaces it. |
+| Private state | — | **Add**, in `mn-passport-account`: a `PrivateStateProvider`. `connect` and the agent library implement it against Passport (§8.5). |
+| Account metadata | — | **Add**, in `mn-passport-account`: read and write the metadata that a WaaS provider keeps on the key of the user. Each entry has a namespace and a version. Each write reads, merges, writes, and then reads back. Entries stay small, because some providers keep only 2 KB. |
+| Registry | — | **Add**, in `mn-passport-contract`: get the artifacts of a dApp by content hash, and verify them before use (§8.3). For each circuit, a registry entry has the ZKIR, the verifier key, and the crate revisions. It does not have the proving keys. |
 
 ---
 
 ## 7. Adapters
 
-Sixteen adapters are named across `architecture.md` §4.4 and the M0 specs. This
-proposal keeps nine (renaming two), retires five, merges two into the key-provider
-model, and redefines two.
+`architecture.md` §4.4 and the M0 specs name sixteen adapters. This proposal
+keeps nine (and gives two of them new names), retires five, merges two into the
+key-provider model, and redefines two. It also adds two: the registry adapter and
+`adapter-waas`.
 
 | Adapter | Today | Verdict | Why | Replacement |
 |---|---|---|---|---|
-| `adapter-agent-ows` | Wraps `ows-core`; maps OWS onto grants | **Retire** | OWS is not something Passport wraps. It authors the agent's key; Passport registers it like any grantee key; OWS reads the grant from the ACC as its policy. | The OWS key provider inside `mn-passport-agent`, plus agent grant handling in `core`. |
-| `adapter-dapp-connection` | Answers C23 discovery, sign-in, and grant requests | **Retire** | There is no C23 channel to answer. Connection is the MIP §9 ceremony. | Grant issuance in `core`: the authoriser page, validation of the request and its proof, consent, `issue_grant`, and the redirect. |
-| `adapter-wallet-connect` | Passport connecting out to external wallets | **Retire as an adapter** | An external wallet is a key provider (k256 through the Midnight connector's `signData`), registered as a device or a read-only grant. | The Midnight connector wallet key provider (§4). Ethereum-style wallets need a new envelope first. |
-| `adapter-storage-vendor` | Native vendor-keystore sync | **Retire** | A PWA cannot write to it; it does not cross ecosystems; WPP covers the durable copy. | `adapter-storage-wpp`. |
-| `adapter-storage-shared` (#58) | Portable sealed-backup service; source of dApp witness provisioning | **Replace** (pending open question 7) | WPP claims the same job, with a fuller design: packages, catalogs, conflict retention, and a Passport integration contract. Provisioning moves to the private-state seam. | `adapter-storage-wpp`: WPP's storage adapters behind the storage seam, Google Drive first. |
-| `adapter-signer-managed` | The provider as a presence gate over a local device secret | **Merge into key providers** | The provider's key is now a k256 device that signs ACC challenges. | The provider's embedded-wallet key provider (§4). |
-| `adapter-signer-local` | PRF-derived JubJub device, plus an interim hash-preimage signer | **Merge into key providers** | The passkey is now the primary device, not a fallback; the hash-preimage signer is gone from the reference ACC. | The passkey key provider (§4). ADR 0001's contingency framing needs revisiting. |
-| `adapter-prover-wasm` | In-tab proving for small circuits | **Defer beyond V1** | The ACC's circuits sit at k=15–17 with 112–224 MB proving keys; the zkir WASM package does not expose key generation; browsers cannot hold the memory. The demo proves nothing in the tab. | Revisit for small circuits when WASM key generation ships. |
-| `adapter-prover-remote` | Seals the preimage to an enclave; key by `keyLocation` | **Redefine** | The working shape is transaction in, proof out, with keys held by the prover. It is shared by all three entry libraries. | Same name, new interface (§6), implementing the seam in `mn-passport-account`. The prover sees the coin and amount; say so (§9). |
-| Settlement adapter | Balancing, DUST, submit through the proving & settlement service | **Keep, as `adapter-broadcast`** | A user never holds DUST (decision 11), so what the client does is broadcast: hand the proven transaction to the sponsor, which pays the fees and broadcasts it, then track it until it is final. | `adapter-broadcast`, implementing the broadcast seam in `mn-passport-account`. |
-| `adapter-fee-capacity-exchange` | Sponsored DUST through liquidity-provider quotes | **Keep, deferred; shared** | With sponsorship, one of the two ways fees are paid, since no user holds DUST. Contract-held NIGHT cannot generate DUST, which makes it more important, not less. dApp and agent transactions pay fees too, so it sits with the shared adapters, not behind `core`. | — |
-| `adapter-recovery` | Guardians and paper keys for total-loss recovery (C14/C15) | **Keep** | Account recovery is unchanged. WPP key recovery is a separate operation and does not replace it. | — |
-| `adapter-did` | `did:midnight` create and resolve | **Keep, and define** (initial work Q4) | A DID is its own contract with its own JubJub controller key, so grants do not apply and it needs no new adapter — only this one, filled in. | Q4: a wrapper over `midnight-did-api` behind `core` — create at account creation, link to the ACC, hold the controller and recovery keys, sign, and resolve in-process. Target: a DID controlled by the ACC, which needs a DID contract change, a new ACC circuit, and a MIP extension (§8.6). |
-| `adapter-browser` | Browser wiring | **Keep** | Unchanged. Load the two WASM runtimes in order (the demo found Safari fails otherwise). | — |
-| `adapter-node` | Node wiring | **Keep, as `adapter-nodejs`** | The Node.js runtime for backends, `mn-passport-agent` among them. The new name says which runtime. | `adapter-nodejs`. |
-| Registry adapter | — | **Add** | Agents need a dApp's circuit and artefacts at run time. | Behind the registry seam: content-addressed fetch, verification, local cache. |
+| `adapter-agent-ows` | Wraps `ows-core`; maps OWS onto grants | **Retire** | Passport does not wrap OWS. OWS makes the key of the agent, and Passport registers it as it registers each grantee key. OWS reads the grant from the ACC as its policy. | The OWS key provider in `mn-passport-agent`, and the agent grant functions in `core`. |
+| `adapter-dapp-connection` | Answers C23 discovery, sign-in, and grant requests | **Retire** | No C23 channel exists. The MIP §9 ceremony is the connection. | Grant issuance in `core`: the authorizer page, the validation of the request and its proof, consent, `issue_grant`, and the redirect. |
+| `adapter-wallet-connect` | Passport connects to external wallets | **Retire as an adapter** | An external wallet is a key provider (k256 through the `signData` call of the Midnight connector). Passport registers it as a device or as a read-only grant. | The key provider for a Midnight connector wallet (§4). Ethereum-style wallets first need a new envelope. |
+| `adapter-storage-vendor` | Native vendor-keystore sync | **Retire** | A PWA cannot write to it, and it does not work across ecosystems. WPP holds the durable copy. | `adapter-storage-wpp`. |
+| `adapter-storage-shared` (#58) | A portable sealed-backup service, and the source of dApp witness provisioning | **Replace** (open question 7 decides) | WPP does the same job with a fuller design: packages, catalogs, conflict retention, and a contract for the integration with Passport. Witness provisioning moves to the private-state seam. | `adapter-storage-wpp`: the storage adapters of WPP behind the storage seam, with Google Drive first. |
+| `adapter-signer-managed` | The provider as a presence gate over a local device secret | **Merge into key providers** | The key of the provider is now a k256 device that signs ACC challenges. | The key provider for the embedded wallet of the provider (§4). |
+| `adapter-signer-local` | A JubJub device from the PRF, and an interim hash-preimage signer | **Merge into key providers** | The passkey is now the primary device, not a fallback. The reference ACC no longer has the hash-preimage signer. | The passkey key provider (§4). The contingency text in ADR 0001 needs a review. |
+| `adapter-prover-wasm` | Proofs in the tab for small circuits | **Defer to after V1** | The circuits of the ACC are at k=15–17, with proving keys of 112–224 MB. The zkir WASM package does not supply key generation. Browsers cannot hold that much memory. The demo makes no proofs in the tab. | Examine it again for small circuits when WASM key generation is available. |
+| `adapter-prover-remote` | Seals the preimage to an enclave, and finds the key by `keyLocation` | **Redefine** | The shape that works is transaction in, proof out, and the prover holds the keys. All three entry libraries share it. | The same name with a new interface (§6), which implements the seam in `mn-passport-account`. The prover sees the coin and the amount, and the docs must say so (§9). |
+| Settlement adapter | Balance, DUST, and submission through the proving & settlement service | **Keep, as `adapter-broadcast`** | A user never holds DUST (decision 11). Thus, the client only broadcasts. It gives the proven transaction to the sponsor, which pays the fees and broadcasts it. Then it monitors the transaction until it is final. | `adapter-broadcast`, which implements the broadcast seam in `mn-passport-account`. |
+| `adapter-fee-capacity-exchange` | DUST from a sponsor, through quotes from liquidity providers | **Keep for later; shared** | No user holds DUST. Thus, this adapter and sponsorship are the two ways to pay fees. NIGHT that a contract holds cannot make DUST, which makes this adapter more important. dApp and agent transactions also pay fees. Thus, it is with the shared adapters, not behind `core`. | — |
+| `adapter-recovery` | Guardians and paper keys for total-loss recovery (C14/C15) | **Keep** | Account recovery does not change. WPP key recovery is a different operation and does not replace it. | — |
+| `adapter-did` | `did:midnight` create and resolve | **Keep, and define** (initial work in Q4) | A DID is its own contract with its own JubJub controller key. Thus, grants do not apply, and it needs no new adapter. It needs only this adapter, with full content. | Q4: a wrapper over `midnight-did-api` behind `core`. It makes the DID when the user makes the account, links it to the ACC, and holds the controller and recovery keys. It also signs and resolves in the same process. Target: a DID that the ACC controls. That needs a change to the DID contract, a new ACC circuit, and a MIP extension (§8.6). |
+| `adapter-browser` | Browser runtime | **Keep** | No change. Load the two WASM runtimes in the correct order. The demo found that Safari fails if the order is wrong. | — |
+| `adapter-node` | Node runtime | **Keep, as `adapter-nodejs`** | The Node.js runtime for backends, which include `mn-passport-agent`. The new name tells which runtime it is. | `adapter-nodejs`. |
+| Registry adapter | — | **Add** | Agents need the circuit and the artifacts of a dApp at run time. | Behind the registry seam: a content-addressed fetch, verification, and a local cache. For a circuit, it makes the verifier key again from the ZKIR and compares it with the verifier key on chain. |
+| `adapter-waas` | — | **Add** | A dApp that creates Passports needs the embedded key of a WaaS provider and the metadata on that key. | It implements two seams: the key provider (k256, envelope 0) and the account metadata. It names no vendor. The first implementation is for the provider that the demo uses. |
 
 ---
 
@@ -362,72 +422,80 @@ model, and redefines two.
 
 ### 8.1 Onboarding
 
-There are two routes. Either way the ACC is deployed in three waves (the circuit
-roster exceeds one block's write budget), the first device is activated, and the
-name is claimed.
+Onboarding has two routes. On each route, Passport deploys the ACC in three
+waves. The reason is that the circuit roster is larger than the write budget of
+one block. Then the first device becomes active, and the user claims the name.
 
-- **In the Passport app.** The passkey is activated as the first device. The
-  provider's embedded wallet, if used, is enrolled as a second device, through
-  FS-2.4's signed request.
-- **In a dApp, through a WaaS provider.** The user signs in with the provider
-  inside the dApp, and the provider's embedded key for that user is activated as
-  the first device (k256, envelope 0). The account's metadata (the ACC address and
-  the viewing key) is written to the metadata the provider attaches to the user's
-  key. When the user later signs in with the same provider elsewhere — the Passport
-  app, or a new device — that metadata finds the account and opens the payments
-  already sealed to it, and the provider's key approves adding a new device. The
-  dApp's own code never holds a device secret. The provider's requirements:
-  - it holds the user's key for the user and signs raw ACC challenges with it;
-  - it attaches metadata to the user's key that the user's sign-in can read and
-    write from any origin the provider serves;
-  - it lets the Passport app sign in to the same user.
+- **In the Passport app.** The passkey becomes the first device. If the user has
+  the embedded wallet of the provider, the app enrolls it as a second device.
+  The app uses the signed request of FS-2.4 for this.
+- **In a dApp, through a WaaS provider.** The user signs in with the provider in
+  the dApp. The embedded key of the provider for that user becomes the first
+  device (k256, envelope 0). The dApp writes the ACC address and the viewing key
+  to the metadata that the provider keeps on the key of the user. The code of the dApp never holds a device secret. The provider must do these things:
+  - hold the key for the user, and sign raw ACC challenges with it;
+  - keep metadata on the key of the user, which the sign-in of the user can read and write from each origin that the provider serves;
+  - let the Passport app sign in as the same user.
 
-  The provider can read that metadata. A viewing key there lets the provider see
-  what the account is paid, never move it; the user is told so (§9). The metadata
-  is small (as little as 2 KB with some providers), so it carries keys and
-  references only, never private state.
+  In the same flow, `mn-passport-connect/onboard` issues a grant to the
+  per-origin key of the dApp, signed by the key of the provider. The user
+  approves that grant in the UI of the dApp, not on the authorizer page of
+  Passport. Thus, the scope of that grant has a fixed ceiling, which the team
+  confirms during the implementation (open question 15). A wider scope needs the
+  usual grant ceremony in the Passport app.
 
-A dApp without a WaaS provider sends a user who has no Passport to the Passport
-app (§3.13's fallback), and the user returns through the grant ceremony.
+  Later, the user can sign in with the same provider at a different place: the Passport app, or a new device. That metadata then finds the account and opens the payments that senders sealed to it earlier. Then the key of the provider approves a new device.
 
-The contract binding must accept a partly deployed account. midnight-js's
-`findDeployedContract` checks every circuit's verifier key, so it refuses an
-account whose later waves have not landed; the demo's fee sponsor checks only the
-circuits it calls. FS-0.2's connect-time version check needs the same rule.
+  The provider can read that metadata. With a viewing key there, the provider
+  can see what the account receives, but it cannot move it. Passport tells the
+  user this (§9). The metadata is small (as little as 2 KB with some
+  providers). Thus, it holds only keys and references, never private state.
+
+A dApp without a WaaS provider sends a user with no Passport to the Passport app
+(the fallback in §3.13). The user then returns through the grant ceremony.
+
+The contract binding must accept a partly deployed account. The midnight-js
+function `findDeployedContract` checks the verifier key of each circuit. Thus,
+it refuses an account if its later waves are not on chain yet. The fee sponsor
+of the demo checks only the circuits that it calls. The version check of FS-0.2
+at connect time needs the same rule.
 
 ### 8.2 A dApp connects and makes a call
 
-1. The dApp generates a key for its origin and navigates to the Passport
-   authoriser page with a `GrantRequest` and a possession proof (MIP §9). If the
-   user has no account, the authoriser page walks them through creating one first,
-   then returns to the request.
-2. The user approves with their passkey; Passport submits `issue_grant` and
-   redirects back. The dApp re-reads the grant from the chain before trusting it.
-3. The dApp receives, through `connect`, the ACC address, its private data for
-   its own contract, and the viewing key if the grant includes read access.
-4. The dApp builds the circuit that composes the user's ACC — its own contract
-   calling into the ACC — and runs it in its own UI (decision 10). `connect`
-   supplies the ACC's interface for that circuit (from `mn-passport-contract`),
-   builds the ACC challenge, and signs it with the dApp's grant key; it does not
-   compose the call. The prover proves the transaction and `adapter-broadcast`
-   hands it to the sponsor.
+1. The dApp makes a key for its origin. It goes to the Passport authorizer page
+   with a `GrantRequest` and a possession proof (MIP §9). If the user has no
+   account, the authorizer page first helps the user make one. Then it goes
+   back to the request.
+2. The user approves with the passkey. Passport submits `issue_grant` and
+   redirects back to the dApp. The dApp reads the grant from the chain again
+   before it trusts it.
+3. Through `connect`, the dApp gets the ACC address and the private data for its
+   own contract. It also gets the viewing key if the grant includes read access.
+4. The dApp builds the circuit that composes the ACC of the user (decision 10).
+   This circuit is the contract of the dApp, which calls into the ACC. The dApp
+   runs it in its own UI. `connect` supplies the interface of the ACC for that
+   circuit, from `mn-passport-contract`. `connect` also builds the ACC
+   challenge and signs it with the grant key of the dApp. `connect` does not
+   compose the call. The prover proves the transaction, and
+   `adapter-broadcast` gives it to the sponsor.
 
-**What a dApp's contract may call inside its own circuit.** Compact runs witnesses
-only in the contract a transaction starts from; a contract called by another
-cannot use one. The reference ACC declares one witness, `held_coin`, and eight of
-its thirty circuits use it — every shielded spend, including the four shielded
-grant spends. So:
+**What the contract of a dApp can call in its own circuit.** Compact runs
+witnesses only in the contract where a transaction starts. A contract that
+another contract calls cannot use a witness. The reference ACC declares one
+witness, `held_coin`, and eight of its thirty circuits use it. These are all the
+shielded spends, which include the four shielded grant spends. Thus:
 
-| May be called from a dApp's circuit | Must start its own intent |
+| A dApp circuit can call it | It must start its own intent |
 |---|---|
 | Deposits, unshielded withdrawals (device and grant), device, grant, and key management, `append_inbox` | `withdraw_shielded_*`, `withdraw_shielded_to_contract_*`, and their grant forms |
 
-**Moving shielded value out of the ACC therefore takes two intents in one
-transaction.** The ACC's spend starts one intent, with its witness supplied from
-the coin store; the dApp's own call starts another, with the dApp's witnesses
-supplied by Passport. Composing them is still the dApp's job; `mn-passport-account`
-offers the transaction joiner as a helper that joins the two (`addIntent`, never
-`merge`). This is how the demo sends from one Passport to another.
+**Thus, to move shielded value out of the ACC, a transaction needs two
+intents.** The spend of the ACC starts one intent, and the coin store supplies
+its witness. The call of the dApp starts the other intent, and Passport supplies
+the witnesses of the dApp. The dApp still does the composition.
+`mn-passport-account` supplies the transaction joiner, a helper that joins the
+two intents (`addIntent`, never `merge`). The demo uses this method to send from
+one Passport to another.
 
 ```mermaid
 flowchart LR
@@ -442,188 +510,217 @@ flowchart LR
     class I1,I2 intent
 ```
 
-This rule lifts when called contracts can run witnesses (MPS-0021 phase 2, the
-capsule work) and when midnight-js carries a called contract's shielded spends
-into the transaction (§12).
+This rule stops when two things occur. First, called contracts can run
+witnesses (MPS-0021 phase 2, the capsule work). Second, midnight-js carries the
+shielded spends of a called contract into the transaction (§12).
 
-### 8.3 An agent is set up and makes a call
+### 8.3 An agent connects and makes a call
 
-1. The agent backend creates its key in OWS and builds a grant request through
-   `mn-passport-agent`. It is the same request a dApp sends (decision 9).
-2. The agent provider presents that request in whatever way suits its product: a
-   QR code printed by a command-line tool and scanned with the Passport app, or a
-   link or button in the provider's own app that opens the Passport app. The SDK
-   offers every form to agents and dApps alike; it does not prescribe one. The
-   request itself, and how Passport validates it, is the same in every case.
-3. The user approves a scope in the Passport app; Passport submits
-   `issue_grant`. The readable scope and its salt go to the agent, because OWS
-   cannot check limits from the chain alone: the colour, recipient, coin bound,
-   host, and running total are stored as salted commitments.
-4. Before signing, the agent library reads the grant's on-chain state from the
-   ACC — whether it is live, and the commitments the readable scope opens — so OWS
-   enforces the grant as its policy. This is a read of the chain, not a
-   server-side check.
-5. To act, the agent library fetches the target dApp's circuit and artefacts from
-   the registry by content hash, verifies them, and runs the dApp's circuit, which
-   composes the ACC as it does for the dApp itself. OWS signs the ACC challenge,
-   the prover proves the transaction, and `adapter-broadcast` hands it to the
-   sponsor.
+1. The agent backend makes its key in OWS. It builds a grant request through
+   `mn-passport-agent`. This is the same request that a dApp sends (decision 9).
+2. The agent provider shows that request in the form that suits its product. It
+   can be a QR code from a command-line tool, which the user scans with the
+   Passport app. It can also be a link or a button in the app of the provider,
+   which opens the Passport app. The SDK supplies each form to agents and to
+   dApps. It does not specify one form. The request, and how Passport validates
+   it, are the same in each case.
+3. The user approves a scope in the Passport app, and Passport submits
+   `issue_grant`. The agent gets the readable scope and its salt. The reason is
+   that OWS cannot check the limits from the chain only. The chain stores the
+   color, the recipient, the coin bound, the host, and the current total as
+   salted commitments.
+4. Before OWS signs, the agent library reads the on-chain state of the grant
+   from the ACC. It reads if the grant is live, and the commitments that the
+   readable scope opens. Thus, OWS enforces the grant as its policy. This is a
+   read of the chain, not a check on a server.
+5. To act, the agent library gets the circuit and the artifacts of the target
+   dApp from the registry. It uses the content hash, and it verifies them. Then
+   it runs the circuit of the dApp, which composes the ACC as for the dApp. OWS
+   signs the ACC challenge, and the prover proves the transaction. Then
+   `adapter-broadcast` gives the transaction to the sponsor.
 
-The registry follows the pattern the capsule MIP describes: code named by content
-hash, fetched from any store, and trusted only through an on-chain reference. That
-on-chain reference does not exist yet (open question 5), so in V1 the agent
-verifies what it fetches against a hash the dApp publishes.
+The registry uses the pattern of the capsule MIP. Code has a name from its
+content hash, and it can come from any store. The agent trusts it only through
+an on-chain reference.
+
+For circuits, the chain already gives that reference (passport PR #170). The
+agent makes the verifier key again from the ZKIR and the SRS. Then it compares
+that key with the verifier key on chain. A match proves that the ZKIR, and thus
+the proving key, agrees with the deployed circuit. The SRS is 25 MB at k=17, and
+proofs already need it.
+
+The client code of the dApp has no such anchor. Its on-chain reference does not
+exist yet (open question 5). Thus, in V1 the agent verifies the client code
+against a hash that the dApp publishes.
 
 ### 8.4 Payments
 
 | Recipient | Circuit | What the payer must supply |
 |---|---|---|
-| A regular shielded wallet | `withdraw_shielded_*` | The **full** shielded address. The circuit takes the coin public key; midnight-js needs the encryption public key to build the note the recipient's wallet finds. Pass it as `additionalCoinEncPublicKeyMappings`; without it midnight-js's resolver has no key for the recipient and the transaction cannot be built. Neither key derives from the other. |
-| Another Passport | `withdraw_shielded_to_contract_*` plus the recipient's `deposit_shielded`, joined in one transaction | A 192-byte inbox entry sealed to the recipient account's advertised `enc_key`, **read at the moment of sealing** and again on every retry, because the recipient can rotate it. Without the entry the coin arrives and can never be spent. The transaction publicly links the two accounts (MIP-0012 §6.6). |
-| An unshielded address | `withdraw_unshielded_*` | An `mn_addr` address. There is no circuit that moves NIGHT between two accounts. |
+| A usual shielded wallet | `withdraw_shielded_*` | The **full** shielded address. The circuit takes the coin public key. The midnight-js library needs the encryption public key to build the note that the wallet of the recipient finds. Give it as `additionalCoinEncPublicKeyMappings`. Without it, the resolver of midnight-js has no key for the recipient, and it cannot build the transaction. You cannot get one key from the other. |
+| Another Passport | `withdraw_shielded_to_contract_*` and the `deposit_shielded` of the recipient, joined in one transaction | A 192-byte inbox entry, sealed to the advertised `enc_key` of the recipient account. Read that key **at the time of the seal**, and again for each retry, because the recipient can rotate it. Without the entry, the coin arrives but nobody can spend it. The transaction publicly links the two accounts (MIP-0012 §6.6). |
+| An unshielded address | `withdraw_unshielded_*` | An `mn_addr` address. No circuit moves NIGHT between two accounts. |
 
-Two further rules the docs need. Take both halves of a shielded address from one
-parsed address, never from two sources: the signed challenge covers the coin key
-but not the encryption key, so a wrong encryption key makes a payment that lands
-but is never found (open question 9). And before spending, read the change coin's
-position from the indexer's commitment tree; the demo lost a proof — about 45
-seconds — to every wrong guess.
+The docs also need two more rules. First, take the two halves of a shielded
+address from one parsed address, never from two sources. The signed challenge
+covers the coin key but not the encryption key. Thus, a wrong encryption key
+makes a payment that arrives, but the recipient never finds it (open question
+9). Second, before a spend, read the position of the change coin from the
+commitment tree of the indexer. The demo lost a proof, about 45 seconds, for
+each wrong guess.
 
-Requirements §3.12 also names `deposit_night`; the circuit is `deposit_unshielded`.
+Requirements §3.12 also names `deposit_night`, but the circuit is
+`deposit_unshielded`.
 
 ### 8.5 Private data
 
-A dApp's witness functions read its private state from a midnight-js
-`PrivateStateProvider`. "Passport injects the witnesses" means the SDK gives the
-dApp a provider whose store of record is Passport; the dApp's own witness code is
-unchanged.
+The witness functions of a dApp read its private state from a midnight-js
+`PrivateStateProvider`. The phrase "Passport injects the witnesses" means this:
+the SDK gives the dApp a provider that uses Passport as its store of record. The
+witness code of the dApp does not change.
 
-- **Release.** After the grant ceremony, `connect` returns a provider scoped to the
-  dApp's contract. On first read, Passport releases that contract's state,
-  encrypted to the dApp's session key, under consent and a passkey tap. Never the
-  whole profile.
-- **Write-back only after confirmation.** midnight-js already follows this rule:
-  building a call never writes private state, and `submitCallTx` writes the next
-  state only after the transaction finalises with `SucceedEntirely`. The
-  asynchronous `submitCallTxAsync` leaves the write to the caller, and its docs say
-  a partial success "must NOT store private state updates". So on the ordinary path
-  the Passport-backed provider's `set` *is* the commit, and the SDK must make the
-  asynchronous path follow the same rule. Passport may additionally track a
-  submitted transaction's state as pending, so that a reopened session can resume
-  it; the demo does this for its coin store, but that is Passport's bookkeeping,
-  not something midnight-js requires.
-- **The signing-key half.** The same provider interface also stores a per-contract
-  signing key (`setSigningKey`, `getSigningKey`, `exportSigningKeys`, and so on),
-  and `findDeployedContract` creates and stores one if none exists. The
-  Passport-backed provider must implement this half too; for a dApp that only calls
-  an existing contract, keeping it local to the dApp is enough (open question 10).
-- **Storage through WPP.** `core` holds the WPP encryption layer, which seals and
-  opens private state only after the passkey tap and scoped authorisation. WPP's
-  storage adapters sit behind the storage seam. The dApp sees backup status, never
-  keys or a bulk export. These are WPP's own stated terms for integrating with
-  Passport.
-- **What goes where.**
+- **Release.** After the grant ceremony, `connect` returns a provider for the
+  contract of the dApp. At the first read, Passport releases the state of that
+  contract. Passport encrypts the state to the session key of the dApp, after
+  consent and a passkey tap. Passport never releases the full profile.
+- **Write-back only after confirmation.** The midnight-js library already obeys
+  this rule. When it builds a call, it never writes private state.
+  `submitCallTx` writes the next state only after the transaction finalizes with
+  `SucceedEntirely`. The asynchronous `submitCallTxAsync` lets the caller do the
+  write. Its docs say that a partial success "must NOT store private state updates".
+- **The `set` call is the commit.** Thus, on the usual path, the `set` call of the provider that uses
+  Passport _is_ the commit. The SDK must make the asynchronous path obey the
+  same rule. Passport can also keep the state of a submitted transaction as not yet final, so that a reopened session can continue it. The demo does this for
+  its coin store. But that is internal work for Passport, not a midnight-js
+  requirement.
+- **The signing-key half.** The same provider interface also stores a signing
+  key for each contract (`setSigningKey`, `getSigningKey`, `exportSigningKeys`,
+  and others). If no key exists, `findDeployedContract` makes and stores one.
+  The provider that uses Passport must also implement this half. For a dApp that
+  only calls a contract that already exists, it is enough to keep the key in
+  the dApp (open question 10).
+- **Storage through WPP.** `core` holds the WPP encryption layer. It seals and
+  opens private state only after the passkey tap and scoped authorization. The
+  storage adapters of WPP are behind the storage seam. The dApp sees the backup
+  status, but never keys or a bulk export. WPP states these terms for an
+  integration with Passport.
+- **Where each type of data goes.**
 
 | Data | Tier | Where |
 |---|---|---|
-| A dApp's private state | Irreplaceable | WPP |
-| The ACC's coin store (`held_coin`'s data, queued coins, positions) | Rebuildable from the on-chain inbox with the viewing key | Local cache only |
-| Viewing key, ACC address, grant references | Small, rarely changing, needed by every client | WPP metadata, the WaaS provider's metadata on the user's key (for accounts onboarded through one, §8.1), or the passkey's `largeBlob` (open question 4) |
-| Device keys | Regenerable from the passkey | Not stored |
+| The private state of a dApp | Irreplaceable | WPP |
+| The coin store of the ACC (the data of `held_coin`, queued coins, positions) | Passport can make it again from the on-chain inbox with the viewing key | Local cache only |
+| Viewing key, ACC address, grant references | Small, they change rarely, and each client needs them | WPP metadata, or the `largeBlob` of the passkey (open question 4). For accounts that onboarded through a WaaS provider: the metadata of the provider on the key of the user (§8.1). |
+| Device keys | Passport can make them again from the passkey | Passport does not store them |
 
-The storage doc also needs three WPP rules it lacks: a user-visible Google Drive
-folder under `drive.file` (the hidden `appDataFolder` may only ever be a cache),
-retaining conflicting histories instead of letting the last write win, and
-reporting when a backup's freshness is unknown.
+The storage doc also needs three WPP rules, which it does not have now:
+
+- a Google Drive folder that the user can see, under `drive.file` (the hidden
+  `appDataFolder` must never be more than a cache);
+- keep each history when two histories conflict, and do not let the last write
+  win;
+- a report when the freshness of a backup is unknown.
 
 ### 8.6 Identity (DID)
 
-A `did:midnight` identifier is not a dApp that the user grants. It is its own
-contract, one deployed per DID, controlled by a JubJub Schnorr key that its
-circuits check against a `controllerPublicKey` stored in the DID contract's own
-ledger, plus a separate recovery key. The ACC cannot be its controller, a grant
-key means nothing to it, and it cannot be driven from the ACC in a call between
-contracts: every one of its update circuits reads the `currentTimestamp` witness,
-so it can only ever start a transaction.
+A `did:midnight` identifier is not a dApp that the user gives a grant to. It is
+its own contract, with one deployment for each DID. A JubJub Schnorr key
+controls it. Its circuits check this key against a `controllerPublicKey` in the
+ledger of the DID contract. It also has a different recovery key.
 
-So the DID fits the existing `adapter-did` slot as one more thing the Passport
-app operates for the user, with a key only the Passport app holds:
+Thus, the ACC cannot be its controller, and a grant key does not apply to it.
+Also, the ACC cannot drive it in a call between contracts. The reason is that
+each update circuit of the DID reads the `currentTimestamp` witness. Thus, the
+DID can only start a transaction.
 
-- **Create** the DID when the account is created (roadmap R39), through
+Thus, the DID goes into the current `adapter-did` slot. It is one more thing
+that the Passport app operates for the user, with a key that only the Passport
+app holds:
+
+- **Create** the DID when the user creates the account (roadmap R39), through
   `midnight-did-api` (`initPrivateState`, `createDID`).
-- **Link it to the account**: the DID document's `alsoKnownAs` carries the
-  Passport name, and a service entry names the ACC, so either can be found from
-  the other.
-- **Hold the controller and recovery keys.** The API generates both as random
-  32-byte secrets, which makes them irreplaceable. Either derive the controller key
-  from the passkey's PRF output under a separate label — so it is regenerable, as
-  the device key already is — or keep it in WPP; the recovery key belongs with
-  account recovery, in colder custody (open question 12).
-- **Sign each operation** over (contract, version, operation, arguments). The API
-  signs with the raw secret and has no external-signer interface, so for now the
-  signing happens inside the Passport app's core. A pluggable signer upstream
-  would let it use the key-provider interface (§12).
-- **Resolve in-process**: `MidnightDIDResolver` reads the DID contract's state
-  from the indexer directly; the resolver service is optional.
+- **Link it to the account.** The `alsoKnownAs` field of the DID document
+  carries the Passport name, and a service entry names the ACC. Thus, a reader
+  can find each one from the other.
+- **Hold the controller and recovery keys.** The API makes both keys as random
+  32-byte secrets, so it is not possible to make them again. There are two
+  options for the controller key. One option is to derive it from the PRF output
+  of the passkey, under a different label. Then the app can make it again, as it
+  does for the device key. The other option is to keep it in WPP. The recovery
+  key goes with account recovery, in colder custody (open question 12).
+- **Sign each operation** over (contract, version, operation, arguments). The
+  API signs with the raw secret and has no interface for an external signer.
+  Thus, for now, the core of the Passport app makes the signature. A pluggable
+  signer upstream can let it use the key-provider interface (§12).
+- **Resolve in the same process.** `MidnightDIDResolver` reads the state of the
+  DID contract directly from the indexer. The resolver service is optional.
 
-Credentials (roadmap R40) live in a separate project (`midnight-verifiable-credentials`)
-and build on this: the DID is the anchor, and the Passport app holds and presents
-them.
+Credentials (roadmap R40) are in a different project
+(`midnight-verifiable-credentials`) and use this DID. The DID is the anchor, and
+the Passport app holds and shows the credentials.
 
-**The target: a DID controlled by the ACC.** Holding a separate DID key is the Q4
-answer, not the end state. The direction is for the DID to authenticate through
-Passport the way every dApp does, so that the ACC is the one authority behind both
-the account and the identity. The DID contract stores the user's ACC address as its
-controller instead of a key, and each DID update calls into the ACC, which checks
-that the signer holds a grant allowing it to act for that DID.
+**The target: a DID that the ACC controls.** A separate DID key is the answer
+for Q4, not the final state. The direction is that the DID authenticates through
+Passport, as each dApp does. Then the ACC is the one authority for both the
+account and the identity.
 
-The direction of that call matters. The DID's update circuit starts the
-transaction, so it can still read its timestamp witness; the ACC is the contract
-being called, which works because the check it runs needs no witness. Getting
-there needs three changes:
+The DID contract stores the ACC address of the user as its controller, not a
+key. Each DID update calls into the ACC. The ACC checks that the signer has a
+grant that lets it act for that DID.
+
+The direction of that call is important. The update circuit of the DID starts
+the transaction, so it can still read its timestamp witness. The ACC is the
+called contract. This works because its check needs no witness. Three changes
+are necessary:
 
 | Where | Change needed | Owner |
 |---|---|---|
-| DID contract | A **controller mode where the controller is an account contract**: store the ACC address, and on each update call the ACC's authorisation check with a challenge over (DID contract, version, operation, arguments), instead of verifying a signature against `controllerPublicKey`. Recovery then follows the account's own recovery rather than a separate recovery key. The contract also moves from ledger 8 to ledger 9, which calls between contracts need. This is a new contract version; the DID team's docs currently place contract and multi-controller support out of scope, so it needs their agreement. | DID team |
-| ACC | A new **exported authorisation circuit, with no witness**, that checks a device or grant signature for an operation that is not a payment, bound to the calling contract's address. Today the authorisation check is internal to each circuit and grants cover only the three spend operations and read. | Passport (contract) |
-| Scoped-grants MIP | A **grant operation for acting on another contract**, roughly "may authorise operations on contract X", with that address pinned in the scope. | Passport (standards) |
+| DID contract | A **controller mode where the controller is an account contract**. The contract stores the ACC address. On each update, it calls the authorization check of the ACC with a challenge over (DID contract, version, operation, arguments). This replaces the signature check against `controllerPublicKey`. Recovery then follows the recovery of the account, not a separate recovery key. The contract also moves from ledger 8 to ledger 9, which calls between contracts need. This is a new contract version. The docs of the DID team now put contract and multi-controller support out of scope, so the change needs their agreement. | DID team |
+| ACC | A new **exported authorization circuit, with no witness**. It checks a device or grant signature for an operation that is not a payment. It binds the check to the address of the contract that calls it. Today, each circuit does its own authorization check, and grants cover only the three spend operations and read. | Passport (contract) |
+| Scoped-grants MIP | A **grant operation to act on a different contract**, for example "can authorize operations on contract X". The scope pins that address. | Passport (standards) |
 
-It works before `kernel.caller()` reaches a release: the signed challenge carries
-the DID contract's address, so a signature cannot be replayed on another contract
-(the same "authority travels in the arguments" pattern the cross-contract-calls
-experiment proved). Once `kernel.caller()` is available, the ACC can also assert
-that the caller is that DID contract, which makes the DID the first use of
-caller-identity grants.
+This works before `kernel.caller()` is in a release. The signed challenge
+carries the address of the DID contract. Thus, nobody can replay a signature on
+a different contract. This is the same "authority travels in the arguments"
+pattern that the cross-contract-calls experiment proved. When `kernel.caller()`
+is available, the ACC can also check that the caller is that DID contract.
+Thus, the DID becomes the first use of caller-identity grants.
 
-What it gives: adding a device, recovering the account, or revoking a grant then
-applies to the DID too, and the DID's own controller and recovery keys disappear
-(open question 12 closes). What it costs: every DID update becomes a call between
-two contracts, so two proofs, one of them the ACC's (size class 15–17). A grant
-keeps its own nonce, so DID updates do not contend with the account's other
-operations.
+What it gives: device additions, account recovery, and grant revocations then
+also apply to the DID. The controller and recovery keys of the DID are no longer
+necessary (open question 12 closes). What it costs: each DID update becomes a
+call between two contracts. That means two proofs, and one of them is for the
+ACC (size class 15–17). A grant has its own nonce, so DID updates do not
+conflict with the other operations of the account.
 
 ---
 
 ## 9. Normative rules to amend
 
-`CLAUDE.md` lists five MUSTs that `conformance` checks. Two change, two extend, one
-stands.
+`CLAUDE.md` lists five MUSTs that `conformance` checks. Two change, two get
+extensions, and one stays.
 
 | Rule | Today | Proposal |
 |---|---|---|
-| Ceremony gate | Before any witness use (requirements §2.2) | **Change.** A passkey tap when a grant is issued and when private data is released. Within a session, the dApp holds its released state and signs with its own key; a per-call tap applies only if that key is a passkey on the dApp's origin. |
-| Encrypt the preimage to the enclave | Before remote proving (§2.5) | **Change.** V1's prover receives the transaction and sees the coin and the amount; the user is told so. Encryption to an enclave becomes required when a trusted-hardware prover exists (the proving-service MPS). |
-| Deposit, not address | Paying an account is a deposit call (§3.12) | **Extend** with the inbox rule of §8.4 and the correct circuit name. |
-| `connect` never links `core` | Architecture §4.4 | **Extend** to `mn-passport-agent`. Shared code lives in `mn-passport-account`. |
-| Two version axes | Wire and binding | **Stands.** The wire axis now versions the MIP §9 messages. |
+| Ceremony gate | Before each witness use (requirements §2.2) | **Change.** A passkey tap when Passport issues a grant and when it releases private data. In a session, the dApp keeps its released state and signs with its own key. A tap for each call applies only if that key is a passkey on the origin of the dApp. |
+| Encrypt the preimage to the enclave | Before remote proofs (§2.5) | **Change.** The prover in V1 gets the transaction and sees the coin and the amount. Passport tells the user this. Encryption to an enclave becomes mandatory when a trusted-hardware prover exists (the proving-service MPS). |
+| Deposit, not address | A payment to an account is a deposit call (§3.12) | **Extend** it with the inbox rule of §8.4 and the correct circuit name. |
+| `connect` never links `core` | Architecture §4.4 | **Extend** it to `mn-passport-agent`. Shared code goes in `mn-passport-account`. |
+| Two version axes | Wire and binding | **Stays.** The wire axis now gives versions to the MIP §9 messages. |
 
-New rules to add: a payment takes a full shielded address; a payment to a Passport
-reads the recipient's key at the moment of sealing; private data is written back
-only after the transaction finalises with `SucceedEntirely`, on every submit path;
-one grantee key per account per origin; a dApp onboards a user only through a WaaS
-provider that supports metadata attached to the user's key, never with a device
-secret in its own code, and the user is told that the provider can read what that
-metadata holds.
+New rules to add:
+
+- A payment takes a full shielded address.
+- A payment to a Passport reads the key of the recipient at the time of the
+  seal.
+- Passport writes back private data only after the transaction finalizes with
+  `SucceedEntirely`, on each submit path.
+- One grantee key for each account and each origin.
+- A dApp onboards a user only through a WaaS provider that supports metadata on
+  the key of the user. The dApp never holds a device secret in its own code.
+  Passport tells the user that the provider can read that metadata.
+- A grant that a dApp gets when it creates a Passport stays within the fixed
+  ceiling (§8.1). A wider scope needs the grant ceremony in the Passport app.
 
 ---
 
@@ -631,63 +728,66 @@ metadata holds.
 
 | Document | Sections | Change |
 |---|---|---|
-| `sdk-requirements.md` | §1.1 | Keep; add devices versus grants. |
-| | §2.1–§2.3 | Replace custody paths and signing with key authoring (§4). |
+| `sdk-requirements.md` | §1.1 | Keep it. Add the difference between devices and grants. |
+| | §2.1–§2.3 | Replace the custody paths and the signature text with key creation (§4). |
 | | §2.2 | Amend the ceremony rule (§9). |
-| | §2.5 | Remote by default; transaction in, proof out; small circuits only in the tab, later. |
-| | §2.6 | Narrow to the Passport app's own operations; the provider's key is a device. |
-| | §3.1 | Onboarding in the Passport app, or in a dApp through a WaaS provider that supports metadata attached to the user's key (§8.1); three-wave deploy. |
+| | §2.5 | Remote proofs by default, with transaction in and proof out. Proofs in the tab only for small circuits, and later. |
+| | §2.6 | Narrow it to the operations of the Passport app. The key of the provider is a device. |
+| | §3.1 | Onboarding in the Passport app, or in a dApp through a WaaS provider that supports metadata on the key of the user (§8.1). Deploy in three waves. |
 | | §3.2, §3.9 | Rewrite: grant ceremony, per-origin key, private-state provider, joiner. |
-| | §3.6 | Rebuild around WPP and the tiers in §8.5; add the viewing key. |
-| | §3.8 | Rewrite: agents as key providers, the agent grant ceremony (delivery chosen by the agent provider), registry. |
-| | §3.7 | Rewrite: the DID as its own contract operated by the Passport app in Q4, with the ACC-controlled DID as the target (§8.6); keep the one-signing-primitive rule, which the DID's JubJub key satisfies. |
-| | §3.10 | Fold into key providers; record that Ethereum-style wallets need a new envelope. |
-| | §3.11 | Note that contract-held NIGHT cannot generate DUST. |
-| | §3.12 | Extend with §8.4. |
-| `architecture.md` | §1 | Three entry libraries over a shared foundation; `core` is the Passport app. |
-| | §4.2 | The fee seam: fees are sponsored or swapped through the Capacity Exchange; no user-held-DUST default (decision 11). The settlement seam becomes broadcast. |
-| | §4.2 | Seams per §6. |
-| | §4.4 | Packages and adapters per §5 and §7. |
+| | §3.6 | Rebuild it on WPP and the tiers in §8.5. Add the viewing key. |
+| | §3.8 | Rewrite: agents as key providers, the agent grant ceremony (the agent provider chooses the delivery), registry. |
+| | §3.7 | Rewrite: the DID as its own contract that the Passport app operates in Q4, with the DID that the ACC controls as the target (§8.6). Keep the rule of one signing primitive, which the JubJub key of the DID satisfies. |
+| | §3.10 | Merge it into key providers. Record that Ethereum-style wallets need a new envelope. |
+| | §3.11 | Record that NIGHT that a contract holds cannot make DUST. |
+| | §3.12 | Extend it with §8.4. |
+| `architecture.md` | §1 | Three entry libraries on a shared foundation. `core` is the Passport app. |
+| | §4.2 | The fee seam: a sponsor pays the fees, or the user swaps for them through the Capacity Exchange. No default with DUST that the user holds (decision 11). The settlement seam becomes broadcast. |
+| | §4.2 | Seams as in §6. |
+| | §4.4 | Packages and adapters as in §5 and §7. |
 | | §4.5 | Tiers and WPP. |
 | | §2, §4.4 | Remove the `onboard` facade. |
-| | §4.6 | Replace examples 1–4 and 6 with: onboarding in the app; onboarding in a dApp through a WaaS provider; connect and a joined call; an agent call; a payment to a shielded address. |
-| `dapp-connection.md` | whole | Rewrite around the two processes and the MIP §9 ceremony; keep only the Phase A release, as §8.5. |
-| `storage-and-recovery.md` | §3–§8 | Rebuild on WPP (§8.5). |
-| `provider-integration.md` | §2–§6 | Narrow to the Passport app; transaction in, proof out; the provider's key as a k256 device. |
+| | §4.6 | Replace examples 1–4 and 6 with five new examples. The new examples are onboarding in the app, onboarding in a dApp through a WaaS provider, and connect with a joined call. They also include an agent call and a payment to a shielded address. |
+| `dapp-connection.md` | whole | Rewrite it for the two processes and the MIP §9 ceremony. Keep only the Phase A release, as in §8.5. |
+| `storage-and-recovery.md` | §3–§8 | Rebuild it on WPP (§8.5). |
+| `provider-integration.md` | §2–§6 | Narrow it to the Passport app. Transaction in, proof out. The key of the provider is a k256 device. |
 | `beta-scope.md`, roadmap, M1–M3 | — | See §11. |
-| FS-0.2 | loader, OQ-2 | Client loads module, decoder, and manifest; partly deployed accounts; dApp artefacts. |
-| FS-0.4, FS-0.5, FS-0.7 | interfaces | Key provider; transaction-in prover; WPP storage. |
-| FS-0.6 | whole | Rename the settlement seam to broadcast; drop the user-held-DUST dev default for sponsored fees (decision 11). |
-| FS-0.8 | adapters | Rename `adapter-node` to `adapter-nodejs`. |
-| ADR 0001 | — | Revisit: the passkey is primary, not a fallback. |
-| ADR 0005 | — | Superseded by a new ADR recording decision 1 (§3.1): onboarding from a dApp through a WaaS provider instead of the `onboard` facade. |
-| `onboarding-and-key-authorisation.md` | §1–§5, §7 | Replace partner-origin issuance through the facade with onboarding through a WaaS provider; keep the experiment's findings as recognition in the Passport app. |
-| | §6 | Keep; extend the signed request to the grant path; k256 until the p256 arm lands. |
-| | §8 | Keep, including the revocation limits; add that grants, not devices, are the default for platforms, agents, and dApps. |
-| `sdk-requirements.md` | §3.5 | Keep the out-of-band key-authorisation rule; extend it to grants. |
-| | §3.13 | Rewrite: onboarding from a dApp through a WaaS provider, with the provider's requirements (§8.1); keep the redirect fallback for dApps without one. |
-| FS-2.3 | whole | Rewrite around the WaaS route (§8.1): the provider's key as first device, the account metadata on it, and recovery through the same sign-in. |
-| FS-2.4 | §1–§3 | Keep; amend per §3.1. |
+| FS-0.2 | loader, OQ-2 | The client loads the module, the decoder, and the manifest. Add partly deployed accounts and dApp artifacts. Record the exact zkir and midnight-zk crate revisions in the version registry. |
+| FS-0.4, FS-0.5, FS-0.7 | interfaces | Key provider, a prover with transaction in, and WPP storage. |
+| FS-0.6 | whole | Change the name of the settlement seam to broadcast. Remove the dev default (DUST that the user holds), and use sponsored fees (decision 11). |
+| FS-0.8 | adapters | Change the name of `adapter-node` to `adapter-nodejs`. |
+| ADR 0001 | — | Examine it again: the passkey is primary, not a fallback. |
+| ADR 0005 | — | A new ADR replaces it and records decision 1 (§3.1): onboarding from a dApp through a WaaS provider, not the `onboard` facade. |
+| `onboarding-and-key-authorisation.md` | §1–§5, §7 | Replace partner-origin issuance through the facade with onboarding through a WaaS provider. Keep the findings of the experiment as recognition in the Passport app. |
+| | §6 | Keep it. Extend the signed request to the grant path. Use k256 until the p256 arm is available. |
+| | §8 | Keep it, with the revocation limits. Add that grants, not devices, are the default for platforms, agents, and dApps. |
+| `sdk-requirements.md` | §3.5 | Keep the out-of-band rule for key authorization, and extend it to grants. |
+| | §3.13 | Rewrite: onboarding from a dApp through a WaaS provider, with the requirements for the provider and the grant ceiling (§8.1). Keep the redirect fallback for dApps without one. |
+| FS-2.3 | whole | Rewrite it for the WaaS route (§8.1). Include the key of the provider as the first device, the account metadata on it, and recovery through the same sign-in. Add the grant of the dApp up to the ceiling, `mn-passport-connect/onboard`, and `adapter-waas`. |
+| FS-2.4 | §1–§3 | Keep it, and amend it as in §3.1. |
 
 ---
 
 ## 11. Roadmap and beta
 
-- **M1 (managed onboarding)** becomes passkey-first, with the provider's key as a
-  second device. The three-wave deploy and the partly deployed check are in scope.
-- **M2 (connect)** becomes the grant ceremony. Sign-in without a grant does not
-  exist in the MIP (§10: "There is no identity-only on-chain grant"), so the
-  `{ name, account }` profile read is a grant with read scope or waits for the
-  unfiled sign-in MIP (open question 1).
-- **M2** rewrites FS-2.3 around the WaaS route and keeps FS-2.4 (§3.1).
+- **M1 (managed onboarding)** becomes passkey-first, with the key of the
+  provider as a second device. The three-wave deploy and the check for partly
+  deployed accounts are in scope.
+- **M2 (connect)** becomes the grant ceremony. The MIP has no sign-in without a
+  grant (§10: "There is no identity-only on-chain grant"). Thus, the
+  `{ name, account }` profile read is either a grant with read scope, or it
+  waits for the unfiled sign-in MIP (open question 1).
+- **M2** also rewrites FS-2.3 for the WaaS route and keeps FS-2.4 (§3.1).
   Beta-scope item 5 (partner-origin onboarding) becomes onboarding from a dApp
-  through a WaaS provider that supports metadata attached to the user's key.
+  through a WaaS provider. That provider must support metadata on the key of the
+  user.
 - **M3 (reference dApp)** must hold a grant for the same reason. It connects
-  existing Passports, and may issue new ones through a WaaS provider.
-- **Not built for beta** changes: remove `adapter-agent-ows`,
-  `adapter-wallet-connect`, and `adapter-dapp-connection` from the list (they are
-  retired, not deferred); add `mn-passport-agent` and the registry as post-beta
-  work.
+  Passports that already exist, and it can issue new Passports through a WaaS
+  provider.
+- **The list of items not built for beta** changes. Remove
+  `adapter-agent-ows`, `adapter-wallet-connect`, and `adapter-dapp-connection`
+  from it, because this proposal retires them and does not defer them. Add
+  `mn-passport-agent` and the registry as work after beta.
 
 ---
 
@@ -695,109 +795,129 @@ metadata holds.
 
 | Dependency | Needed for | Status |
 |---|---|---|
-| midnight-js carrying a called contract's shielded spends into the transaction's offer (`Custom error: 217`) | Shielded value through calls between contracts | Reproduced, and a fix measured, in passport-demo `docs/demo/midnight-js-callee-offer-issue.md`. Not filed upstream: on both `v5.0.0-beta.7` and `main`, `createUnprovenCallTx` builds the offer from the one Zswap state the execution returns. The closest open issue, midnight-js #968, covers the same gap between sibling calls. The 2026/09/16 offer refactor (#1309) changed how the offer is split across segments, not this. |
-| Witnesses in called contracts | Shielded ACC spends called from a dApp's circuit | MPS-0021 phase 2; the capsule MIP (draft) |
-| `kernel.caller()` in a Compact release | Caller checks on the ACC | Merged to the compiler's main branch 2026/09/24 (compact PR #447). Undefined in root circuits that move unshielded tokens; lendable but not forgeable (MPS-0040); the calling circuit is not recorded. Applies to witness-free circuits first. |
-| A prover that holds or rebuilds keys | Every client | Artefacts loaded from disk (midnight-ledger PR #770); keys rebuilt from ZKIR (passport PR #170); a key-distribution MPS in preparation |
-| Key generation exposed in the zkir WASM package | Proving small circuits in the tab | Requested |
-| Contract-held NIGHT generating DUST | Accounts whose funds live in the ACC | Not supported; an upstream ask |
-| The ACC's p256 arm | Passkeys on secp256r1 | Waits on the secp256r1 surface |
-| An EIP-191 envelope on the ACC's k256 arm | Ethereum-style wallets as devices or grants (roadmap R10) | Not specified; needs keccak-256 in-circuit |
-| `midnight-did` on the ACC's toolchain | Running the DID and the ACC in one app | `midnight-did` pins ledger 8, midnight-js `4.0.2`, and compact-runtime `0.16.0`; the ACC is on ledger 9 and midnight-js 5. Either the DID packages move to ledger 9, or Passport relies on midnight-js 5's support for the older ledger era |
-| A pluggable signer in `midnight-did-api` | Signing DID operations through the key-provider interface (Q4 path) | The API signs with the raw controller secret today |
-| A DID contract whose controller is an account contract | The ACC-controlled DID (§8.6) | Not specified; needs the DID team's agreement and a ledger 9 version of the DID contract |
-| An exported, witness-free authorisation circuit on the ACC, and a grant operation for acting on another contract | The ACC-controlled DID, and any other contract that wants to authenticate through Passport | Not specified; a contract change and a scoped-grants MIP extension |
-| A midnight-js version to build on | Every package | The demo pins `5.0.0-beta.7`. `main` has moved on with breaking changes: both ledger eras dispatched through a protocol facade (#1194, #1218), the offer composer (#1309), and compact-js `3.0.0-rc.0` (#1341). The SDK should pin one version and state which behaviour it relies on. |
-| An on-chain reference for dApp artefacts | Trusting fetched artefacts without a published hash | The capsule MIP's governed reference; not yet specified |
+| midnight-js puts the shielded spends of a called contract into the offer of the transaction (`Custom error: 217`) | Shielded value through calls between contracts | The passport-demo file `docs/demo/midnight-js-callee-offer-issue.md` reproduces the issue and measures a fix. Nobody filed it upstream. On `v5.0.0-beta.7` and on `main`, `createUnprovenCallTx` builds the offer from the one Zswap state that the execution returns. The nearest open issue, midnight-js #968, covers the same gap between sibling calls. The 2026/09/16 offer refactor (#1309) changed how the offer splits across segments, but not this. |
+| Witnesses in called contracts | Shielded ACC spends that a dApp circuit calls | MPS-0021 phase 2; the capsule MIP (draft) |
+| `kernel.caller()` in a Compact release | Caller checks on the ACC | The main branch of the compiler got it on 2026/09/24 (compact PR #447). It is not defined in root circuits that move unshielded tokens. Callers can lend it, but nobody can forge it (MPS-0040). It does not record which circuit made the call. It applies to witness-free circuits first. |
+| A prover that holds or rebuilds keys | Every client | The prover loads artifacts from disk (midnight-ledger PR #770). Passport PR #170 (merged 2026/09/30) shows that a prover can make each proving key again from the ZKIR and the on-chain verifier key. The keys are byte-identical, and the step takes less than 1.5 s at k=17. A key-distribution MPS is in preparation. |
+| A proof-server mode that makes keys from ZKIR | A prover that holds no keys before the first call | Not available. Passport PR #170 lists it as an upstream request. Nobody tested if a proof server accepts keys made from ZKIR only. |
+| Stable keys across toolchain releases | Cached proving keys | The keys change with the exact zkir and midnight-zk crate revisions, not with the version string. The on-chain verifier key shows a change but does not repair it. |
+| Key generation in the zkir WASM package | Proofs of small circuits in the tab | We asked for it |
+| DUST from NIGHT that a contract holds | Accounts that keep their funds in the ACC | Not available. We asked upstream for it. |
+| The p256 arm of the ACC | Passkeys on secp256r1 | It waits on the secp256r1 surface |
+| An EIP-191 envelope on the k256 arm of the ACC | Ethereum-style wallets as devices or grants (roadmap R10) | Not specified. It needs keccak-256 in the circuit. |
+| `midnight-did` on the toolchain of the ACC | The DID and the ACC in one app | `midnight-did` pins ledger 8, midnight-js `4.0.2`, and compact-runtime `0.16.0`. The ACC is on ledger 9 and midnight-js 5. Either the DID packages move to ledger 9, or Passport uses the support of midnight-js 5 for the older ledger era. |
+| A pluggable signer in `midnight-did-api` | DID signatures through the key-provider interface (Q4 path) | The API signs with the raw controller secret today |
+| A DID contract with an account contract as its controller | The DID that the ACC controls (§8.6) | Not specified. It needs the agreement of the DID team and a ledger 9 version of the DID contract. |
+| An exported, witness-free authorization circuit on the ACC, and a grant operation to act on a different contract | The DID that the ACC controls, and each other contract that must authenticate through Passport | Not specified. It needs a contract change and a scoped-grants MIP extension. |
+| A midnight-js version for the build | Every package | The demo pins `5.0.0-beta.7`. `main` now has changes that are not compatible with it. Both ledger eras go through a protocol facade (#1194, #1218). There is also the offer composer (#1309) and compact-js `3.0.0-rc.0` (#1341). The SDK must pin one version and state which behavior it uses. |
+| An on-chain reference for dApp artifacts | Trust in fetched artifacts without a published hash | The governed reference of the capsule MIP. It is not specified yet. |
 
 ---
 
 ## 13. Open questions
 
-1. **Sign-in.** Is sign-in a read-scoped grant, or does it wait for the sign-in MIP?
+1. **Sign-in.** Is sign-in a grant with read scope, or does it wait for the
+   sign-in MIP?
 2. **Private-data handoff.** Is each release and write-back a redirect, a
-   long-lived session key, or the embedded (iframe) transport already sketched in
-   `dapp-connection.md`? This sets how many round trips a busy dApp makes.
-3. **Agents and private data.** Does Passport release a dApp's private data to an
-   agent backend, over which channel and under which ceremony, or are agents
-   limited to calls that need none?
-4. **The viewing key.** How does it reach OWS and dApps with read grants: WPP
-   metadata, the WaaS provider's metadata on the user's key (for accounts
-   onboarded through one), the passkey's `largeBlob` (which needs PRF support), or
-   another route?
-   Passkey sync carries the signing key but not the viewing key.
-5. **The registry.** Where do dApps publish their artefacts, and how do agents
-   verify them before an on-chain reference exists?
-6. **`kernel.caller()`.** When does the ACC adopt it, and may a grant be tied to
-   named calling contracts (a non-goal in the current MIP)?
+   session key with a long life, or the embedded (iframe) transport that
+   `dapp-connection.md` already describes? The answer sets how many round trips
+   a busy dApp makes.
+3. **Agents and private data.** Does Passport release the private data of a dApp
+   to an agent backend? If yes, through which channel and with which ceremony?
+   If no, can agents make only calls that need no private data?
+4. **The viewing key.** How does it get to OWS and to dApps with read grants?
+   The options are WPP metadata, the `largeBlob` of the passkey (which needs PRF
+   support), or a different route. For accounts that onboarded through a WaaS
+   provider, the metadata of the provider on the key of the user is also an
+   option. Passkey sync carries the signing key but not the viewing key.
+5. **The registry.** Where do dApps publish their artifacts? For circuits, the
+   on-chain verifier key is an anchor now (§8.3). How do agents verify the client
+   code of a dApp before an on-chain reference exists?
+6. **`kernel.caller()`.** When does the ACC start to use it? Can a grant name the
+   contracts that it accepts as callers (a non-goal in the current MIP)?
 7. **WPP and #58.** Does WPP replace the #58 sealed-backup service?
-8. **Shielded grant spends in V1.** Confirm that they use the transaction joiner
-   with the ACC's spend as its own intent.
-9. **The recipient's encryption key.** Should the signed challenge cover it, or is
-   "one parsed address" a documented rule?
-10. **Contract signing keys.** The midnight-js private-state provider also stores a
-    per-contract signing key. Does Passport keep it for a dApp, or does it stay
-    local to the dApp?
-11. **The provider's key scheme.** FS-2.4 specifies P-256; the ACC has no p256 arm
-    yet and the demo uses k256. Which does the provider enrol with for V1?
-12. **DID keys (until the ACC controls the DID).** Is the DID controller key
-    derived from the passkey (regenerable) or stored in WPP, and where does its
-    recovery key live?
-13. **Ethereum-style wallets.** Is an EIP-191 envelope worth a contract change, or
-    do such users come in through a provider wallet with raw signing?
-14. **The ACC-controlled DID.** Will the DID team take on a controller mode for
-    account contracts, and is the new ACC authorisation circuit general enough to
-    serve other contracts that want to authenticate through Passport?
+8. **Shielded grant spends in V1.** Confirm that they use the transaction
+   joiner, with the spend of the ACC as its own intent.
+9. **The encryption key of the recipient.** Must the signed challenge cover it,
+   or is "one parsed address" a documented rule?
+10. **Contract signing keys.** The midnight-js private-state provider also
+    stores a signing key for each contract. Does Passport keep it for a dApp, or
+    does it stay in the dApp?
+11. **The key scheme of the provider.** FS-2.4 specifies P-256. The ACC has no
+    p256 arm yet, and the demo uses k256. Which scheme does the provider use to
+    enroll for V1?
+12. **DID keys (until the ACC controls the DID).** Does the app derive the DID
+    controller key from the passkey (so the app can make it again), or keep it
+    in WPP? Where does its recovery key go?
+13. **Ethereum-style wallets.** Is an EIP-191 envelope worth a contract change?
+    Or do these users come in through a provider wallet that can sign a raw
+    digest?
+14. **The DID that the ACC controls.** Will the DID team agree to make a
+    controller mode for account contracts? Is the new ACC authorization circuit
+    general enough for other contracts that must authenticate through Passport?
+15. **The grant ceiling at creation.** When a dApp creates a Passport, which
+    grant can it get? Which operations, tokens, caps, and expiry stay within the
+    ceiling? The team confirms this during the implementation (§8.1).
 
-15. **Onboarding from a dApp.** Which package runs the three-wave deploy and the
-    first-device activation for a dApp using a WaaS provider — `connect` over
-    `mn-passport-account`, or a small onboarding library beside it — and is the
-    WaaS provider an adapter behind the key-provider seam, with a metadata seam of
-    its own?
 ---
 
 ## 14. Sources
 
 - Passport direction: planning workspace `docs/passport-direction.md`.
-- SDK docs on `main` (`5dff89f`): ADR 0005; `onboarding-and-key-authorisation.md`
-  §6 and §8 (errata 7 and 8, commit `64fe00d`); FS-2.3; FS-2.4;
-  `dapp-connection.md` (the embedded transport, commit `29da155`).
+- SDK docs on `main` (`5dff89f`):
+  - ADR 0005;
+  - `onboarding-and-key-authorisation.md` §6 and §8 (errata 7 and 8, commit
+    `64fe00d`);
+  - FS-2.3 and FS-2.4;
+  - `dapp-connection.md` (the embedded transport, commit `29da155`).
 - Scoped grants and dApp connection: planning workspace
-  `docs/mps-mip/mips/mip-xxxx-scoped-grants.md` (§3.2, §6, §8, §9, §10); reference
-  implementation evidence in passport PR #155.
+  `docs/mps-mip/mips/mip-xxxx-scoped-grants.md` (§3.2, §6, §8, §9, §10). The
+  evidence for the reference implementation is in passport PR #155.
 - MPS-0040, cross-contract call provenance: `midnight-improvement-proposals`
   `mps/mps-0040-cross-contract-call-provenance.md`.
 - `kernel.caller()`: LFDT-Minokawa/compact PR #447 and its review thread.
 - The reference ACC: planning workspace `contract/contracts/account.compact`
   (`witness held_coin`, line 171).
-- The demo's account-custody work, passport-demo `main`: `d884fec` (recipient key
-  read at seal time), `424236e` (one send engine for both arms), `22ce134` (NIGHT to
-  an address only), `c3fe625` (coin position from the chain), `21247fc` (queued
-  deliveries), `6ebd8f1` (partly deployed accounts), `2586f9c` (WASM load order),
-  `8cf7ed8` (one key enrols another); `examples/passport-balancer/src/proveAccountCustody.ts`
-  (transaction in, proof out); `docs/demo/account-custody-layer-design.md` §3c
-  (the one-transaction send); `docs/demo/midnight-js-callee-offer-issue.md`.
-- Proving-key sizes and regeneration: servicedesk issue #203 and its comments;
-  passport PR #170.
+- The account-custody work of the demo, passport-demo `main`:
+  - `d884fec` (recipient key read at seal time);
+  - `424236e` (one send engine for both arms);
+  - `22ce134` (NIGHT to an address only);
+  - `c3fe625` (coin position from the chain);
+  - `21247fc` (queued deliveries);
+  - `6ebd8f1` (partly deployed accounts);
+  - `2586f9c` (WASM load order);
+  - `8cf7ed8` (one key enrolls another);
+  - `examples/passport-balancer/src/proveAccountCustody.ts` (transaction in,
+    proof out);
+  - `docs/demo/account-custody-layer-design.md` §3c (the one-transaction send);
+  - `docs/demo/midnight-js-callee-offer-issue.md`.
+- Proving-key sizes and how to make the keys again: servicedesk issue #203 and
+  its comments; passport PR #170 (`experiments/proving-key-regeneration/`,
+  merged 2026/09/30).
 - Capsule runtime: shieldedtech/product PR #155 (`capsule-runtime/MIP.md`).
-- `did:midnight`: midnight-did `4e7f6b0` (`packages/contract/src/did.compact`,
-  `packages/api`, `w3c-spec/midnight-method.md` draft v0.7.0,
-  `docs-site/architecture/adr-controller-authorization-signatures.md`) and
-  midnight-did-resolver `49912b2` (resolver and manager services).
-- The ACC's k256 envelopes: planning workspace `contract/contracts/account.compact`
-  (`envelope_digest`: 0 raw, 1 connector).
-- Witness Protection Program: `docs/integrations.md`, `docs/security-and-recovery.md`,
-  and `docs/explanation/application.md` in its repository.
+- `did:midnight`:
+  - midnight-did `4e7f6b0`: `packages/contract/src/did.compact`,
+    `packages/api`, `w3c-spec/midnight-method.md` (draft v0.7.0), and
+    `docs-site/architecture/adr-controller-authorization-signatures.md`;
+  - midnight-did-resolver `49912b2` (resolver and manager services).
+- The k256 envelopes of the ACC: planning workspace
+  `contract/contracts/account.compact` (`envelope_digest`: 0 raw, 1 connector).
+- Witness Protection Program: `docs/integrations.md`,
+  `docs/security-and-recovery.md`, and `docs/explanation/application.md` in its
+  repository.
 - midnight-js, checked at `v5.0.0-beta.7` and `main` (2026/09/24):
-  `packages/types/src/private-state-provider.ts` (the provider interface);
-  `packages/contracts/src/submit-call-tx.ts` and `src/internal/transaction.ts`
-  (private state written only after `SucceedEntirely`);
-  `packages/contracts/src/unproven-call-tx.ts` and `src/utils/zswap-utils.ts` (the
-  encryption-key resolver and the offer built from one Zswap state);
-  `packages/contracts/src/find-deployed-contract.ts` (`verifyContractState` checks
-  every declared circuit); `packages/http-client-proof-provider/src/http-client-proving-provider.ts`
-  and `packages/types/src/midnight-types.ts` (every proof uploads the proving key,
-  verifier key, and ZKIR); issues #968 and #1351; PR #1309.
-- The witness rule for called contracts: LFDT-Minokawa/compact `runtime/src/contract.ts`
-  (`forbiddenCalleeWitnesses`: "calls to witnesses in non-root contracts are not yet
-  supported").
+  - `packages/types/src/private-state-provider.ts` (the provider interface);
+  - `packages/contracts/src/submit-call-tx.ts` and `src/internal/transaction.ts`
+    (private state written only after `SucceedEntirely`);
+  - `packages/contracts/src/unproven-call-tx.ts` and
+    `src/utils/zswap-utils.ts` (the encryption-key resolver, and the offer built
+    from one Zswap state);
+  - `packages/contracts/src/find-deployed-contract.ts` (`verifyContractState`
+    checks each declared circuit);
+  - `packages/http-client-proof-provider/src/http-client-proving-provider.ts`
+    and `packages/types/src/midnight-types.ts` (each proof uploads the proving
+    key, the verifier key, and the ZKIR);
+  - issues #968 and #1351; PR #1309.
+- The witness rule for called contracts: LFDT-Minokawa/compact
+  `runtime/src/contract.ts` (`forbiddenCalleeWitnesses`: "calls to witnesses in
+  non-root contracts are not yet supported").
