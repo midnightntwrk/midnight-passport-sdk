@@ -50,7 +50,7 @@ parallel. Different teams can do them, if necessary:
 | D12a | DID, held by the Passport app | Passport app | R39 | Q4 (initial) | D6 |
 | D12b | DID controlled by the ACC | Passport app | R39, R40 | Q1 | D12a, D2; a DID contract change, an ACC circuit, and a MIP extension |
 | D13 | Sign-in and grants for dApps | dApps | R05, R12 | Q4 | D2–D4, D8 |
-| D14 | Private data for dApps | dApps | R05, R09 | Q4 | D9, D13 |
+| D14 | Private data for dApps | dApps | R05, R09 | Q4 | D8, D9, D13 |
 | D15 | Pay with Passport | dApps | R05, R04 | Q4 | D11, D13 |
 | D16 | Onboarding kit for apps | dApps | R11 | Q4 | D6, D13 |
 | D17 | Onboarding measurements | dApps | R14 | Q4 | D6, D16 |
@@ -103,6 +103,7 @@ flowchart LR
     D2 --> D12B
     D12 --> D23
     D8 --> D13
+    D8 --> D14
     D9 --> D14
     D13 --> D14
     D11 --> D15
@@ -129,7 +130,7 @@ flowchart LR
 |---|---|---|---|
 | **0 — Foundation** | Start now | D1–D5 | A client can build, prove, and submit an ACC call without the core of the Passport app |
 | **1 — The account** | Q4, early | D6, D7, D8, D11, D12a | A user creates a Passport, adds devices, approves and revokes grants, and pays, all in the Passport app |
-| **2 — Apps and agents join** | Q4, late | D9, D13, D14, D15, D18, D10 | A dApp signs a user in through a grant and uses the private data of that user. The ACC records a grant for an agent |
+| **2 — Apps and agents join** | Q4, late | D9, D13, D14, D15, D18, D10 | A dApp gets its grant and the handoff of the private data, and then operates with the Passport app closed. The ACC records a grant for an agent |
 | **3 — Adoption** | Q4 end / Q1 | D16, D17 | Apps integrate Passport in a few lines. The onboarding numbers are ready for publication |
 | **4 — Agents act** | Q1 | D19, D20, D12b, D23 (start) | Agents run the circuits of dApps. OWS enforces each grant as it reads it from the chain. The DID answers to the ACC |
 | **5 — Richer rules** | Q2 | D23 (proofs) | Proofs without documents |
@@ -148,17 +149,20 @@ get it (§5).
 
 D1 contains these items:
 
-- typed bindings for the ACC at `spec_version = 2` (scoped grants);
+- typed bindings for the ACC at `spec_version = 3` (scoped grants with caller
+  pins). Version 3 adds `caller_commit` to `GrantScope`. It is a
+  fresh-deployment schema, not an upgrade of version 2 (passport PR #176);
 - the version registry and the integrity checks for artifacts, with the exact
   zkir and midnight-zk crate revisions, because the keys change with them;
 - the detection of an account that is only partly deployed;
 - the client artifact set: the compiled module, the ledger decoder, and the
-  manifest (ZKIR goes only to the prover);
+  manifest. A client that only builds calls does not need the ZKIR;
 - the ACC's interface for dApp circuits, so that the contract of a dApp can call
   the ACC;
-- a loader for the artifacts of a dApp, with integrity checks. For a circuit,
-  the loader makes the verifier key again from the ZKIR and compares it with the
-  verifier key on chain (passport PR #170).
+- a loader for the artifacts of a dApp, with integrity checks. This loader
+  verifies circuits, so it gets the ZKIR and uses the SRS. It makes the verifier
+  key again and compares it with the verifier key on chain (passport PR #170).
+  The proving keys stay with the prover.
 
 *Needs:* the reference ACC v2 artifact, published and deployed on the target
 network.
@@ -209,8 +213,16 @@ D4 defines the messages that dApps, agents, and the Passport app exchange:
 - the sign-in message;
 - the signed out-of-band request for keys and grants (FS-2.4, extended).
 
-The grant request is one message for dApps and agents. It can travel as a
-redirect, a QR code, or a link. D4 gives the messages a version.
+The grant request is one message format for dApps and agents, with two binding
+profiles:
+
+- the browser profile binds the web origin with the possession proof (MIP §9),
+  and travels as a redirect;
+- the agent profile has no web origin. It binds the agent key with the FS-2.4
+  fields (a self-signature, a nonce, an expiry, and a label), and travels as a
+  QR code or a link.
+
+D4 gives the messages a version.
 
 **D5 — Platform adapters** (`adapter-browser`, `adapter-nodejs`)
 
@@ -225,8 +237,10 @@ D5 has two runtimes:
 **D6 — Account creation** (R01, R02, R03)
 
 A passkey becomes the first device (JubJub, from the PRF output of the passkey).
-The Passport app deploys the ACC in its three waves and claims the name. A
-sponsor pays the fees and the opening balance.
+The Passport app deploys the ACC in waves and claims the name. The deploy
+planner packs the circuits into waves within a 15,000-byte verifier budget, from
+the actual artifacts. On 2026/10/09 that is seven waves with caller pins, and ten
+waves with the p256 arm. A sponsor pays the fees and the opening balance.
 
 *Needs:* the name service and fee sponsorship on the target network.
 
@@ -237,7 +251,12 @@ D7 contains these items:
 - add and remove devices through the signed request of FS-2.4, which shows as a
   QR code or a link;
 - the key of the provider's wallet as a device;
-- a Midnight connector wallet as a device.
+- a Midnight connector wallet as a device. Only a wallet whose `signData` uses
+  the `ecdsa_secp256k1_sha256` scheme of the connector fits. The ACC verifies
+  `H(ASCII("midnight_signed_message:32:") || c)`, where `H` is SHA-256 and `c`
+  is the 32-byte challenge (passport PR #180);
+- a passkey on the p256 arm, within the profiled WebAuthn form `wa-json134`
+  (passport PR #175).
 
 D7 also states the limits of device revocation (errata 7 and 8).
 
@@ -252,7 +271,10 @@ D8 contains these items:
 - consent;
 - `issue_grant`;
 - the list of dApps and agents that have grants, with their limits;
-- the revocation of one grant, or of all grants in one action.
+- the revocation of one grant, or of all grants in one action;
+- after the revocation of a grant with read access, a rotation of the
+  encryption key (`rotate_enc_key`). Notes sealed before the rotation stay
+  readable to the revoked party, and the user sees this.
 
 A key for a family member, with a limit on what the member can spend, is a
 grant the same as all other grants. This is the basic form of R41.
@@ -321,8 +343,8 @@ This change belongs to the DID team, and it needs the agreement of that team.
   signature for an operation that is not a payment;
 - a scoped-grants MIP extension for a grant that can act on another contract.
 
-With `kernel.caller()` in a release, the ACC can also check the caller. But this
-check is not necessary.
+The ACC can also pin the grant to the DID contract as its immediate caller,
+through `kernel.caller()` (passport PR #176). But this check is not necessary.
 
 **D23 — Credentials** (R40, then R23–R27)
 
@@ -337,8 +359,9 @@ Later, the user can prove one fact and not give the full document.
 
 D13 is the dApp library. It contains these items:
 
-- the grant ceremony, the same as for agents: the key of the dApp for its own
-  website, the request to the Passport app, and a check of the grant on chain;
+- the grant ceremony with the browser profile: the key of the dApp for its own
+  website, a request and a possession proof that bind its web origin, and a
+  check of the grant on chain;
 - sign-in that uses the grant.
 
 The dApp builds the circuit that composes the user's ACC. The library supplies
@@ -349,11 +372,41 @@ these items for that circuit:
 - the signature of the grant key;
 - the joiner helper, for a shielded spend that must start its own intent.
 
+The dApp signs each call with its grant key. It never asks Passport to sign a
+call. This is the difference between a delegation of authority and Passport as
+an intermediary for each transaction (realignment decision 12).
+
+*Acceptance:* the dApp operates independently. The test has four steps:
+
+1. Request and approve the grant. Confirm its registration on chain, and verify
+   the approved scope and the key binding.
+2. Complete each data or viewing handoff that has a separate consent (D14).
+3. Close Passport. The dApp makes several allowed calls, tracks confirmation,
+   and keeps its own state. This also works after a reload of the dApp or a
+   retry of a transaction.
+4. A revoked, expired, or exhausted grant stops the authorization. A request or
+   a change of the grant goes back to Passport.
+
 **D14 — Private data for dApps** (R05, R09)
 
-D14 gives the dApp a private-state provider, with Passport as its store.
-Passport releases the data of that dApp after consent. The provider stores the
-updated data in Passport after each confirmed transaction.
+D14 is the private-data handoff. It completes inside the connection flow of
+D13, before the dApp operates independently:
+
+- The user gives separate consents for the grant, for private-state access, and
+  for the viewing key (only with read access). Each one has its own scope.
+- Passport gives the dApp a key for its own encrypted package in WPP, and only
+  for that package.
+- After the handoff, the private-state provider of the dApp reads and writes
+  that package in WPP directly. Passport is not on the read or write path.
+- The dApp writes back new state only after the transaction finalizes with
+  `SucceedEntirely`. If that write fails, the dApp keeps the state as not yet saved, and
+  tries again, also after a reload.
+
+A revocation does not take back data that the dApp already read. Thus, a
+revocation of private-state access rotates the key of the package. A revocation
+of read access rotates the viewing key (D8).
+
+*Acceptance:* the same four steps as D13, with the data handoff in step 2.
 
 **D15 — Pay with Passport** (R05, R04)
 
@@ -376,11 +429,16 @@ that supports metadata attached to the user's key (§6). The entry point
 
 - it deploys the ACC and activates the key of the provider as the first device;
 - it claims the name;
-- it issues a grant to the per-origin key of the app, up to a fixed ceiling;
 - it writes the account metadata to the key of the user at the provider.
 
-`adapter-waas` supplies the key of the provider and the metadata. A wider grant
-needs the usual grant ceremony in the Passport app.
+`adapter-waas` supplies the key of the provider and the metadata. The app does
+not issue its own grant. It then gets its grant through the usual grant
+ceremony (D13), and the user approves it in the Passport app. After onboarding,
+the app never uses the key of the provider again.
+
+During activation, the page of the app drives the signatures of the provider.
+Open question 1 asks which guard makes sure that the provider
+signs only the activation (§6).
 
 **D17 — Onboarding measurements** (R14)
 
@@ -395,14 +453,15 @@ numbers are ready for publication.
 D18 is the side of the agent:
 
 - The agent creates its key in OWS.
-- The agent builds the grant request. This is the same request that a dApp
-  sends.
+- The agent builds the grant request, in the same message format that a dApp
+  uses, with the agent profile. The request has no web origin. It binds the
+  agent key with a self-signature, a nonce, an expiry, and a label.
 - The agent shows the request as a QR code or a link. The agent provider selects
   the form.
 
 The user approves the request in the Passport app (D8). The agent receives its
-readable scope, so that OWS can check limits before it signs. D18 has no
-execution yet.
+readable scope, so that OWS can check limits before it signs. After the grant,
+the agent operates with the Passport app closed. D18 has no execution yet.
 
 **D19 — Agent execution** (R15, R22)
 
@@ -448,8 +507,8 @@ shows the capabilities that need work outside the SDK.
 
 | Roadmap | Why | What is necessary |
 |---|---|---|
-| R10 (Ethereum-style wallets) | The k256 arm of the ACC accepts a raw digest (envelope 0) and the framing of the Midnight connector (envelope 1). Ethereum wallets sign under EIP-191 with a keccak-256 digest, and cannot sign a raw digest. | A new envelope (a contract change that needs keccak-256 in the circuit). Or, the users of these wallets join through a provider wallet that can sign raw digests. Midnight connector wallets work today. |
-| R15 ("contracts, assets, amount") | A grant covers one token and a maximum of one pinned recipient. A list of contracts is a list of grants, one for each contract and token. This works, but it is not easy to use. A grant that lists contracts to call is a non-goal of the current MIP. | Many grants for each agent now. A scope with a list of values is a MIP extension. A check of the caller needs `kernel.caller()` in a release. |
+| R10 (Ethereum-style wallets) | The k256 arm of the ACC accepts a raw digest (envelope 0) and the framing of the Midnight connector (envelope 1). Envelope 1 fits only wallets that use the `ecdsa_secp256k1_sha256` scheme. Ethereum wallets sign under EIP-191 with a keccak-256 digest, and cannot sign a raw digest. | A new envelope (a contract change that needs keccak-256 in the circuit). Or, the users of these wallets join through a provider wallet that can sign raw digests. Midnight connector wallets work today. |
+| R15 ("contracts, assets, amount") | A grant covers one token and a maximum of one pinned recipient. A list of contracts is a list of grants, one for each contract and token. This works, but it is not easy to use. A grant that lists contracts to call is a non-goal of the current MIP. | Many grants for each agent now. A scope with a list of values is a MIP extension. A grant can already pin one contract that calls the ACC directly, through `kernel.caller()` (passport PR #176). |
 | R18, R41 full (authority down a chain) | Only a device can issue a grant. Thus a grantee cannot give a narrower grant to a different key, and the revocation of a parent does not stop the grants below it. | A MIP extension for chained grants. |
 | R39, R40 (a DID that authenticates through Passport) | The DID contract checks only its own stored key, so the ACC cannot control it today. | A controller mode in the DID contract for account contracts, on ledger 9 (the DID team). A witness-free authorization circuit on the ACC. A MIP extension for grants that act on another contract (D12b). |
 | R17 (the agent's own identity) | Nothing gives an agent an identity today. Also, "one agent per service per person" needs a nullifier scheme. | A design: an agent DID, a name subdomain, or both. |
@@ -480,14 +539,21 @@ a new user can create a Passport inside the app. The condition is that the app
 onboards the user through a wallet-as-a-service (WaaS) provider. That provider
 must support metadata attached to the user's key.
 
-The app also gets a grant for its own key in the same flow. The user approves
-that grant in the UI of the app, not in the Passport app. Thus, the grant has a
-fixed ceiling, and the team confirms the ceiling during the implementation. A
-wider scope needs the usual grant ceremony in the Passport app.
+The app uses the key of the provider only to create the account. It does not
+issue its own grant. The app then gets its grant through the usual grant
+ceremony, as each other app does. The user approves it in the Passport app,
+where the user signs in with the same provider. After onboarding, the app never
+uses the key of the provider again.
+
+**Known risk.** During activation, the page of the app drives the signatures of
+the provider. Thus, a hostile app can try to get more than the activation
+signed, for example a new device. Open question 1 asks which guard closes this
+risk: a signing policy at the provider, an ACC rule for a new first device, or a
+risk that the team accepts and records.
 
 | Route | Experience of a new user | What it costs |
 |---|---|---|
-| **In the app, through a WaaS provider** | The user signs in with the provider inside the app. The app creates the Passport there, with no hand-off | The key of the provider for the user is the first device of the account. The provider holds it for the user, and the code of the app does not hold it. The provider attaches the metadata of the account (its address and viewing key) to that key. Thus the user finds and recovers the account anywhere they sign in with the same provider, also in the Passport app. The provider can read that metadata: it can see the payments to the account, but it can never move them. |
+| **In the app, through a WaaS provider** | The user signs in with the provider inside the app. The app creates the Passport there, with no hand-off | The key of the provider for the user is the first device of the account. The provider holds it for the user, and the code of the app does not hold it. The provider attaches the metadata of the account (its address and viewing key) to that key. Thus the user finds and recovers the account anywhere they sign in with the same provider, also in the Passport app. The provider can read that metadata, so it can see the payments to the account. The metadata alone gives no authority to spend. But the provider holds a full-authority key for the user, so the account is only as safe as the signing security of the provider. |
 | **In the Passport app, then return** | The user taps "Continue with Passport". The Passport app opens, creates the account, and goes directly back to the grant request of the app | One hand-off. This is the route for an app without a WaaS provider. |
 
 One route stays forbidden: the app creates the Passport with a device secret in
@@ -523,8 +589,10 @@ define the scope of D16.
 
 ## 8. Open questions
 
-1. When an app creates a Passport, which grant can it get (§6; realignment open
-   question 15)? The team confirms the ceiling during the implementation.
+1. When an app creates a Passport, which guard makes sure that the provider
+   signs only the activation (§6; realignment open question 15)? The options
+   are a signing policy at the WaaS provider, an ACC rule for a new first
+   device, or a risk that the team accepts and records.
 2. Who builds the registry of dApp code, and in which form (§5, D19)?
 3. Can an agent receive the private data of a dApp (D19)?
 4. Ethereum-style wallets: do they need a new envelope, or do they join through a
