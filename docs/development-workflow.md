@@ -111,7 +111,7 @@ time so the code does.
    automated and maintained per PR.
 
 **`mn-passport-skills-code-style`** — project coding preferences. Grounded in
-`.claude/rules/` (British English + Oxford comma, `YYYY/MM/DD` dates, Rust
+`.claude/rules/` (American English + Oxford comma, `YYYY/MM/DD` dates, Rust
 style) plus TS conventions, and the **Midnight** brand for any UI —
 Midnight Passport is a Midnight-branded product, not an IOG-branded one.
 Judgment layer (prose in comments/docs, brand adherence, i18n,
