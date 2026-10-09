@@ -44,7 +44,7 @@ from the docs and one or more deliverables (`D…`). Per spec:
 3. **Loop — `mn-passport-skills:spec-driver` (loop phase), per tranche:**
    1. `mn-passport-skills:devenv` — environment ready (HTTPS-local, devnet, proof server, compact CLI, debts repo).
    2. Implement the tranche.
-   3. Run the four lenses in parallel: `mn-passport-skills:conformance` (against the docs and the planning workspace), `mn-passport-skills:security-audit` (key management + residual-risk register), `mn-passport-skills:code-style` (British English, dates, Midnight brand), `mn-passport-skills:verify` (does it actually prove / submit?). Fix blocking findings.
+   3. Run the four lenses in parallel: `mn-passport-skills:conformance` (against the docs and the planning workspace), `mn-passport-skills:security-audit` (key management + residual-risk register), `mn-passport-skills:code-style` (American English, dates, Midnight brand), `mn-passport-skills:verify` (does it actually prove / submit?). Fix blocking findings.
    4. Code diverges from the docs for a *good* reason → `mn-passport-skills:doc-sync` (update docs + ADR).
    5. `mn-passport-skills:pr-open` — prepare branch + description (`Refs`/`Closes #NN`), then **STOP** for the human to push, open, and merge.
    6. After merge → `STATE.md` tranche to Done.
@@ -89,7 +89,8 @@ the ones most often in play:
 
 ## Conventions
 
-- British English, Oxford comma; dates `YYYY/MM/DD`.
+- American English, Oxford comma; dates `YYYY/MM/DD`. Code identifiers,
+  file names, and quoted external titles keep their original spelling.
 - **Type as much as you can:** no `any`; `unknown` only as a documented last
   resort naming why and who owns the type (code-style skill has the detail).
 - **Stage explicitly, never `git add -A`:** commits name their paths, so a
