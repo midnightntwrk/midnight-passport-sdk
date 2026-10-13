@@ -88,6 +88,7 @@ entry library uses lives in the foundation.
 | Private state | The midnight-js `PrivateStateProvider` | `account` | `connect` (agents: open) | `connect`, over the WPP package of the dApp |
 | Account metadata | Namespaced, versioned entries; read, merge, write, read back | `account` | `connect/onboard`, `core` | `adapter-waas` |
 | Registry | Get dApp artifacts by content hash, and verify them | `contract` | `mn-passport-agent` | The registry adapter |
+| Multi-chain | Submit an authorized intent for a different chain, then report its settlement or its failure | `account` | All three | `adapter-multi-chain` |
 | Storage | Ciphertext only: WPP packages, catalogs, conflict retention, backup states | `core` | `core` | `adapter-storage-wpp` |
 | Recovery | Guardians and paper keys | `core` | `core` | `adapter-recovery` |
 | DID | Create, link, sign, and resolve `did:midnight` | `core` | `core` | `adapter-did` |
@@ -138,6 +139,7 @@ foundation, never from `core`.
 | `adapter-nodejs` | Platform | The Node.js runtime for backends, `mn-passport-agent` included. |
 | `adapter-waas` | Key provider, account metadata | The embedded key of a WaaS provider (k256, envelope 0) and the metadata on it. It names no vendor. |
 | Registry adapter (name open) | Registry | Content-addressed fetch, verification, and a local cache. It makes the verifier key again from the ZKIR and the SRS, and compares it with the key on chain. |
+| `adapter-multi-chain` | Multi-chain | **After V1.** It connects to a multi-chain signature network. The network signs for the ACC on other chains, after the ACC authorizes the intent. |
 | `adapter-prover-wasm` | Prover | **After V1.** ACC proving keys are 112–224 MB, and the zkir WASM package has no key generation. |
 
 ### Passport-app adapters
@@ -456,5 +458,6 @@ it on the authorizer page. Neither side imports the other. The wire axis
 - Planning workspace (`midnightntwrk/passport`): the scoped-grants MIP (§9,
   §10), the signature-schemes MIP (§2), `contract/GRANTS-CALLER.md`,
   `contract/WEBAUTHN.md`, and PRs #170, #175, #176, and #180.
+- Planning workspace: the cross-chain integration interface (component C25).
 - midnight-js `PrivateStateProvider` and `submitCallTx`, checked at
   `v5.0.0-beta.7`.
