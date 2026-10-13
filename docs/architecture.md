@@ -12,6 +12,9 @@
 - The SDK has **three entry libraries** on a **shared foundation**. `core` is
   the engine of the Passport app. `connect` is the dApp library.
   `mn-passport-agent` is the agent library.
+- **After V1**, a fourth entry library, `mn-passport-ecosystems`, shows
+  Passport in the wallet pickers of other chains, such as Solana and EVM
+  chains.
 - The foundation has three packages: `mn-passport-account` (the ACC client and
   the shared seams), `mn-passport-contract` (bindings and artifacts), and
   `mn-passport-protocol` (wire messages).
@@ -64,6 +67,7 @@ All packages publish under the `@midnight-ntwrk/` scope.
 | `mn-passport-connect` | A dApp (browser) | The grant ceremony with the browser profile. The per-origin key provider. The signature of the ACC challenge with the grant key. The private-data handoff, then a private-state provider over the WPP package of the dApp. Pay with Passport. |
 | `mn-passport-connect/onboard` | A dApp (browser) | A separate entry point. It creates a Passport through a WaaS provider: deploy, activate, claim the name, and write the account metadata. It issues no grant. A dApp that only signs users in does not load it. |
 | `mn-passport-agent` | An agent backend (Node.js) | The grant ceremony with the agent profile. OWS as the key provider. On-chain grant reads, so that OWS can enforce the grant as its policy. A registry client that gets and runs the circuit of a dApp. |
+| `mn-passport-ecosystems` | A dApp on a different chain (browser) | **After V1.** It registers Passport in the wallet standards of other chains: `/solana` for the Solana Wallet Standard, and `/evm` for EIP-6963 and EIP-1193. It holds no key. It sends each request to the Passport app (example 8). |
 
 ### Foundation
 
@@ -117,8 +121,15 @@ interface KeyProvider {
 | Midnight connector wallet | k256, envelope 1 (`signData` with `ecdsa_secp256k1_sha256`) | Device, or a read-only grant | `core`, `connect` |
 | dApp per-origin key | JubJub, k256 (envelope 0), or p256 | Grant | `connect` |
 | Agent key in OWS | JubJub or k256 (envelope 0) | Grant | `mn-passport-agent` |
+| EVM wallet | k256, EIP-191 | **After V1.** Device or grant | `core`, `connect` |
+| Solana wallet | Ed25519 | **After V1.** Device or grant | `core`, `connect` |
 
 [`sdk-requirements.md`](./sdk-requirements.md) owns the exact signing digests.
+
+An external wallet can sign for the ACC only on an arm that the ACC verifies.
+The EVM wallet needs a new k256 envelope for EIP-191, and the Solana wallet
+needs an Ed25519 arm. The contract team adds these arms. Then the key-provider
+interface gets the new scheme or envelope.
 
 ## Adapters
 
@@ -160,12 +171,15 @@ Only `core` uses these adapters.
    `mn-passport-protocol`. These two depend on no other SDK package.
 3. **`connect` and `mn-passport-agent` never link `core`**, and never link a
    Passport-app adapter. Shared code goes into `mn-passport-account`.
-4. A shared adapter depends on the package that defines its seam, and on its own
+4. `mn-passport-ecosystems` depends only on `mn-passport-protocol`. It never
+   links `core`, `mn-passport-account`, or an adapter, so that a dApp on a
+   different chain loads only a small package.
+5. A shared adapter depends on the package that defines its seam, and on its own
    provider SDK. It never depends on `core` or on a different adapter.
-5. A Passport-app adapter implements a seam from `core`. Only `core` uses it.
-6. `core` and the foundation hold no platform code (`fs`, `window`, `fetch`).
+6. A Passport-app adapter implements a seam from `core`. Only `core` uses it.
+7. `core` and the foundation hold no platform code (`fs`, `window`, `fetch`).
    The platform adapters supply it.
-7. The SDK never compiles or owns the ACC. It consumes the published artifact.
+8. The SDK never compiles or owns the ACC. It consumes the published artifact.
 
 The workspace lint and the manifest test enforce these rules on each change.
 
@@ -219,7 +233,8 @@ Three rules complete the invariant:
 
 - **The ceremony gate.** A passkey tap occurs when Passport issues a grant and
   when the handoff completes. There is no tap for each call. The exception is a
-  grant key that is itself a passkey on the origin of the dApp.
+  grant key that is itself a passkey on the origin of the dApp. A request from
+  a dApp on a different chain also gets its own tap (example 8).
 - **No device secret in a dApp or an agent.** The code of a dApp or an agent
   holds only its grant key. The WaaS provider holds the embedded key, and a dApp
   drives it only to onboard the user.
@@ -442,6 +457,30 @@ it on the authorizer page. Neither side imports the other. The wire axis
 (`PROTOCOL_VERSION`) is separate from the binding axis;
 [`compatibility.md`](./compatibility.md) owns both.
 
+### Example 8: Passport in the wallet picker of a different chain (after V1)
+
+```ts
+import { registerPassportWallet } from '@midnight-ntwrk/mn-passport-ecosystems/solana';
+import { announcePassportProvider } from '@midnight-ntwrk/mn-passport-ecosystems/evm';
+
+registerPassportWallet({ passportAppUrl }); // Solana Wallet Standard
+announcePassportProvider({ passportAppUrl }); // EIP-6963, with an EIP-1193 provider
+```
+
+A dApp on Solana or on an EVM chain calls one function when it starts. Then
+Passport shows in its wallet picker, next to the other wallets. The package
+holds no key and no ACC logic. It sends each request to the Passport app in a
+popup:
+
+1. `core` shows the request, and the user approves it with a passkey tap.
+2. The ACC authorizes the intent.
+3. `adapter-multi-chain` gets the signature for the other chain and reports the
+   settlement.
+
+A dApp on a different chain cannot hold a grant on the ACC. Thus, the Passport
+app approves each request. This is the only flow in which the Passport app acts
+for a dApp on each request. A Midnight dApp always uses a grant (example 3).
+
 ## Sources
 
 - SDK realignment proposal:
@@ -459,5 +498,7 @@ it on the authorizer page. Neither side imports the other. The wire axis
   §10), the signature-schemes MIP (§2), `contract/GRANTS-CALLER.md`,
   `contract/WEBAUTHN.md`, and PRs #170, #175, #176, and #180.
 - Planning workspace: the cross-chain integration interface (component C25).
+- Wallet standards of other chains: the Solana Wallet Standard, EIP-6963, and
+  EIP-1193.
 - midnight-js `PrivateStateProvider` and `submitCallTx`, checked at
   `v5.0.0-beta.7`.
