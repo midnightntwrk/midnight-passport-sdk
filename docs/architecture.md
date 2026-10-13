@@ -1,862 +1,460 @@
-# Midnight Passport SDK — Architecture Approaches (Draft)
+# Midnight Passport SDK architecture
 
-> **Status:** draft · 2026/07/20
-> **Companion to:** [`sdk-requirements.md`](./sdk-requirements.md) (the
-> *what/why*) and [`development-workflow.md`](./development-workflow.md)
-> (how we build it); the reduced first cut is
-> [`beta-scope.md`](./beta-scope.md). Requirement references (§) point to the
-> requirements doc; component references (`[C…]`) and promises (`[P…]`) point
-> to the planning repo's [`docs/plans`](https://github.com/midnightntwrk/passport/tree/main/docs/plans).
-> **Purpose:** lay out candidate architectures for the SDK, recommend one,
-> and map every requirement onto it. Decisions still open are marked
-> **[open]** with a stated lean.
+> **Status:** draft · 2026/10/13
+> **Owns:** the packages, the seams, the adapters, and the dependency rules of
+> the SDK.
+> **Companions:** [`sdk-requirements.md`](./sdk-requirements.md) (what the SDK
+> must do), [`compatibility.md`](./compatibility.md) (the version axes), and
+> [`beta-scope.md`](./beta-scope.md) (what beta contains).
 
-## 1. Framing — one core, three faces
+## Summary
 
-The SDK is not one API. It presents **three consumer faces** over a single
-ACC-centric core:
+- The SDK has **three entry libraries** on a **shared foundation**. `core` is
+  the engine of the Passport app. `connect` is the dApp library.
+  `mn-passport-agent` is the agent library.
+- The foundation has three packages: `mn-passport-account` (the ACC client and
+  the shared seams), `mn-passport-contract` (bindings and artifacts), and
+  `mn-passport-protocol` (wire messages).
+- **`connect` and `mn-passport-agent` never link `core`.** Code that more than
+  one entry library needs goes into `mn-passport-account`.
+- Most seams live in `mn-passport-account`, so that the three entry libraries
+  share one prover, one broadcast client, and one key-provider interface.
+  Storage, recovery, and DID stay behind `core`.
+- **Transaction in, proof out.** The prover gets the unproven transaction and
+  holds the proving keys. In V1, the prover sees the coin and the amount, and
+  the user is told.
+- After the grant and the handoff, a dApp or an agent operates with the
+  Passport app closed. It signs with its own grant key, never through Passport.
+- **A user never holds DUST.** A sponsor pays the fees, or the user swaps for
+  them through the Capacity Exchange.
 
-| Face | Consumer | Package |
+## The package map
+
+![Midnight Passport SDK package map](./proposals/assets/2026-09-25-sdk-packages.svg)
+
+_The entry libraries depend on the foundation. The shared adapters implement
+seams from `mn-passport-account`, and the registry adapter implements a seam
+from `mn-passport-contract`. The Passport-app adapters implement seams from
+`core`, and only `core` uses them._
+
+## Design approach
+
+The requirements fix three ingredients: typed packages with a clean split, a
+kernel secret boundary, and a reactive state model. The approaches differ only
+in how many of them V1 adopts.
+
+| Approach | Shape | Verdict |
 |---|---|---|
-| **Wallet** | Official UI (MNF), CLI | `@midnight-ntwrk/mn-passport-core` + adapters |
-| **Agent** | AI agents (OWS) | agent adapter (§3.8) |
-| **dApp** | Partner dApps | `@midnight-ntwrk/mn-passport-connect` (thin, §3.9) |
+| 1. Thin typed wrappers | Typed bindings and injected providers. No kernel, no reactive surface. | Rejected as a target. It does not contain secrets or discipline state. |
+| 2. Layered core and adapters | A minimal kernel boundary, seams as adapter packages, observable reads, and imperative writes | **V1.** |
+| 3. Kernel, adapters, and a command bus | Each mutation goes through one pipeline: authorize, build, prove, broadcast, confirm. | The target end state. |
 
-The through-line that keeps them coherent: **scoped grants
-([C10]/[C11]/[C12]) are the universal authorisation currency.** Devices,
-agents, and dApps are all principals holding scoped grants on the ACC; they
-differ only in how a grant is *issued and gated* — device by passkey
-ceremony (§2.2), agent by OWS policy engine (§3.8), dApp by user consent
-plus ceremony (§3.9). One primitive, three issuance paths. The ACC ([C1]) is
-the seat of identity; everything else is a mediated interaction with it.
+V1 builds approach 2 with seams that already have the approach 3 shape. Thus,
+approach 3 is an evolution, not a rewrite.
 
-## 2. Reference stack
+## Packages
 
-Every candidate shares this layering; they differ only in how the core
-(shaded) is built.
+All packages publish under the `@midnight-ntwrk/` scope.
 
-```mermaid
-flowchart TB
-  UI["Official UI (MNF)"] --> FLOWS
-  CLI["CLI / scripts"] --> FLOWS
-  AGENT["AI agent"] --> CONNECT
-  DAPP["Partner dApp"] --> CONNECT["@midnight-ntwrk/mn-passport-connect — thin, C23"]
-  DAPP --> ONBOARD["@midnight-ntwrk/mn-passport-onboard — issuance facade (§3.13)"]
-  ONBOARD --> FLOWS
+### Entry libraries
 
-  subgraph CORE["@midnight-ntwrk/mn-passport-core — kernel + surface"]
-    FLOWS["Flow surfaces: onboard, connect, devices, grants, recover, assets, agents"] --> CMD["Command + state surface"]
-    CMD --> KERNEL["Kernel: ACC session, ceremony gate, witness lifecycle, grant registry"]
-    KERNEL --> SEAMS["Seams: signer, prover-router, storage/sync, indexer, recovery, DID, agent/OWS, dApp-connection"]
-  end
-
-  CONNECT -. "C23 protocol" .-> KERNEL
-  SEAMS --> ADAPT["Platform adapters: browser, node"]
-  ADAPT --> EXT["External: TEE prover (enclave) — direct for partner-origin issuance, wallet-infra provider, vendor keystore, indexer"]
-  KERNEL --> CHAIN["Midnight chain / ACC"]
-```
-
-The two dApp-side entry points differ deliberately: `connect` talks to the
-user's wallet **over the C23 wire** and never links the core;
-`onboard` (§3.13) **embeds** the core's onboard flow to issue an account at
-the partner origin — the recorded exception, detailed in §4.4.
-
-## 3. The three approaches
-
-Three ingredients are settled by the requirements, not in question:
-**(i)** typed, multi-package packaging with a clean wallet/dApp split;
-**(ii)** a kernel secret-boundary (one place touches decrypted secrets);
-**(iii)** a reactive state model so consumers can't recreate the
-prototype's state mess. The approaches differ only in **how many of these
-you adopt at v1** — an ambition ladder, not rival designs.
-
-### Approach 1 — Thin typed wrappers
-Typed ACC bindings + an `Account` facade + injected providers. No kernel,
-no reactive surface; the consumer wires everything. Essentially the
-prototype, cleaned and typed.
-*Buys:* kills the `any`-typing and browser/node duplication.
-*Leaves unsolved:* secret containment and state discipline — the two
-deeper prototype failures. **Reject as target** (it is, however, migration
-step 0).
-
-### Approach 2 — Layered core + provider adapters *(recommended v1)*
-Typed `Account` facade (imperative methods) + provider **seams** as adapter
-packages + a **minimal kernel boundary**: only the kernel decrypts secrets
-and enforces the ceremony. Reads are observable; writes are imperative (no
-full command bus yet).
-*Buys:* the critical security boundary, substitutable providers ([P8]),
-clean packaging — buildable for the October target.
-*Cost:* less state-flow discipline than Approach 3; disciplined by
-convention until the command bus lands.
-
-### Approach 3 — Kernel + adapters + reactive command bus *(target end-state)*
-Every seam has an **adapter** registered with the kernel; every mutation
-is a **command** through one pipeline (authorise → build → prove → submit →
-confirm), reactive state as the primary API. An adapter holding only a
-grant handle *structurally* cannot device-authorise.
-*Buys:* strongest secret containment (bounded blast radius per adapter)
-and state discipline; the natural home for agent access (§3.8) as an
-untrusted adapter.
-*Cost:* most upfront design; over-built if adapters stay few.
-
-### Recommendation
-**Build Approach 2 for v1, with the kernel boundary and seam interfaces
-already shaped like Approach 3 — so 3 is an evolution, not a rewrite.**
-Concretely: ship imperative flows over a real kernel secret-boundary and
-adapter-packaged providers now; promote seams to registered adapters
-and writes to a command bus as the agent and multi-consumer load justify
-it. Approach 1 is rejected as a destination because it fixes only the
-shallowest of the prototype's three failures.
-
-## 4. The recommended shape in detail
-
-### 4.1 Kernel (the trusted core — keep it small)
-The only code that ever holds decrypted secrets. Owns:
-- the **ACC session** and typed contract bindings;
-- the **witness / secret lifecycle** — decrypt under ceremony, expose an
-  *ephemeral handle* to build/prove, best-effort zeroise after ([C7]);
-- the **ceremony gate** (§2.2) — passkey PRF or password KDF;
-- the **private-state envelope** — seal/open, keyed independently of any
-  sync channel (§3.6);
-- the **grant registry** — which principals may act, at what scope.
-
-Invariant: secrets leave the kernel only as (a) an in-circuit witness to a
-local prover, (b) an enclave-encrypted preimage to a TEE prover, or (c) ciphertext
-to storage/sync. Never in plaintext to an adapter, a dApp, or an agent.
-
-### 4.2 Seams (adapters in the full model)
-Each is an interface with 2–3 interchangeable adapters; the provider-free
-default is always present (§2.1, [P8]):
-
-| Seam | Adapters | Req |
+| Package | Runs in | What it does |
 |---|---|---|
-| Signer / custody | managed anchor · local in-circuit Jubjub · interim hash-preimage | §2.1, §2.3 |
-| Prover (router) | in-tab wasm (low k) · provider-routed (proof returned, Passport broadcasts) · direct TEE, encrypt-to-enclave (prove + broadcast) | §2.5 |
-| Storage / sync | vendor keystore (native) · shared provider #58 · local-only | §3.6 |
-| Indexer / view-key | hosted · self-hosted | §3.6 |
-| Recovery | guardians + paper key | §3.4 |
-| DID | `did:midnight` | §3.7 |
-| Agent / OWS | OWS policy engine + credential | §3.8 |
-| dApp-connection | C23 wallet side | §3.2 |
-| External wallet connect (client) | EIP-6963/1193 · Solana Wallet Standard · CIP-30 · Midnight connector | §3.10 |
-| Fee / DUST sponsorship | user-held DUST · Capacity Exchange LP marketplace | §3.11, [C24] |
+| `mn-passport-core` | The Passport app (browser) | Onboarding, devices, grant issuance and revocation (the authorizer page of MIP §9), and recovery. It keeps private data through WPP and gives out the viewing key. It recognizes an account from the passkey and its largeBlob. It is not on the path of a dApp or an agent. |
+| `mn-passport-connect` | A dApp (browser) | The grant ceremony with the browser profile. The per-origin key provider. The signature of the ACC challenge with the grant key. The private-data handoff, then a private-state provider over the WPP package of the dApp. Pay with Passport. |
+| `mn-passport-connect/onboard` | A dApp (browser) | A separate entry point. It creates a Passport through a WaaS provider: deploy, activate, claim the name, and write the account metadata. It issues no grant. A dApp that only signs users in does not load it. |
+| `mn-passport-agent` | An agent backend (Node.js) | The grant ceremony with the agent profile. OWS as the key provider. On-chain grant reads, so that OWS can enforce the grant as its policy. A registry client that gets and runs the circuit of a dApp. |
 
-#### 4.2.1 The prover router (§2.5)
+### Foundation
 
-The one seam with real routing logic, so it is drawn out. The routing input
-is the circuit's **k** (against a measured, per-device-class threshold);
-the split below k is a **trust** choice, and the two remote variants differ
-in **who broadcasts**:
-
-```mermaid
-flowchart TB
-  CMD["proving request (preimage embeds witness)"] --> K{"k ≤ device threshold?"}
-  K -- yes --> WASM["1 · in-tab WASM prover (Web Worker)\nwitness never leaves the device"]
-  K -- no --> R{"remote variant"}
-  R --> PROV["2a · provider-routed\nwallet-infra provider → its proving vendor\nproof returned → Passport balances + broadcasts"]
-  R --> TEE["2b · direct TEE proof server\npreimage encrypted to enclave key BEFORE send\nserver proves AND broadcasts → Passport awaits confirmation"]
-  WASM -. "capability failure → PROPOSE remote (manual consent)" .-> R
-```
-
-Rules carried by the router (all normative in §2.5): the preimage is
-**encrypted to the prover's enclave key before it leaves the device** on
-both remote variants — the SDK does *not* verify enclave attestation
-(that is the provider's / upstream's responsibility; the SDK trusts the
-enclave key it is given); in 2b the fee-payer / balancing order is an
-explicit prerequisite ([C24]); proof provenance — where it was proved
-*and who submitted it* — is surfaced truthfully to the user as a
-first-class pipeline event (§4.3); and **the in-tab → remote fallback is
-consent-gated** — a capability failure *proposes* the remote prover and the
-transaction pauses for explicit user confirmation (moving off-device is a
-privacy downgrade, §2.5), after which the SDK shows a standing reminder that
-remote proving is active.
-
-### 4.3 Command + state surface
-- **Reads:** an observable projection of ACC state + session (devices,
-  grants, balances, names), rebuilt from indexer + local storage — the
-  source of truth, replacing the prototype's per-render `ctx` bag and
-  module singletons.
-- **Writes:** commands through one pipeline, emitting an event per stage
-  (proof provenance, §2.5, is a first-class event here). Instance-scoped
-  and disposable — multi-account, no globals.
-
-### 4.4 Packaging
-
-Dependency rule: everything points **inward** to `@midnight-ntwrk/mn-passport-core`'s
-interfaces; nothing points outward. `@midnight-ntwrk/mn-passport-connect` links neither the
-core nor any adapter — only the shared protocol types and the contract
-bindings (for §3.12 deposits) — so a dApp can never pull the kernel into
-its bundle. **One recorded exception sits beside it:**
-`@midnight-ntwrk/mn-passport-onboard` (§3.13) deliberately *does* link the
-core and adapters, because partner-origin issuance is custody work — it is
-a composition facade, never a reimplementation, and its threat model is
-stated rather than hidden (ADR 0005). The `connect` rule itself is
-unchanged.
-
-**Foundation**
-
-- **`@midnight-ntwrk/mn-passport-protocol`** — the shared wire types and the C23 connection
-  protocol (EIP-6963 discovery, CAIP-25-shaped requests,
-  Sign-In-with-Passport messages). Deliberately dependency-light so *both*
-  the wallet side and the thin dApp connector share it without either
-  pulling in the other. No logic — just contracts. Also home to the
-  **onboarding and key-authorisation shared constants** (§3.13): the Passport RP ID
-  (config-overridable), the PRF device-key salt, and the versioned largeBlob
-  payload schema — the three things the partner package and the Passport app
-  must agree on. Types and constants only, as ever: the blob's pure codec
-  lives in `core`.
-- **`@midnight-ntwrk/mn-passport-contract`** — typed bindings and the exported pure
-  commitment circuits over the **externally-owned, versioned ACC artefact**
-  (§8.2). Wraps the contract team's published build (compiled module, ZK
-  asset manifest, generated types) and owns the connect-time version guard
-  (the compatibility contract). The SDK never owns or compiles the
-  contract.
-
-**Core**
-
-- **`@midnight-ntwrk/mn-passport-core`** — the platform-neutral heart. Contains the **kernel**
-  (ACC session, ceremony gate, witness / secret lifecycle, private-state
-  envelope, grant registry), the **command + state surface**, the **flow
-  surfaces** (onboard, connect, devices, grants, recover, assets, agents),
-  and the **seam interfaces** (signer, prover, storage/sync, indexer,
-  recovery, DID, agent, dApp-connection). Holds **no** platform code (`fs`,
-  `window`, `fetch`) and **no** concrete provider — only interfaces; this is
-  what keeps it portable and unit-testable. Depends on `@midnight-ntwrk/mn-passport-contract`
-  and `@midnight-ntwrk/mn-passport-protocol`.
-
-**Platform adapters** — dedupe the prototype's `providers.ts` ≈
-`node/wallet.ts` split into one core plus two thin wirings.
-
-- **`@midnight-ntwrk/mn-passport-adapter-browser`** — wires the seams to browser APIs:
-  `FetchZkConfigProvider` (ZK assets over HTTP), WebAuthn **PRF passkeys**
-  for the ceremony — including the Related-Origin-Request credential
-  creation and the bundled PRF + largeBlob assertions the §3.13 issuance
-  and recognition flows need (the `Platform.ceremony` extension; `core`
-  never learns WebAuthn exists) — the in-tab wasm prover (Web Worker),
-  browser storage / vendor keystore, `fetch` and `WebSocket`. The default target — Passport
-  is browser-first. Consumed by the Official UI (MNF) and web dApps
-  embedding the wallet.
-- **`@midnight-ntwrk/mn-passport-adapter-node`** — wires the same seams to Node.js so the SDK
-  runs **server-side**: filesystem ZK-asset loading (`NodeZkConfigProvider`),
-  disk-backed private state (LevelDB), the `ws` WebSocket, Node crypto, and
-  a **non-WebAuthn ceremony / signer** (WebAuthn is browser-only, so on Node
-  the presence factor is a file / env or hardware key, or — for an agent —
-  a policy-gated credential rather than a passkey). Consumers: the **CLI**,
-  automated / E2E tests, backend services, and **agent runtimes** (an OWS
-  agent or MCP server runs in a Node process and cannot perform a passkey
-  ceremony, which is why the agent path is policy-gated, §3.8). This is the
-  package that makes the CLI and agent faces possible.
-
-**Seam adapters** — `@midnight-ntwrk/mn-passport-adapter-*`, each implementing one core seam
-interface and depending only on that interface plus its own provider SDK;
-the provider-free default always ships.
-
-- **`adapter-signer-managed`** — managed custody (§2.1, §2.6): the wallet-infra
-  provider (embedded WaaS or extension) authenticates the user and gates the
-  ACC device secret via a `signMessage` presence gesture; ACC calls run via
-  midnight-js. The provider is the auth / presence layer, not the
-  contract-call signer. v1 target: the §2.3 cryptographic binding.
-- **`adapter-signer-local`** — decentralised custody: the PRF-derived Jubjub
-  device key verified in-circuit, plus the interim hash-preimage signer
-  behind the same interface until Schnorr lands (§2.3).
-- **`adapter-prover-wasm`** — the in-tab wasm prover (lifted from the prototype
-  worker) for small-k circuits (§2.5).
-- **`adapter-prover-remote`** — the remote-proving client for high-k
-  circuits, three modes (§2.5, provider-integration.md): **provider-routed**
-  (the provider routes the sealed payload; the service proves, balances,
-  sponsors, and binds in one process; the SDK broadcasts — the managed
-  path's decided topology), **direct service** (same wire contract, called
-  by Passport itself — the §3.13 partner-origin path, ADR 0005), and
-  **direct TEE prove-and-broadcast** (the server also submits; deferred).
-  **Encrypts the preimage to the prover's enclave key before sending** in
-  every mode; enclave attestation is the provider's responsibility on the
-  routed mode and a **Passport-pinned published key** on the direct mode
-  (provider-integration §5.1).
-- **`adapter-storage-vendor`** — native vendor-keystore sync adapter (§3.6).
-- **`adapter-storage-shared`** — the shared private-storage provider (#58)
-  adapter; also the source for dApp witness provisioning (§3.9).
-- **`adapter-recovery`** — guardian + paper-key total-loss recovery
-  (§3.4, [C14]/[C15]).
-- **`adapter-did`** — `did:midnight` create / resolve (§3.7).
-- **`adapter-agent-ows`** — wraps WingRiders' `ows-core` (its Midnight
-  plugin) and maps OWS agent access onto Passport scoped grants; the agent's
-  "key" is a grant authoriser on the ACC, never the account key (§3.8).
-- **`adapter-dapp-connection`** — the wallet side of C23: answers discovery,
-  Sign-In-with-Passport, and scoped-grant requests (§3.2).
-- **`adapter-wallet-connect`** — the wallet-connector **client**: Passport
-  connecting *out* to external wallets (Lace, 1am, Gero, MetaMask, Rabby,
-  Phantom), one adapter per standard (§3.10). The opposite direction to
-  `adapter-dapp-connection`; foreign-curve wallets attach via the §2.3 binding.
-- **`adapter-fee-capacity-exchange`** — the Fee seam's sponsored fill
-  (§3.11): wraps the upstream Capacity Exchange SDK — LP quote requests
-  (pure API, off-chain), quote selection, composition of the LP's partial
-  transaction (DUST intent + payment leg) with the user's dApp intent, and
-  quote expiry / replay / abandonment handling. User-held DUST remains the
-  provider-free default in core.
-
-**dApp side**
-
-- **`@midnight-ntwrk/mn-passport-connect`** — the **thin** connector a third-party developer
-  installs (§3.9). Implements the dApp end of C23 over `@midnight-ntwrk/mn-passport-protocol`:
-  Sign-In-with-Passport, scoped-grant requests, and requesting
-  Passport-provisioned witnesses. Also exposes the **deposit function**
-  (§3.12: resolve name → connect to the recipient's ACC → call the deposit
-  circuit) — the one direct chain interaction, riding
-  `mn-passport-contract` rather than the C23 channel. Minimal footprint,
-  own threat model; talks C23 *to* the wallet across a trust boundary and
-  **must not link `@midnight-ntwrk/mn-passport-core`** or any adapter
-  (`mn-passport-contract` is a foundation dependency, permitted).
-- **`@midnight-ntwrk/mn-passport-onboard`** — the partner-origin **issuance
-  facade** (§3.13, [`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md)). A
-  narrow API (`createPassport`, `signIn`, `capabilities`) that is
-  composition only: it
-  instantiates the `core` kernel with the browser platform adapter, the
-  PRF-derived local signer (the provider-managed variant is a future
-  iteration), the remote prover connected **directly** to the third-party
-  proving and DUST sponsorship service, and sponsored settlement, then runs
-  `core`'s own onboard / sign-in flows. Links `core`
-  and adapters **by design** — issuance is custody work, and one kernel
-  implementation beats a duplicated one; the trade is recorded in ADR 0005.
-  Exposes no lifecycle surface beyond issuance and recognition.
-
-```mermaid
-flowchart LR
-  PROTO["@midnight-ntwrk/mn-passport-protocol"]
-  CONTRACT["@midnight-ntwrk/mn-passport-contract"]
-  CORE["@midnight-ntwrk/mn-passport-core"]
-  CAPS["@midnight-ntwrk/mn-passport-adapter-*"]
-  BROW["@midnight-ntwrk/mn-passport-adapter-browser"]
-  NODE["@midnight-ntwrk/mn-passport-adapter-node"]
-  CONNECT["@midnight-ntwrk/mn-passport-connect"]
-  ONBOARD["@midnight-ntwrk/mn-passport-onboard"]
-
-  CORE --> CONTRACT
-  CORE --> PROTO
-  CAPS --> CORE
-  BROW --> CORE
-  BROW --> CAPS
-  NODE --> CORE
-  NODE --> CAPS
-  CONNECT --> PROTO
-  CONNECT --> CONTRACT
-  ONBOARD --> CORE
-  ONBOARD --> BROW
-  ONBOARD --> CAPS
-  ONBOARD --> PROTO
-  ONBOARD --> CONTRACT
-```
-*Arrows read "depends on". `@midnight-ntwrk/mn-passport-connect` reaches only
-`@midnight-ntwrk/mn-passport-protocol` and `@midnight-ntwrk/mn-passport-contract`
-(deposit bindings, §3.12) — never the core or an adapter.
-`@midnight-ntwrk/mn-passport-onboard` is the recorded exception in the other
-direction: a facade that links the core and adapters because issuance is
-custody work (§3.13, ADR 0005).*
-
-### 4.5 Private storage and backup
-
-The mobile-web constraints (§8.5) force this model; resolve it in three
-moves.
-
-**1. Classify state by what it takes to get it back on a new device.**
-
-| Tier | Examples | On a new device |
-|---|---|---|
-| **Regenerable** | device key (passkey PRF), chain-visible state (view-key + indexer) | Re-derived / re-synced — no stored copy needed |
-| **Irreplaceable** | genuinely user-supplied private inputs / dApp witness data | **Cannot be regenerated — recoverable *only* from a durable backup. The data the storage system exists to protect.** |
-| **Recovery material** | recovery secret / shares | Preserved and restored by the recovery protocol ([C14]/[C15], guardians) — not the private-state backup |
-| **Cache / metadata** | name, ACC address, grant refs, sync cursor | Rebuilt from chain |
-
-The **irreplaceable** tier is the crown jewels: neither on-chain nor
-re-derivable, so if the local store is evicted *before* a durable backup
-exists it is gone permanently — potentially locking the user out of their
-private state. Its backup is the **critical path**, not a footnote. Two
-levers keep it small and safe:
-
-- **Shrink it by derivation.** Every secret that *can* be derived from the
-  passkey-PRF root under a domain-separated salt (as the device key already
-  is) should be — moving it into the *regenerable* tier, where it needs no
-  backup. Only truly user-supplied data stays irreplaceable.
-- **Preserve recovery material via the recovery protocol** ([C14]/[C15]),
-  not local backup — guardians / paper key are its durability story.
-
-**2. Local store — IndexedDB, ciphertext only.** IndexedDB is the durable
-local substrate on every mobile engine (OPFS for large *non-secret* assets
-such as staged ZK params). It holds only **ciphertext**: each entry is
-`{version, nonce, ciphertext}`, keyed per account / context. A per-entry
-data key is wrapped by a **ceremony-derived** key (passkey PRF, or password
-KDF); plaintext and the wrapping key materialise only transiently inside
-the kernel after a §2.2 ceremony. So device theft or an IndexedDB read
-(XSS, extracted backup) yields ciphertext only. **Decided:** the wrapping
-key is the **passkey (PRF)**, falling back to a **password (KDF)** on
-devices without passkey/PRF support (§2.2). Residual lock+key risk — passkey
-and ciphertext in the same vendor cloud — is mitigated by routing the backup
-copy through the portable #58 provider rather than the vendor keystore
-(§3.6); any remaining exposure is an accepted risk in the security register.
-
-**3. Backup — mandatory and redundant for the irreplaceable tier.**
-IndexedDB is an evictable cache that mobile browsers do not replicate across
-devices (§8.5), so the irreplaceable tier MUST have a durable backup, and
-the SDK should treat *a confirmed durable backup exists* as a precondition
-before the user accrues irreplaceable state. Redundant paths over the
-Storage/sync seam:
-
-- **Portable (web + cross-ecosystem):** the shared private-storage provider
-  (#58) holds the ciphertext copy — the durable source of truth; the
-  provider sees ciphertext only.
-- **Native:** vendor keystore (§3.6) as the on-platform fast path.
-- **User-held:** an exported encrypted backup / recovery phrase.
-- Regenerable and cache/metadata tiers are never backed up — re-derived
-  from the passkey PRF and rebuilt from the indexer.
-
-On a recovery epoch bump ([C14]), rotate the data keys, re-seal, and
-re-upload. **Net properties:** for regenerable and metadata state, eviction
-≠ loss; for the irreplaceable tier, eviction ≠ loss **only if a durable
-backup exists** — which is why its backup is mandatory, not a floor.
-Provider compromise ≠ disclosure (ciphertext only); device theft ≠
-disclosure (needs the ceremony).
-
-### 4.6 Library composition — container view and worked examples
-
-§4.4's graph shows *dependency edges*; this shows the same packages as a
-**layered stack** (what sits on what), then works through concrete tasks so
-the composition is visible.
-
-> **Illustrative API.** The snippets below are indicative shapes to show
-> which library does what and how they compose — signatures are **not**
-> fixed and will be set when the packages are specced.
-
-**Container view.** Top tier calls down; nothing calls up. An adapter fills
-a `core` seam; `connect` is deliberately off to the side, reaching only the
-foundation packages (never `core`).
-
-```mermaid
-flowchart TB
-  subgraph T0["Consumers"]
-    UI["Official UI · CLI"]
-    AGENT["AI agent runtime"]
-    DAPP["Partner dApp"]
-  end
-  subgraph T1["Entry libraries"]
-    CORE["mn-passport-core — kernel + flows + seams (wallet / agent side)"]
-    CONNECT["mn-passport-connect — thin (dApp side)"]
-    ONBOARD["mn-passport-onboard — issuance facade (dApp side, links core)"]
-  end
-  subgraph T2["Adapters — fill core's seams"]
-    SIGN["adapter-signer-*"]
-    PROVE["adapter-prover-*"]
-    STORE["adapter-storage-*"]
-    FEE["adapter-fee-capacity-exchange"]
-    AGT["adapter-agent-ows"]
-    WC["adapter-wallet-connect"]
-  end
-  subgraph T3["Foundation"]
-    CONTRACT["mn-passport-contract — typed ACC bindings"]
-    PROTO["mn-passport-protocol — C23 types"]
-  end
-  subgraph T4["External / ecosystem"]
-    MJS["midnight-js + ledger"]
-    WASM["zkir-v2 wasm"]
-    PROV["wallet-infra provider · remote prover"]
-    DCA["dapp-connector-api"]
-  end
-  CHAIN["Midnight chain / the user's ACC"]
-
-  UI --> CORE
-  AGENT --> CORE
-  DAPP --> CONNECT
-  DAPP --> ONBOARD
-  ONBOARD --> CORE
-  ONBOARD --> T2
-  ONBOARD --> CONTRACT
-  ONBOARD --> PROTO
-  CORE --> T2
-  CORE --> CONTRACT
-  CORE --> PROTO
-  CONNECT --> PROTO
-  CONNECT --> CONTRACT
-  CONNECT -. "C23 over the wire" .-> CORE
-  SIGN --> PROV
-  PROVE --> WASM
-  PROVE --> PROV
-  FEE --> PROV
-  WC --> DCA
-  CORE --> MJS
-  CONTRACT --> MJS
-  MJS --> CHAIN
-```
-
-#### Example 1 — Onboarding (wallet side): deploy the ACC, claim the name
-
-Libraries: `core` (orchestrates the flow + ceremony), `adapter-signer-local`
-(device authoriser), `adapter-prover-wasm` (proof), `mn-passport-contract`
-(ACC bindings, under `core`).
-
-```ts
-import { Passport }      from '@midnight-ntwrk/mn-passport-core';
-import { passkeySigner } from '@midnight-ntwrk/mn-passport-adapter-signer-local';
-import { wasmProver }    from '@midnight-ntwrk/mn-passport-adapter-prover-wasm';
-
-const passport = await Passport.create({
-  signer: passkeySigner(),   // WebAuthn PRF → in-circuit Jubjub (§2.1 decentralised)
-  prover: wasmProver(),      // in-tab, low-k (§2.5)
-  // storage / indexer / fees: provider-free defaults unless overridden
-});
-
-const account = await passport.onboard({ name: 'alice' });  // → alice.passport.night
-```
-
-Who did what: `core` runs the single onboarding ceremony; `signer` derives
-the device authoriser; `prover` proves the deploy in-tab; `mn-passport-contract`
-(inside `core`) shapes the ACC `deploy` call; `core` then claims the name via
-the C2 name service. **Progressive decentralisation is one line:** swap
-`signer: providerSigner(providerWallet)` (§2.6) for the managed path —
-same flow, same ACC.
-
-#### Example 2 — dApp side: sign in + request a scoped grant (two-sided split)
-
-Libraries: `mn-passport-connect` + `mn-passport-protocol` on the dApp side;
-they meet the user's `core` (`adapter-dapp-connection`) only over C23.
-
-```ts
-// in a partner dApp — installs ONLY the thin connector, never core
-import { connectPassport } from '@midnight-ntwrk/mn-passport-connect';
-
-const session = await connectPassport.signIn();        // Sign-In-with-Passport (C23); no keys cross
-const grant   = await connectPassport.requestGrant({   // scoped grant (C10/C11)
-  operation: 'withdraw', token: NIGHT, cap: 100n,
-});
-```
-
-Who did what: `connect` speaks the dApp end of C23 using `protocol` types; the
-user's `core` (wallet side) shows the consent ceremony (§2.2) and writes the
-grant to the ACC, which enforces it on-chain (C12). `connect` and `core` share
-no code — only the `protocol` contract over the wire.
-
-#### Example 3 — Pay a Passport account: the deposit (§3.12), `connect` + `contract`, no `core`
-
-Libraries: `mn-passport-connect` (exposes the deposit function),
-`mn-passport-contract` (deposit-circuit bindings + ZK assets).
-
-```ts
-import { depositTo } from '@midnight-ntwrk/mn-passport-connect';
-
-// resolve alice.passport.night → her ACC, call the deposit circuit;
-// proven, balanced and fee-paid by the SENDER's own wallet
-const { txId } = await depositTo('alice.passport.night', { token: NIGHT, amount: 25n });
-```
-
-Who did what: `connect` resolves the name (C2) and drives the deposit;
-`mn-passport-contract` supplies the deposit-circuit bindings. `core` is **not**
-imported — this is the live proof of the "connector links `protocol` +
-`contract`, never the kernel" rule (§4.4).
-
-#### Example 4 — Zero-DUST (sponsored) contract call: adapter composition in the pipeline
-
-Libraries: `core` (build + authorise + submit), `adapter-fee-capacity-exchange`
-(sponsor), `adapter-prover-*` (proof).
-
-```ts
-import { Passport }            from '@midnight-ntwrk/mn-passport-core';
-import { capacityExchangeFees } from '@midnight-ntwrk/mn-passport-adapter-fee-capacity-exchange';
-
-const passport = await Passport.create({ /* signer, prover, */ fees: capacityExchangeFees() });
-
-// user holds zero DUST — the fee adapter fetches LP quotes (pure API),
-// composes the sponsor's DUST-supplying partial tx, then the call proceeds
-await passport.account.grantWithdraw({ token: NIGHT, amount: 10n, to: recipient });
-```
-
-Who did what: `core` builds and authorises the call (device-secret witness,
-ceremony); `adapter-fee-capacity-exchange` fetches LP quotes and composes the
-partial transaction (§3.11); `adapter-prover-*` proves it; `core` balances with
-the sponsor leg and submits. Same `grantWithdraw` call whether fees come from
-the user's DUST or a sponsor — the adapter is invisible to the flow.
-
-#### Example 5 — The `protocol` library: one wire-contract, both sides type-checked
-
-`protocol` has **no runtime** — it is *only* the shared message types both
-ends of the C23 conversation compile against. That is exactly why it is hard
-to picture: you never call it, you import types from it. Concretely, a grant
-request:
-
-```ts
-// ── @midnight-ntwrk/mn-passport-protocol ──  types + constants only, zero logic
-export const PROTOCOL_VERSION = 1;
-export interface GrantRequest {
-  version:   typeof PROTOCOL_VERSION;
-  operation: 'withdraw' | 'transfer';
-  token:     TokenId;
-  cap:       bigint;
-  expiresAt: number;
-}
-export interface GrantResponse { granted: boolean; grantId?: string }
-```
-
-```ts
-// ── dApp side (mn-passport-connect) BUILDS the request ──
-import { PROTOCOL_VERSION, type GrantRequest } from '@midnight-ntwrk/mn-passport-protocol';
-
-const req: GrantRequest = {                 // ← type-checked against the shared shape
-  version: PROTOCOL_VERSION,
-  operation: 'withdraw', token: NIGHT, cap: 100n,
-  expiresAt: Date.now() + 3_600_000,
-};
-transport.send(req);                        // over the wire (postMessage / EIP-6963 channel)
-```
-
-```ts
-// ── wallet side (inside mn-passport-core) HANDLES it ──
-import { type GrantRequest, type GrantResponse } from '@midnight-ntwrk/mn-passport-protocol';
-
-async function onGrantRequest(msg: GrantRequest): Promise<GrantResponse> {
-  // msg is the SAME type the dApp built — validate, ceremony-gate (§2.2), write to the ACC
-}
-```
-
-Why it earns its own library — the part a diagram can't show:
-
-- **Both sides import `GrantRequest` from `protocol`; neither imports the
-  other.** Change the shape in `protocol` (say `cap` becomes
-  `{ token; amount }`) and **typecheck breaks on the dApp builder and the
-  wallet handler at the same time** — they cannot silently drift apart. That
-  lockstep *is* the job.
-- **It is what lets `connect` stay `core`-free.** The only thing the thin
-  dApp package and the wallet share is these types. If they lived in `core`,
-  `connect` would have to depend on `core` — dragging the kernel into every
-  dApp bundle (§4.4). A logic-free shared package is what makes the trust
-  boundary enforceable rather than aspirational.
-- **No logic means no trust surface.** `protocol` ships types plus constants
-  (version, error codes, topic names) and nothing executable — importing it
-  on either side adds a *contract*, not attack surface.
-
-Mental model: it is the `.proto` / OpenAPI schema of the wallet↔dApp
-conversation — the shared definition two independent parties agree on, owned
-by neither. (Per §4.4 it likely *extends* Midnight's `dapp-connector-api`
-types with the Passport-specific messages, and may ship as a module rather
-than a standalone package at v1.)
-
-**Two version axes — do not conflate them.** `protocol` versioning is *not*
-the SDK↔contract compatibility; they are independent:
-
-| Axis | Between | Owned by |
-|---|---|---|
-| **Wire** | the dApp's connector and the user's wallet (off-chain C23 messages) | `mn-passport-protocol` (`PROTOCOL_VERSION`) |
-| **Binding** | the SDK's contract bindings and the deployed ACC (on-chain circuit shape) | `mn-passport-contract` (§8.2 compatibility contract) |
-
-A dApp built last quarter (`connect@1.2`, protocol v1) can hit a
-freshly-updated wallet (`core@1.9`, protocol v2) — the *wire* axis, which
-`protocol` negotiates because the two parties upgrade independently.
-Separately, that wallet's SDK 1.54 carries `mn-passport-contract` bindings
-for on-chain ACC v1.20 and guards the match at connect time (§8.2) — the
-*binding* axis. "Contract v1.20 with SDK 1.54" is the binding axis;
-`protocol` never sees it.
-
-#### Example 6 — Partner-origin issuance: the `onboard` facade (§3.13)
-
-Libraries: `mn-passport-onboard` — which internally wires `core` (kernel +
-onboard/sign-in flows), `adapter-browser` (WebAuthn/ROR ceremonies),
-`adapter-signer-local` (PRF-derived authoriser), and `adapter-prover-remote`
-(direct to the third-party proving and DUST sponsorship service); shared
-constants from `mn-passport-protocol`. Design:
-[`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md).
-
-```ts
-// in the partner dApp — one import; core + adapters ride along inside
-import { capabilities, createPassport, signIn } from '@midnight-ntwrk/mn-passport-onboard';
-
-// 0 · Gate first: below the ROR/PRF floor, issuing here is impossible —
-//     hand the user to first-party onboarding instead.
-const cap = capabilities();
-if (!cap.canIssueHere) {
-  location.href = `https://midnightpassport.com/onboard?return=${location.origin}`;
-  // cap.reasons: e.g. ['no related-origin support', 'no PRF']
-}
-
-// 1 · Issue — two passkey prompts: create() under the Passport RP ID (ROR),
-//     ACC deployed via the third-party proving & DUST sponsorship service
-//     (fees sponsored), address stamped onto the credential (largeBlob).
-const passport = await createPassport({
-  user: 'nightfi-user',            // display label for the passkey sheet
-  // rpId: 'midnightpassport.com', // protocol default; override if the domain changes
-  // serviceUrl: '…',              // third-party proving & sponsorship endpoint
-  // indexerUrl: '…',              // all fields per FS-2.3 §4 OnboardConfig
-});
-console.log(passport.account);      // the deployed ACC address
-console.log(passport.credentialId); // remember it — helps providers that
-                                     // do not enumerate discoverable credentials
-
-// 2 · Recognise — one prompt: PRF re-derives the key, the blob returns the
-//     ACC address; on a blob miss the facade falls back to the indexer.
-const session = await signIn();
-console.log(session.account, session.publicKey);
-```
-
-Who did what: the facade instantiated the `core` kernel with the browser
-adapters and ran `core`'s own onboard and sign-in flows — the partner wrote
-none of that, and the heavy lifecycle (devices, grants, recovery, assets)
-simply is not exported. Contrast with example 2: `connect` talks to the
-user's wallet **over the C23 wire** and never links `core`; `onboard`
-**embeds** the custody core to issue an account at the partner origin — the
-recorded §4.4 exception. When the managed variant lands
-(onboarding-and-key-authorisation.md §5), the only change here is configuration: an
-`authoriser` option on the same two calls.
-
-Across the six: (1) wallet-side orchestration with adapters injected, (2) the
-cross-boundary two-sided split, (3) a thin-package chain call that never touches
-`core`, (4) adapter composition inside the write pipeline, (5) the shared
-wire-contract that keeps the two sides of the split in lockstep without either
-depending on the other, and (6) the issuance facade that embeds the core at a
-partner origin rather than reimplementing it.
-
-## 5. Security architecture
-
-The user's concern with the prototype was security; this is the layer that
-answers it. The design is a set of **trust boundaries** with explicit rules
-for what may cross each.
-
-```mermaid
-flowchart TB
-  subgraph TCB["Trusted core — sees decrypted secrets"]
-    KERNEL["Kernel: witness lifecycle, envelope keys, ceremony, grant registry"]
-  end
-  subgraph INPROC["In-process, secret-free"]
-    CAPS["Adapters: signer, prover-router, storage, indexer, recovery, DID"]
-  end
-  subgraph UNTRUSTED["Untrusted principals"]
-    DAPP["dApps via connector"]
-    AGENT["Agents — OWS, policy-gated"]
-  end
-  subgraph ANCHORS["External trust anchors"]
-    DYN["Wallet-infra provider — provider trust"]
-    TEE["TEE prover — provider-attested; SDK encrypts to its enclave key"]
-    VK["Vendor keystore — platform E2E"]
-    IDX["Indexer — sees view-key data"]
-  end
-  KERNEL -->|"scoped handles only"| CAPS
-  CAPS -->|"ciphertext, proofs, scoped ops"| ANCHORS
-  DAPP -->|"C23: consented, scoped"| KERNEL
-  AGENT -->|"policy-gated grant ops"| KERNEL
-  CAPS -->|"enclave-encrypted preimage only"| TEE
-```
-
-Each external anchor carries **one explicit trust assumption**: the
-wallet-infra provider is provider-trust; the remote prover is acceptable
-because the preimage is encrypted to its enclave key (§2.5) — the provider
-attests the enclave, the SDK does not; the vendor keystore is
-platform E2E and must not also hold the envelope key (§3.6); the indexer
-sees whatever the view-key discloses ([C17]).
-
-A ceremony-gated write, end to end:
-
-```mermaid
-sequenceDiagram
-  actor User
-  participant UI
-  participant Cmd as Command pipeline
-  participant Kernel
-  participant Prover as Prover router
-  participant Chain
-  UI->>Cmd: dispatch(withdraw, args)
-  Cmd->>Kernel: authorise(principal)
-  Kernel->>User: ceremony (passkey / password)
-  User-->>Kernel: presence
-  Kernel->>Kernel: decrypt witness (ephemeral)
-  Kernel->>Cmd: unproven tx + witness handle
-  Cmd->>Prover: prove(preimage)
-  Note over Prover: route by k — in-tab wasm | provider-routed | TEE encrypt-to-enclave (2b: server broadcasts)
-  Prover-->>Cmd: proof
-  Cmd->>Chain: submit
-  Chain-->>Cmd: confirmed
-  Cmd-->>UI: state projection + events
-```
-
-For an **agent** write, the `authorise` step resolves to an OWS
-policy-engine check against a standing grant instead of a human ceremony
-(§3.8) — the one exception to the per-transaction ceremony rule.
-
-## 6. Requirement → architecture map
-
-| Requirement | Lives in |
+| Package | What it does |
 |---|---|
-| Custody paths (§2.1) | Signer seam + kernel |
-| Ceremony (§2.2) | Kernel ceremony gate |
-| Signing / ECDSA binding (§2.3) | Signer seam; binding committed as an ACC device entry (kernel) |
-| Provider model (§2.4) | Seam interfaces + adapter packages |
-| Proving paths (§2.5) | Prover-router seam |
-| Onboarding (§3.1) | Onboard flow → kernel (deploy ACC) + signer, storage, DID seams |
-| dApp auth / authz (§3.2) | dApp-connection seam (wallet side) + grant registry |
-| Cross-chain MCS (§3.3) | Deferred post-v1 ([C25]); seam stub |
-| Recovery (§3.4) | Recovery seam + kernel (epoch re-auth) |
-| Multi-device (§3.5) | Kernel grant registry + signer seam |
-| Storage / sync (§3.6) | Storage/sync seam + kernel envelope |
-| DID (§3.7) | DID seam |
-| Agents / OWS (§3.8) | `adapter-agent-ows` wrapping WingRiders `ows-core`, mapped to ACC scoped grants |
-| dApp connector (§3.9) | `@midnight-ntwrk/mn-passport-connect` package |
-| External wallets (§3.10) | `adapter-wallet-connect` + §2.3 binding (kernel) |
-| DUST sponsorship (§3.11) | Fee seam (`adapter-fee-capacity-exchange`); the balance stage of the command pipeline |
-| Deposit mechanism (§3.12) | `mn-passport-contract` deposit bindings, surfaced via `mn-passport-connect` (dApps) and expected of ecosystem wallets |
+| `mn-passport-account` | The ACC client that the three entry libraries share. It builds and signs ACC challenges for each arm, and it reads grants on chain. It has the grant-ceremony client, the coin store, the inbox codec, payments, the transaction joiner, and the grant-scope helpers. It defines the shared seams. |
+| `mn-passport-contract` | Typed bindings over the published ACC artifact, the version registry, and the integrity checks. It loads the compiled module, the ledger decoder, and the manifest. It loads the ZKIR only for a client that verifies circuits. It accepts a partly deployed account. It publishes the interface of the ACC for dApp circuits, and it defines the registry seam. |
+| `mn-passport-protocol` | The MIP §9 messages: the grant request, the possession proof, the redirect response, and the sign-in message (MIP §10). It also carries the shared constants: the RP ID, the PRF salt, and the largeBlob schema. Types and constants only, with no logic. |
 
-## 7. What we lift from the prototype (quarry, not refactor)
+## Seams
 
-The prototype (`demo/mn-passport-foundations`) is a **validated quarry**,
-not the SDK skeleton. Lift:
-- `account.compact` and its seam design (epoch invalidation, `round` replay
-  counter, single `require_device`/`require_grant` auth seam, exported pure
-  commitment circuits) → **seeds the contract team's ACC** (§8.2); the SDK
-  consumes its published build via `@midnight-ntwrk/mn-passport-contract`.
-- the witness pipeline shape ([C7]) → kernel witness lifecycle.
-- the browser prover (`wasmProver.ts` + worker split) → prover-wasm
-  adapter.
+A seam is an interface with interchangeable adapters. A seam that more than one
+entry library uses lives in the foundation.
 
-Rebuild (do not port): the app orchestration (god components, logic in JSX
-closures), the `any`-typed provider boundary, the module-global singletons,
-and the in-memory-only private state. The `require_device` body remains the
-single swap-point where hash-preimage gives way to Jubjub Schnorr and the
-§2.3 binding.
+| Seam | Shape (indicative) | Defined in | Used by | Implemented by |
+|---|---|---|---|---|
+| Key provider | `scheme`, `envelope`, `publicKey()`, `sign(challenge)` | `account` | All three | The key providers below |
+| Prover | `prove(unprovenTx, circuitIds) → provenTx` | `account` | All three | `adapter-prover-remote` |
+| Broadcast | `broadcast(provenTx)`, then monitor until final | `account` | All three | `adapter-broadcast` |
+| Fees | A sponsor pays, or a Capacity Exchange swap | `account` | All three | `adapter-broadcast` (sponsor), `adapter-fee-capacity-exchange` |
+| Platform | Network, WASM load order, WebAuthn or its Node.js equivalent | `account` | All three | `adapter-browser`, `adapter-nodejs` |
+| Private state | The midnight-js `PrivateStateProvider` | `account` | `connect` (agents: open) | `connect`, over the WPP package of the dApp |
+| Account metadata | Namespaced, versioned entries; read, merge, write, read back | `account` | `connect/onboard`, `core` | `adapter-waas` |
+| Registry | Get dApp artifacts by content hash, and verify them | `contract` | `mn-passport-agent` | The registry adapter |
+| Storage | Ciphertext only: WPP packages, catalogs, conflict retention, backup states | `core` | `core` | `adapter-storage-wpp` |
+| Recovery | Guardians and paper keys | `core` | `core` | `adapter-recovery` |
+| DID | Create, link, sign, and resolve `did:midnight` | `core` | `core` | `adapter-did` |
 
-## 8. Open decisions and questions
+### Key providers
 
-1. **Core ambition — decided.** Approach 2 for v1 with Approach-3-shaped
-   seams, evolving to Approach 3.
-2. **ACC source ownership — decided.** The contract is **not owned by the
-   SDK**; it lives in a separate repository (or the same repository under a
-   different team). The SDK consumes a **versioned, published ACC artefact**
-   (compiled contract module, ZK assets, generated types) and owns only the
-   typed bindings over it. This decouples SDK releases from contract
-   recompilation and insulates the SDK from transientHash / toolchain
-   version instability ([C8]), which the contract team manages. Implies a
-   **compatibility contract**: an SDK version resolves against a supported
-   ACC version range (with its language / runtime pin).
-3. **v1 seam scope [open].** *Lean:* real at v1 — signer (managed +
-   interim local), prover (wasm + provider-routed; TEE next), storage
-   (local + vendor-native; #58 as it lands), indexer, dApp-connection,
-   agent/OWS. Interface-stubbed at v1 — full recovery helper ([C15]),
-   cross-chain ([C25]). Fee/sponsor ([C24]) was stub-leaning, but §3.11
-   (Capacity Exchange) is now a named requirement — whether
-   `adapter-fee-capacity-exchange` is real at v1 tracks the upstream launch.
-4. **Agent seam — decided: consume WingRiders `ows-core`.** Adopt
-   `ows-core` (its Midnight plugin) as the OWS implementation rather than
-   reimplement it; `adapter-agent-ows` wraps it and maps OWS agent access
-   onto Passport **scoped grants** (§3.8). Reconciliation with
-   contract-custody: the "key" OWS manages for an agent is a **grant
-   authoriser** on the ACC (a lesser, scoped, revocable key), so the ACC
-   stays the seat of authority and the agent never holds the account key.
-   `ows-core` is tracked as an upstream dependency (currency + cooldown).
-5. **Mobile web storage & persistence [open question — verify].** The UI
-   targets mobile browser / installed PWA. Current-knowledge findings (to
-   re-verify against current iOS/Android): there is **no arbitrary
-   local-file read/write** on mobile browsers — the File System Access
-   pickers are desktop-Chromium only. Durable storage is **IndexedDB** (all
-   engines) plus **OPFS** (origin-private sandbox, iOS Safari 15.2+ /
-   Android) for larger blobs; both hold ciphertext under the ceremony
-   envelope (§2.2). The real risk is **eviction**: iOS ITP caps
-   script-writable storage at ~7 days of inactivity, so local private state
-   can be deleted. `navigator.storage.persist()` and **installing the PWA
-   (Add to Home Screen)** improve durability, more reliably on Android than
-   iOS. OS keystore / real files stay native-only (reinforces §3.6:
-   vendor-keystore is a native adapter). **Design consequence:** on mobile
-   web, local storage MUST be treated as a *reconstructable cache*, not the
-   source of truth — the ACC is authoritative, the device key re-derives
-   from the passkey PRF (§2.1), and cross-device sync (§3.6) plus recovery
-   ([C14]) must cover eviction. *To verify:* current iOS `persist()` grant
-   behaviour and installed-PWA storage durability.
+A key provider holds a private key and signs an ACC challenge. The holder of a
+key makes the key, and the Passport app registers it as a device (full
+authority) or as a grant (scoped authority).
+
+```ts
+// Indicative shape; signatures are fixed when the package is specced.
+interface KeyProvider {
+  readonly scheme: 'jubjub' | 'k256' | 'p256';
+  readonly envelope?: 0 | 1; // k256 only
+  publicKey(): Promise<Uint8Array>;
+  sign(challenge: Challenge): Promise<Authorization>;
+}
+```
+
+| Key provider | Scheme | Usual registration | Lives in |
+|---|---|---|---|
+| Passkey | JubJub, from the PRF output | Device | `core` |
+| Passkey on secp256r1 | p256, `wa-json134` WebAuthn profile only | Device or grant | `core`, `connect` |
+| Embedded wallet of a WaaS provider | k256, envelope 0 | Device | `adapter-waas` |
+| Midnight connector wallet | k256, envelope 1 (`signData` with `ecdsa_secp256k1_sha256`) | Device, or a read-only grant | `core`, `connect` |
+| dApp per-origin key | JubJub, k256 (envelope 0), or p256 | Grant | `connect` |
+| Agent key in OWS | JubJub or k256 (envelope 0) | Grant | `mn-passport-agent` |
+
+[`sdk-requirements.md`](./sdk-requirements.md) owns the exact signing digests.
+
+## Adapters
+
+Each adapter implements one seam. It depends only on the package that defines
+the seam and on its own provider SDK.
+
+### Shared adapters
+
+dApps and agents need these adapters too. Thus, they implement seams from the
+foundation, never from `core`.
+
+| Adapter | Seam | Note |
+|---|---|---|
+| `adapter-prover-remote` | Prover | Transaction in, proof out. The prover holds the proving keys, or makes them again from the ZKIR and the on-chain verifier key. |
+| `adapter-broadcast` | Broadcast, fees | Gives the proven transaction to the sponsor, which pays the fees and broadcasts it. Monitors until final, with bounded waits and resubmission. |
+| `adapter-fee-capacity-exchange` | Fees | The other fee route: a swap through the Capacity Exchange. Planned for later. |
+| `adapter-browser` | Platform | The browser runtime: passkeys with PRF and the two WASM runtimes in the correct order. |
+| `adapter-nodejs` | Platform | The Node.js runtime for backends, `mn-passport-agent` included. |
+| `adapter-waas` | Key provider, account metadata | The embedded key of a WaaS provider (k256, envelope 0) and the metadata on it. It names no vendor. |
+| Registry adapter (name open) | Registry | Content-addressed fetch, verification, and a local cache. It makes the verifier key again from the ZKIR and the SRS, and compares it with the key on chain. |
+| `adapter-prover-wasm` | Prover | **After V1.** ACC proving keys are 112–224 MB, and the zkir WASM package has no key generation. |
+
+### Passport-app adapters
+
+Only `core` uses these adapters.
+
+| Adapter | Seam | Note |
+|---|---|---|
+| `adapter-storage-wpp` | Storage | The storage adapters of WPP, with Google Drive first. |
+| `adapter-recovery` | Recovery | Total-loss recovery through guardians and paper keys. |
+| `adapter-did` | DID | A wrapper over `midnight-did-api`. It makes the DID with the account and links it to the ACC. |
+
+## Dependency rules
+
+1. An entry library depends on the foundation. The foundation never depends on
+   an entry library.
+2. `mn-passport-account` depends on `mn-passport-contract` and
+   `mn-passport-protocol`. These two depend on no other SDK package.
+3. **`connect` and `mn-passport-agent` never link `core`**, and never link a
+   Passport-app adapter. Shared code goes into `mn-passport-account`.
+4. A shared adapter depends on the package that defines its seam, and on its own
+   provider SDK. It never depends on `core` or on a different adapter.
+5. A Passport-app adapter implements a seam from `core`. Only `core` uses it.
+6. `core` and the foundation hold no platform code (`fs`, `window`, `fetch`).
+   The platform adapters supply it.
+7. The SDK never compiles or owns the ACC. It consumes the published artifact.
+
+The workspace lint and the manifest test enforce these rules on each change.
+
+## The core kernel invariant
+
+The kernel in `core` is the only code that holds these secrets in plaintext:
+
+- the PRF output of the passkey, and the JubJub device key derived from it;
+- the WPP keys of the account: the account key, and the package keys derived
+  from it;
+- the viewing key.
+
+### Passkey devices: two arms
+
+A passkey can act as a device on two arms of the ACC. The arms differ in what
+reaches the code of the Passport app.
+
+| | JubJub arm (PRF) | p256 arm (`wa-json134`) |
+|---|---|---|
+| Signing key | A JubJub key that the kernel derives from the PRF output | The credential key of the passkey |
+| Where the key lives | In the memory of the kernel, for one operation only | In the authenticator. It never leaves it. |
+| What reaches the page | The PRF output, after a user tap | A WebAuthn assertion (a signature) only |
+| Exposure | Code that runs in the Passport app origin during the operation | None in the page |
+| Limits | The authenticator must support PRF | Exactly 134 bytes of `clientDataJSON` and a 21-byte origin |
+
+On the JubJub arm, the kernel derives the key, signs, and then discards the PRF
+output and the key. It never stores or sends them. The p256 arm gives a
+stronger boundary, because no secret enters the page.
+
+A device from a WaaS provider is outside the kernel. The provider holds that
+key, and the kernel gets only its signatures.
+
+### What leaves the kernel
+
+No secret leaves the kernel. Only these items, derived from the secrets, leave
+it:
+
+| Item | To | Condition |
+|---|---|---|
+| A signature over an ACC challenge | The prover, inside the transaction | A device operation in the Passport app |
+| The unproven transaction | The V1 prover | The prover sees the coin and the amount. The user is told. |
+| A key for one WPP package | One dApp | At the handoff, after a passkey tap and a separate consent. It opens only the package of that dApp. |
+| Ciphertext | WPP storage | Always |
+
+The viewing key is the one exception: it leaves the kernel whole. It goes to a
+holder of a read grant, after a separate consent. A revocation cannot take it
+back, so after Passport revokes a read grant, it rotates the encryption key of
+the account (`rotate_enc_key`).
+
+Three rules complete the invariant:
+
+- **The ceremony gate.** A passkey tap occurs when Passport issues a grant and
+  when the handoff completes. There is no tap for each call. The exception is a
+  grant key that is itself a passkey on the origin of the dApp.
+- **No device secret in a dApp or an agent.** The code of a dApp or an agent
+  holds only its grant key. The WaaS provider holds the embedded key, and a dApp
+  drives it only to onboard the user.
+- **Encryption to an enclave** becomes mandatory when a trusted-hardware prover
+  exists. Until then, the disclosure above applies.
+
+## Security boundaries
+
+```mermaid
+flowchart TB
+  subgraph APP["Passport app (trusted)"]
+    KERNEL["core kernel<br/>PRF output · WPP keys · viewing key"]
+  end
+  subgraph CLIENTS["dApps and agents (untrusted)"]
+    DAPP["dApp + connect<br/>grant key only"]
+    AGENT["agent + mn-passport-agent<br/>OWS grant key only"]
+  end
+  subgraph EXT["External services"]
+    PROVER["Prover<br/>sees coin and amount"]
+    SPONSOR["Sponsor<br/>pays fees, broadcasts"]
+    WAAS["WaaS provider<br/>full-authority key, reads metadata"]
+    WPP["WPP storage<br/>ciphertext only"]
+    IDX["Indexer<br/>sees what the viewing key opens"]
+  end
+  ACC[("The user's ACC<br/>enforces devices and grants")]
+
+  KERNEL -->|"issue_grant, add_device"| ACC
+  KERNEL -.->|"handoff: scoped package key,<br/>viewing key if read access"| DAPP
+  KERNEL -->|"ciphertext"| WPP
+  DAPP -->|"grant-scoped calls"| ACC
+  AGENT -->|"grant-scoped calls"| ACC
+  DAPP -->|"package ciphertext"| WPP
+  DAPP --> PROVER
+  AGENT --> PROVER
+  PROVER --> SPONSOR
+  SPONSOR --> ACC
+  WAAS -->|"signs as the first device"| ACC
+```
+
+Each external service carries the one trust assumption in its label. The WaaS
+provider needs the most trust: the account is only as safe as the signing
+security of the provider, and Passport tells the user this.
+
+The ACC is the last line of defense. It checks each grant on each call: the
+operations, the token color, the caps, the coin bound, the recipient pin, the
+caller pin, and the expiry.
+
+## Library composition examples
+
+> **Indicative API.** The snippets show which library does what. Signatures are
+> not fixed; each package spec fixes them.
+
+### Example 1: onboarding in the Passport app
+
+```ts
+import { PassportApp, passkeyKeyProvider } from '@midnight-ntwrk/mn-passport-core';
+import { browserPlatform } from '@midnight-ntwrk/mn-passport-adapter-browser';
+import { remoteProver } from '@midnight-ntwrk/mn-passport-adapter-prover-remote';
+import { sponsoredBroadcast } from '@midnight-ntwrk/mn-passport-adapter-broadcast';
+import { wppStorage } from '@midnight-ntwrk/mn-passport-adapter-storage-wpp';
+
+const app = await PassportApp.create({
+  platform: browserPlatform(), storage: wppStorage(),
+  prover: remoteProver({ url: proverUrl }), broadcast: sponsoredBroadcast({ url: sponsorUrl }),
+});
+
+const account = await app.onboard({ device: passkeyKeyProvider(), name: 'alice' });
+```
+
+`core` deploys the ACC in waves. The deploy planner packs the circuits within
+the 15,000-byte verifier budget, so the wave count comes from the artifacts.
+Then `core` activates the passkey as the first device and claims the name. The
+prover proves each wave, and `adapter-broadcast` gives it to the sponsor. If the
+user has the embedded wallet of a WaaS provider, the app can enroll it as a
+second device.
+
+### Example 2: onboarding in a dApp through a WaaS provider
+
+```ts
+import { createPassport } from '@midnight-ntwrk/mn-passport-connect/onboard';
+import { waasKeyProvider, waasMetadata } from '@midnight-ntwrk/mn-passport-adapter-waas';
+
+const user = await waasSdk.signIn(); // the WaaS provider's own SDK
+
+const passport = await createPassport({
+  device: waasKeyProvider(user), // k256, envelope 0: the first device
+  metadata: waasMetadata(user), // ACC address and viewing key, on the user's key
+  name: 'alice', prover, broadcast,
+});
+// Next: the usual grant ceremony (example 3). The dApp never uses this key again.
+```
+
+`connect/onboard` deploys the ACC, activates the embedded key of the provider as
+the first device, claims the name, and writes the account metadata. It issues no
+grant. The user approves the grant of the dApp in the Passport app, where the
+user signs in with the same provider.
+
+**Known risk.** During activation, the page of the dApp drives the signatures of
+the provider. A hostile dApp can try to get more than the activation signed.
+Realignment open question 15 decides the guard.
+
+### Example 3: connect, a joined call, and independent operation
+
+```ts
+import { PassportConnect } from '@midnight-ntwrk/mn-passport-connect';
+import { joinIntents } from '@midnight-ntwrk/mn-passport-account';
+
+const passport = PassportConnect.create({ platform, prover, broadcast });
+
+// 1. Redirect to the Passport authorizer page (browser profile).
+await passport.requestGrant({ operations: ['withdraw_shielded'], color: NIGHT, perCall: 10n, total: 100n });
+
+// 2. Back from the redirect: verify the grant on chain and take the handoff.
+const session = await passport.completeConnection(); // grant, private state, viewing key if read access
+
+// 3. Passport can close now. The dApp builds, signs, proves, and broadcasts.
+const accSpend = await session.grantSpend({ amount: 10n, to: dappContractAddress }); // intent 1
+const dappCall = await dappContract.callTx.claimAndRun(args); // intent 2, the dApp's own circuit
+await session.submit(joinIntents(accSpend, dappCall)); // write-back only after SucceedEntirely
+```
+
+After the redirect, `connect` reads the grant on chain and verifies the scope
+and the key binding. The handoff gives the dApp a scoped key for its own WPP
+package, and `connect` wraps it as a private-state provider.
+
+A called contract cannot run a witness. Thus, a shielded spend from the ACC
+starts its own intent, and the transaction joiner adds the intent of the dApp
+(`addIntent`, never `merge`). The dApp composes the call; the SDK supplies the
+ACC interface, the challenge, and the grant signature. The dApp writes its new
+state to WPP only after `SucceedEntirely`. If the write fails, the state stays
+local and the dApp tries again. [`dapp-connection.md`](./dapp-connection.md)
+owns the full flow.
+
+### Example 4: an agent call
+
+```ts
+import { PassportAgent, owsKeyProvider } from '@midnight-ntwrk/mn-passport-agent';
+import { nodePlatform } from '@midnight-ntwrk/mn-passport-adapter-nodejs';
+import { registry } from '@midnight-ntwrk/mn-passport-adapter-registry'; // name open
+
+const agent = PassportAgent.create({
+  key: owsKeyProvider(owsWallet), platform: nodePlatform(), registry: registry(), prover, broadcast,
+});
+
+const request = await agent.requestGrant({ label: 'Rebalancer', scope }); // show as a QR code or a link
+await request.approved(); // the readable scope and its salt
+
+const circuit = await agent.loadDappCircuit(contentHash); // verified against the on-chain verifier key
+await agent.call(circuit, 'rebalance', args); // reads the grant status first
+```
+
+The agent profile binds the agent key with a self-signature, a nonce, an
+expiry, and a label. It has no web origin. The Passport app shows that it
+validates an agent request. Before OWS signs, `mn-passport-agent` reads the
+grant on chain, so that OWS enforces the grant as its policy. The agent then
+operates with the Passport app closed.
+
+### Example 5: a payment to a shielded address
+
+```ts
+import { pay, parseShieldedAddress } from '@midnight-ntwrk/mn-passport-account';
+
+// The coin key and the encryption key come from one parse.
+await pay(account, { to: parseShieldedAddress(address), color: NIGHT, amount: 25n });
+```
+
+`pay` calls `withdraw_shielded_*`. The circuit takes the coin public key, and
+midnight-js needs the encryption public key to build the note for the
+recipient. Both halves come from one parsed address, never from two sources.
+Before the spend, the coin store reads the position of the change coin from the
+indexer. A payment to an unshielded `mn_addr` address calls
+`withdraw_unshielded_*`.
+
+### Example 6: a payment to another Passport
+
+```ts
+import { pay, resolvePassport } from '@midnight-ntwrk/mn-passport-account';
+
+const recipient = await resolvePassport('bob.passport.night'); // the ACC address
+await pay(account, { to: recipient, color: NIGHT, amount: 25n });
+```
+
+A payment to an account is a deposit, never a transfer to a raw address. From a
+Passport, `pay` joins `withdraw_shielded_to_contract_*` with the
+`deposit_shielded` of the recipient in one transaction. It seals a 192-byte
+inbox entry to the `enc_key` of the recipient. It reads that key at the time of
+the seal, and again on each retry. The transaction publicly links the two
+accounts. Unshielded value goes in through `deposit_unshielded`.
+
+### Example 7: the protocol messages
+
+`mn-passport-protocol` has no runtime. Both sides of the grant ceremony compile
+against its types, so they cannot drift apart.
+
+```ts
+// @midnight-ntwrk/mn-passport-protocol: types and constants only
+export const PROTOCOL_VERSION = 2;
+
+export type Binding =
+  | { profile: 'browser'; origin: string; possessionProof: PossessionProof }
+  | { profile: 'agent'; agentKey: PublicKeyRef; nonce: Nonce; expiresAt: number; label: string; selfSignature: Signature };
+
+export interface GrantRequest {
+  version: typeof PROTOCOL_VERSION;
+  grantee: GranteeKey;
+  scope: RequestedScope;
+  binding: Binding;
+}
+
+export interface GrantResponse {
+  grantId: GrantId;
+  scopeSalt: Salt;
+  approvedScope: ApprovedScope;
+  view?: ViewingKeyRef; // only with read access
+}
+```
+
+`connect` and `mn-passport-agent` build a `GrantRequest`, and `core` validates
+it on the authorizer page. Neither side imports the other. The wire axis
+(`PROTOCOL_VERSION`) is separate from the binding axis;
+[`compatibility.md`](./compatibility.md) owns both.
+
+## Sources
+
+- SDK realignment proposal:
+  [`2026-09-25-sdk-realignment.md`](./proposals/2026-09-25-sdk-realignment.md),
+  §4 to §9 and §13.
+- SDK deliverables:
+  [`2026-09-25-sdk-deliverables.md`](./proposals/2026-09-25-sdk-deliverables.md),
+  D1 to D5.
+- Package map:
+  [`2026-09-25-sdk-packages.svg`](./proposals/assets/2026-09-25-sdk-packages.svg).
+- ADR [0002](./adr/0002-m0-per-seam-specs-with-dev-defaults.md) (per-seam
+  specs) and ADR [0004](./adr/0004-artefact-hashes-committed-compiler-deterministic.md)
+  (artifact hashes).
+- Planning workspace (`midnightntwrk/passport`): the scoped-grants MIP (§9,
+  §10), the signature-schemes MIP (§2), `contract/GRANTS-CALLER.md`,
+  `contract/WEBAUTHN.md`, and PRs #170, #175, #176, and #180.
+- midnight-js `PrivateStateProvider` and `submitCallTx`, checked at
+  `v5.0.0-beta.7`.
