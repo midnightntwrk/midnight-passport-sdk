@@ -1,820 +1,551 @@
-# Midnight Passport SDK — High-Level Requirements (Draft)
+# Midnight Passport SDK requirements
 
-> **Scope of this document.** High-level requirements and design
-> principles — the *what* and *why* of the SDK. Detailed component specs,
-> architecture, and diagrams live in sibling docs under `sdk/docs/`:
-> [`architecture.md`](./architecture.md) (the *how*),
-> [`development-workflow.md`](./development-workflow.md) (how we build it),
-> and [`beta-scope.md`](./beta-scope.md) (the reduced first version).
+> **Status:** draft · 2026/10/14
+> **Owns:** what the SDK must do, and the normative rules (the MUSTs) that the
+> `conformance` lens checks.
+> **Companions:** [`architecture.md`](./architecture.md) (packages, seams, and
+> adapters), [`compatibility.md`](./compatibility.md) (the version axes), and
+> [`beta-scope.md`](./beta-scope.md) (what beta contains).
 
-> **Status:** draft · 2026/07/17
-> **Audience:** Passport prototype team, Midnight Foundation, partner wallet
-> and dApp developers.
-> **Traceability:** each requirement is anchored to a component canvas
-> (`[C…]`, [components](https://github.com/midnightntwrk/passport/blob/main/docs/plans/components/README.md)) or promise (`[P…]`,
-> [PROMISES.md](https://github.com/midnightntwrk/passport/blob/main/docs/plans/PROMISES.md)) so this document inherits
-> decisions already recorded there.
+## Summary
 
-## 1. Purpose
+- The **Account Custody Contract (ACC)** is the account of the user. It holds
+  the funds and enforces the rules. Each key on it is a **device** (full
+  authority) or a **grant** (scoped authority).
+- The holder of a key makes the key, and Passport registers it. One
+  **key-provider** interface serves each type of key.
+- **The Passport app** creates accounts, registers devices, issues and revokes
+  grants, keeps private data, and does recovery. Only it has full authority.
+- **A dApp or an agent** gets a grant through the grant ceremony. Then it
+  builds, signs, proves, and submits its own calls, with Passport closed.
+- **A passkey tap** occurs when Passport issues a grant and when the handoff
+  completes. There is no tap for each call.
+- **Transaction in, proof out.** The prover holds the proving keys. In V1, it
+  sees the coin and the amount, and the user is told.
+- **A user never holds or pays with DUST.** A sponsor pays the fees, or the user
+  swaps for them through the Capacity Exchange.
+- **A payment to an account is a deposit**, never a transfer to a raw address.
 
-The Passport SDK is the primary programmatic surface for Midnight Passport.
-It is the **main connector to the Account Custody Contract (ACC, [C1])**:
-every capability below is ultimately a mediated interaction with a user's
-account object on-chain.
+## The ACC: devices and grants
 
-The SDK is an **orchestrator, not a monolith**. It owns the flows and the
-interfaces; heavy or trust-sensitive machinery lives behind substitutable
-providers.
+The ACC is the durable identity of the user. Keys come and go, but the ACC
+stays. One ACC holds the device set, the grants, the name binding (for example
+`alice.passport.night`), the encryption key (`enc_key`), and the assets.
 
-### 1.1 The Account Custody Contract (ACC)
+**A device** has full authority. It can add and remove devices, issue and
+revoke grants, and spend. Only a device can issue a grant.
 
-The **Account Custody Contract** is the centre of the Passport
-architecture — the on-chain object that *is* the user's account. Identity
-in Passport is the ACC, not any key: keys are revocable authorisers *of*
-the account, while the ACC is the durable identity that outlives them.
-This inversion is what makes seedless onboarding, multi-device, revocation,
-and recovery possible at all ([C1], and the custody model in [C4]).
+**A grant** has scoped authority, with these limits:
 
-A single per-user ACC holds:
-
-- the **device set** — the authoriser keys that may act for the account
-  ([C5], [C9]);
-- the **name binding** — the account's `passport.night` sub-domain ([C2]);
-- **grants** — scoped, revocable capabilities issued to dApps and to the
-  user's own sessions ([C10], [C11], [C12]);
-- the user's **Midnight-native assets**, held statelessly in the contract
-  per the resolved custody model ([C4]).
-
-**The SDK interacts primarily with the ACC.** Almost every functional
-surface in §3 resolves to a read of, or an authorised state transition on,
-the user's ACC — onboarding deploys it, device and grant management mutate
-it, recovery re-authorises against it, and dApp connections write grants
-into it. Providers (§2.4) sit *beside* this relationship, supplying
-authorisers, storage, or settlement; they never replace the ACC as the
-seat of the account. Everything downstream in this document should be read
-against that centre.
-
-## 2. Design principles
-
-### 2.1 Multiple custody paths, progressive decentralisation
-
-The SDK does not bind to a single custody or authentication path. It
-presents multiple options behind stable interfaces and orchestrates
-whichever a deployment (or user) selects:
-
-- **Managed path (launch)** — wallet management is delegated to a
-  **wallet-infrastructure provider**, which for
-  **Midnight** offers an embedded Midnight wallet (WaaS) or connects an
-  extension (1am) and supplies auth (social / email / passkey), unified
-  balances, external-wallet connectors, on-ramps, and fee abstraction. In
-  the prototype's managed flow the provider is the **auth / presence layer
-  over the ACC**: it gates the ACC device secret, and ACC contract calls run
-  through midnight-js. Detailed surface by surface in §2.6. ([C9] managed
-  branch.)
-- **Decentralised path (target)** — the passkey-derived on-device key
-  (WebAuthn + PRF) is verified directly in-circuit by the ACC ([C1], [C5],
-  [C9]). No external provider sits in the trust path.
-
-**Progressive decentralisation is a first-class requirement.** Users start
-on the centralised solution and migrate toward decentralised components as
-they mature. Because identity lives in the ACC — not in any key — migration
-is an *authoriser swap*: add the decentralised device key to the account's
-device set, then retire the provider-held authoriser. Account identity,
-name, grants, and assets are untouched. The SDK MUST expose this migration
-as a supported flow, per path, per process (custody, recovery, signing).
-
-Providers are an option, never a dependency ([P8]'s substitutability:
-indexer [C17], helper [C15], sponsor [C24]). The provider-free path MUST
-remain viable at every release.
-
-### 2.2 User-presence ceremony on every transaction
-
-**Every transaction confirmation requires a passkey or password ceremony.**
-This is not (only) UX policy — it is how the witness-security model works:
-
-- Each connected dApp's private state / witness material is stored
-  **encrypted at rest** in wallet local storage ([C16], [C7]).
-- The decryption key is derived from the user ceremony — passkey (PRF
-  evaluation, preferred) or password (KDF fallback where PRF is
-  unavailable).
-- Witness decryption therefore *cannot happen* without user presence: no
-  silent signing, no ambient authority. A compromised app process without
-  the user cannot produce a proof.
-- Decrypted witness material is held in memory only for the duration of
-  proof generation ([C6], [C7]) and zeroised after.
-
-This holds on **both** custody paths: on the managed path the provider's
-enclave enforces the same passkey gate before its key shares participate;
-on the decentralised path the ceremony gates local witness decryption
-directly.
-
-### 2.3 Signing and external-identity binding
-
-**Account operations verify Schnorr-on-Jubjub in-circuit ([C5],
-unchanged for now).** Today Jubjub is the only curve with native Compact
-built-ins (`ecMulGenerator`, `ecMul`, `ecAdd`); P-256 / secp256k1 ECDSA
-inside a Compact circuit would require foreign-field arithmetic the
-language does not *currently* express, at ~15K–25K constraints per
-verification against a few hundred native (see
-[`p256-passkey-nightstream-prototype.md`](https://github.com/midnightntwrk/passport/blob/main/docs/reference/machine-investigation/p256-passkey-nightstream-prototype.md)).
-
-> **Landing soon.** ECDSA support is on the roadmap for both Compact and
-> the ledger. Once in-circuit ECDSA verification is available at
-> acceptable cost, the binding pattern below stops being a workaround and
-> becomes a *choice* — external ECDSA identities could then be verified
-> directly, or the account primitive itself could move to ECDSA. The
-> binding pattern is the correct design **until that lands**, and remains
-> valid after it as the cheap-routine-signing option regardless.
-
-The broader ECDSA ecosystem — WebAuthn passkeys (hardware-locked to P-256),
-the wallet-infrastructure provider's enclave-held ECDSA key, secp256k1
-wallets, secure enclaves, and HSMs — attaches through a **one-time signed
-binding** rather than a curve switch:
-
-- **ECDSA is the identity gate, Jubjub is the signing mechanism.** At
-  enrolment, the external ECDSA identity signs a binding message
-  authorising a Jubjub account key; the binding is committed against the
-  ACC as a typed device entry. Routine transactions verify cheap native
-  Schnorr — ECDSA never enters the routine proof path.
-- **Decentralised path** — the passkey's P-256 credential binds the
-  PRF-derived Jubjub device key.
-- **Managed path** — the v1 target is that the managed wallet's key
-  cryptographically anchors an ACC authoriser (portable, recoverable). In
-  the prototype the provider instead *gates* a browser-local device secret
-  via a `signMessage` presence gesture (§2.2), and that device secret
-  authorises ACC operations in-circuit. See §2.6 for the managed path in
-  full and the demo-grade gap to the true binding.
-- **External wallets** — an external wallet on any foreign scheme
-  (secp256k1, Ed25519) attaches as an authoriser through the same binding;
-  this is the mechanism behind external wallet connections (§3.10).
-
-This preserves the account-authorisation MIP draft, the validated
-`redjubjub-wallet` / `redjubjub-wallet-rs` experiments, the FROST threshold
-profile, and the `midnight-did-jubjub-schnorr` alignment (§3.7), while
-giving every ECDSA-native integration a first-class attachment point.
-
-### 2.4 Provider model
-
-Processes the SDK delegates behind provider interfaces:
-
-| Process | Launch provider | Decentralised counterpart | Anchors |
-|---|---|---|---|
-| Wallet management / signing | Wallet-infrastructure provider — embedded WaaS or extension wallet; auth / presence gate over the ACC device secret (§2.6) | On-device passkey-PRF Jubjub key, in-circuit verification | [C5], [C9] |
-| Account recovery | Provider recovery flows | Stateless guardians + paper keys | [C13], [C14], [C15] |
-| External wallet connectivity | Wallet-infrastructure provider (wallet connectors, on-ramps) | dApp-connection surface, cross-chain intents | [C23], [C25] |
-| Cross-chain (MCS) | Upstream MCS threshold-Schnorr | — (owned upstream) | [C25] |
-| Private storage / device-sync | Vendor keystore (native) or shared provider (#58) | Local-only (no cross-device sync) | [C16] · §3.6 |
-| Sync / indexing | Hosted indexer | Self-hosted indexer | [C17] |
-| Proving | Provider-routed (provider → its proving vendor, proof returned) · direct TEE proof server, encrypt-to-enclave (prove + broadcast) | In-tab WASM prover (low k) | [C6] · §2.5 |
-| Fees / DUST | Capacity Exchange LP marketplace (§3.11) | User-held DUST | [C24] |
-
-**Custody setup — waves.** At launch the wallet-infrastructure provider
-holds the anchor key in a **TEE / secure enclave** (single enclave-held
-key, passkey-gated). The provider's **MPC / threshold-signature (TSS)
-setup — distributed key shares, no single point of assembly — is a
-second-wave feature**; it hardens the managed anchor without changing the
-§2.3 binding to the on-chain Jubjub key, so it is transparent to the ACC
-and to consumers. *On **Midnight** the provider's embedded custody is its
-**WaaS wallet** (its embedded-WaaS Midnight connector), which the prototype
-uses;
-an extension (1am) is the alternative. Either way, in the prototype the
-provider is the auth / presence gate over a browser-local device secret, not
-yet the cryptographic ACC anchor — see §2.6.*
-
-### 2.5 Proving paths
-
-Proof generation ([C6]) is a **Prover seam** the SDK routes. What crosses
-the boundary is the proving *preimage*, which embeds the **witness** — the
-secret / key material decrypted under the §2.2 ceremony. Path choice is
-therefore a privacy decision first and a performance decision second. The
-seam itself is the ledger's two-method `ProvingProvider` (`check`,
-`prove`), so every path is drop-in behind one interface; the SDK's
-contribution is the routing policy and, on the remote paths, encrypting the
-preimage to the prover's enclave.
-
-**Routing is a k-threshold decision tree**, not a flat menu:
-
-1. **k low enough → in-tab WASM prover.** The `zkir-v2` prover runs in a
-   Web Worker on the user's device; the witness **never leaves the device**
-   — the strongest privacy posture, and the literal expression of [P8].
-   Suited to the small-k circuits (the Night, grant, device, and recovery
-   paths — sub-MB keys, seconds); requires one-time per-origin staging of
-   SRS slices and keys. Validated end-to-end in the account-custody
-   prototype. The k-threshold is a **measured, configurable** value per
-   device class, not a constant baked into the SDK.
-2. **k too high → remote proving**, two variants:
-   - **2a. Provider-routed.** The wallet-infrastructure provider
-     routes the proving payload to its remote proof-server vendor and
-     returns the **proof**; Passport balances (fees, [C24]) and
-     **broadcasts from Passport** (the §2.6 target flow).
-   - **2b. Direct remote proof server (prove + broadcast).** Passport calls
-     the remote proof server itself; the server proves **and broadcasts the
-     transaction**, and Passport **waits for on-chain confirmation** rather
-     than receiving the proof back. Passport must hand over everything the
-     broadcast needs — which makes fee-balancing order and the fee-payer
-     explicit prerequisites ([C24]: who balances and signs fees before the
-     server submits — Passport pre-balancing, or a sponsor at the server).
-
-**Confidentiality to the enclave (both remote variants).** The witness
-leaves the device in 2a and 2b — and in 2b the server additionally sees the
-full transaction — so it must reach the prover **encrypted to the enclave**.
-That encryption is the SDK's job: it seals the preimage to the remote
-prover's **enclave public key** before it leaves the device, so the server
-operator (outside the enclave) sees only ciphertext and only code running
-inside the enclave can decrypt and prove.
-
-**The SDK does not perform remote attestation.** Verifying enclave
-measurements, freshness, and vendor-specific quotes is deliberately out of
-scope — too heavy for the SDK. Establishing that the enclave key genuinely
-belongs to a real TEE running trusted code is the **provider's / upstream's
-responsibility**; the SDK consumes a trusted enclave key from that layer
-(for 2a, from the provider's proving vendor — §2.6). *Residual risk
-(accepted; security register):* confidentiality then rests on the
-**provenance of that enclave key** — a non-enclave key substituted upstream
-would defeat the encryption. That trust is delegated by design, not
-verified in the SDK.
-
-Routing inputs remain (a) custody path, (b) circuit k, (c) device
-capability, and (d) privacy posture, with a fallback ladder (in-tab →
-remote), which is **consent-gated, not silent** (see below). The prover
-actually used MUST be surfaced truthfully to the user ("proved in this
-browser" / "proved in a remote enclave" / "proved by the provider") — and
-in 2b, that the transaction was **submitted by the proof server** — proof
-provenance is a user-facing guarantee, not a diagnostic.
-
-**Privacy-downgrade consent (in-tab → remote).** In-tab proving keeps the
-witness on the device; any remote path (2a / 2b) sends it off-device
-(enclave-encrypted, but off-device, and under provider / enclave trust).
-Moving a user from in-tab to a remote prover is therefore a **privacy
-downgrade** and MUST NOT happen silently:
-
-- The SDK MUST capture **explicit, manual user confirmation** before the
-  first switch to a remote prover — including when the fallback ladder
-  would otherwise auto-fall-back on a capability failure (OOM / timeout /
-  missing params). A capability failure *proposes* the switch; it never
-  performs it unattended. The transaction pauses until the user chooses.
-- The confirmation MUST state plainly what changes: the witness leaves the
-  device to the (provider's) enclave, and the trust shifts from
-  "no one but you" to "the provider / enclave".
-- Once a remote prover is active, the SDK MUST **persistently remind** the
-  user of the setup — a standing indicator, not a one-time toast — so the
-  reduced-privacy posture is never silently forgotten, and MUST keep
-  reverting to in-tab (where the device supports it) one tap away.
-
-### 2.6 The managed path in detail
-
-The decentralised path is specified surface by surface below; this is its
-managed counterpart, grounded in the launch provider's actual Midnight
-integration.
-
-**Finding — the managed flow executes real ACC contract calls, with the
-provider as the auth / presence layer over the ACC (not the contract-call
-signer).** Grounded in the prototype's managed flow (branch
-`demo/mn-passport-dynamic-flow`, `experiments/account-custody-prototype`).
-The provider offers Midnight through *both* extension connectors (e.g.
-1am) and an **embedded WaaS wallet**; the prototype uses the embedded WaaS
-path. In it, the provider supplies social-login auth, the embedded Midnight
-wallet (addresses / balances / keys), and a `signMessage` **presence
-gesture**. The ACC **device secret** (the hash-preimage witness) is gated by
-that provider login, and ACC contract calls — deploy, deposit, grants,
-recover — then run through **midnight-js exactly as on the decentralised
-path**, balanced and submitted by the demo's genesis fee wallet (a C24
-shortcut) — **the provider is not in the contract-call path at all**. So the
-managed path needs only `signMessage` to *authorise* the ACC (the device
-secret does the in-circuit auth); it never asks the provider to sign the
-contract call. What it leaves unproven is who **balances and submits** the
-contract transaction in production — see the reconciliation gap below.
-
-| Surface | Managed path (launch provider) |
+| Limit | Meaning |
 |---|---|
-| Onboarding | Provider auth (social / email / passkey) via its app context; embedded Midnight wallet via its embedded-WaaS connector (or an extension via its wallet connectors). |
-| Custody / signing | ACC device secret gated by the provider login (a `signMessage` gesture); ACC contract calls run via midnight-js. The provider authenticates and holds the embedded wallet; it does **not** sign the contract calls. |
-| Addresses | Unshielded `wallet.address`; shielded / DUST via `additionalAddresses`; `getShieldedAddresses()` → coin + encryption public keys. |
-| Assets | `getBalances()` / `getShieldedBalance()` / …; `sendBalance({toAddress, amount})`, pool-routed (no cross-pool transfers). |
-| Proving | Provider routes to its remote proving vendor (§2.5 path 2a). |
-| Ceremony | The provider's `signMessage` / passkey gate (§2.2). |
-| External wallets / on-ramps | Provider connectors (§3.10 managed variant). |
+| Operations | The operations that the grant permits |
+| Token color | One token color |
+| Caps | A cap for each call, and a total cap |
+| Coin bound | A bound on the coins that a call can use |
+| Recipient pin | An optional fixed recipient |
+| Caller pin | An optional contract that calls the ACC directly (`kernel.caller()`) |
+| Expiry | The time after which the grant stops |
 
-**Reconciliation with the ACC — ACC-centric and demonstrated, with one
-caveat.** The managed flow produces a real ACC with device-secret auth and
-the full contract-call set, so the managed path *is* ACC-centric — one
-account model, progressive decentralisation preserved. *Authorisation* is
-settled: it is the device secret, not a provider signature, so the provider
-never signs the contract call. **But fee-payment and submission are a
-separate question the demo dodges:** the contract transaction is balanced
-and submitted by the **genesis wallet** (C24 out of scope), *not* by the
-provider. So whether the managed (provider-held) wallet can itself
-**balance and submit an arbitrary ACC contract transaction** — beyond
-`sendBalance` transfers — is **not proven** and is a verify item ([C24]: in
-production the managed wallet or a sponsor must pay DUST and submit).
+The ACC checks each limit on each call, and a client cannot bypass it. A caller
+pin checks only the immediate calling contract, not a browser origin or a fee
+payer. A read-only grant cannot carry a caller pin.
 
-*Remaining gap (the prototype is demo-grade here).* Its device secret is a
-**random, browser-local** value merely *gated* by the provider login — not
-cryptographically derived from or bound to the provider's key, and not
-portable
-(cross-browser reconnect deliberately fails). The v1 target is the true §2.3
-binding: the managed key cryptographically anchors the ACC authoriser so it
-is portable and recoverable, not just an auth gate over a local secret.
+**Revocation.** A device revokes one grant (`revoke_grant_with_*`) or all
+grants (`revoke_all_grants_with_*`). The removal of a device cannot remove a key
+that added a spare entry for itself (errata 7 and 8). Thus, the SDK must
+register a key as a device only if it is a device of the user. Each other
+platform, dApp, or agent gets a grant.
 
-**Target managed proving + submit flow (provider remote proof server,
-forthcoming).** The provider is working towards incorporating a remote
-proof server. Once it lands, the managed path splits cleanly along the
-existing seams — no redesign:
+## Keys
 
-1. **Build** — Passport builds the unproven ACC contract call and holds the
-   witness (device secret + private inputs).
-2. **Prove** — offloaded to the provider's remote proof server
-   (`adapter-prover-remote`, §2.5 path 2a) → returns the proof.
-3. **Balance / fees** — the provider's embedded wallet (or a sponsor) adds
-   DUST fee inputs and signs ([C24]).
-4. **Broadcast** — Passport submits the assembled, proven, balanced
-   transaction to the node (a trivial submit provider).
+### Key providers
 
-The managed path then reduces to **Passport = build + orchestrate +
-broadcast; provider = prove (+ fee-pay)**. Two caveats travel with it:
+A key provider holds a private key and signs an ACC challenge. The Passport app
+registers the key on one of two paths:
 
-- **Privacy / enclave encryption.** The proving payload embeds the witness,
-  so remote proving sends it to the provider's prover **encrypted to the
-  prover's enclave key** (§2.5) — that encryption is the SDK's job.
-  Attestation that the enclave is genuine is the **provider's**
-  responsibility, not the SDK's; confidentiality then rests on the
-  provenance of the enclave key (accepted residual risk). Pin down the
-  provider's enclave-key provisioning.
-- **Fees are not proving.** A proof server proves; it does not pay DUST.
-  "Just broadcast" holds only once the provider's wallet (or a sponsor) has
-  balanced and fee-paid the transaction ([C24]).
+| Path | Circuits | Authority | Where |
+|---|---|---|---|
+| Device | `activate_initial_device_with_*`, `add_device_with_*` | Full | The Passport app, or a dApp through a WaaS provider (first device only) |
+| Grant | `issue_grant_with_*` | Scoped | The Passport app, through the grant ceremony |
 
-## 3. Functional surfaces
+The SDK must supply these key providers:
 
-### 3.1 Onboarding orchestrator
-
-End-to-end account creation from a single ceremony:
-
-1. **Map the credential** — WebAuthn registration plus PRF evaluation to
-   derive key material ([C9]); on the managed path, provider onboarding
-   (email / social) followed by passkey creation.
-2. **Deploy the ACC** for the new account ([C1]).
-3. **Claim the name** — a free, first-come-first-served sub-domain of
-   `passport.night` (e.g. `alice.passport.night`) via the upstream name
-   service ([C2]).
-4. **Anchor the DID** — create the account's `did:midnight` identifier
-   (§3.7).
-
-A reduced form of this orchestration is also reachable **from a partner
-dApp** — steps 1–2 only (credential + ACC deploy; the name claim and DID
-anchor follow at the Passport app) via a Related Origin Request, detailed
-in §3.13.
-
-### 3.2 dApp authentication and authorisation
-
-The SDK is the client half of the dApp connection surface:
-
-- Authenticate to third-party Midnight dApps — Sign-In-with-Passport over
-  the CAIP-25-shaped, EIP-6963-discoverable connection protocol ([C23]).
-- Manage a distinct, **encrypted** private state per dApp ([C16], §2.2).
-- OAuth-style access: grant, scope, and revoke capabilities to dApps as
-  scoped grants, enforced chain-side ([C10], [C11], [C12]).
-- Every dApp-initiated transaction is confirmed by the user ceremony
-  (§2.2); the ceremony decrypts only *that dApp's* witness state.
-
-### 3.3 Cross-chain orchestration (MCS)
-
-- Bridge tokens in and out from external networks by producing user-signed
-  trade intents and consuming settlement confirmations across the upstream
-  Multi-Chain Signature boundary ([C25]).
-- The cross-chain machinery is owned upstream; the SDK integrates against
-  it. Passport-side integration is sequenced post-v1.0 initial release.
-
-### 3.4 Account recovery
-
-- Drive both recovery paths: lost-device revocation ([C13]) and total-loss
-  recovery via stateless guardians and paper keys, over the helper protocol
-  ([C14], [C15]).
-- On the managed path, recovery is delegated to the provider's flows; on
-  the decentralised path it runs against the ACC and on-device key material
-  directly. Migration between the two follows §2.1.
-
-### 3.5 Multi-device management
-
-- Add, list, and remove credentials against the account's device set —
-  including the 1-of-n / last-device guard ([C1], [C9], [C13]).
-- On the decentralised path, device authorisations are verified in-circuit
-  by the ACC; on the managed path they are delegated to the provider.
-- **Authorising additional keys (platforms and providers).** A
-  new platform — a Passport-embedding environment or a managed provider
-  needing its own authoriser key for the user; never a dApp, which
-  integrates through the connector (§3.9) and holds no account key — MUST
-  NOT write to the **authoriser key set**, and the proposal never touches
-  the chain at all. The platform generates its key per the §2.3 signing
-  requirements — a managed provider signs with its **P-256 secure-signer
-  key**, never passkey/PRF (PRF is the self-custody passkey mechanism) —
-  and **exposes a signed authoriser request out-of-band, preferably as a
-  QR code** (versioned payload: scheme tag, public key, the §2.3-derived
-  device commitment, account hint, nonce, expiry, bounded label, and a
-  self-signature over all of it — proof of possession and anti-replay).
-  The **Passport app scans it**, verifies the payload before any ceremony
-  UI, shows the fingerprint under the §2.2 ceremony, and — with an
-  existing authorised key — **approves the key into the authoriser key
-  set** through the existing `add_device(commitment)` circuit. The PWA is
-  the only party that receives the request and the only party that signs
-  the approval. No candidate storage, no cap, no new circuits — no ACC
-  change.
-  Full design: [`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md) §6.
-
-### 3.6 Private local-storage management
-
-- Persist and manage the wallet's encrypted private state on-device:
-  wrapped key material, sync state, name ownership, and per-dApp witness
-  state ([C16]), plus the view-key / indexer read path ([C17]).
-- The encryption envelope is keyed from the user ceremony (§2.2).
-- **In scope:** the shared private-storage provider —
-  midnightntwrk/passport#58.
-
-**Cross-device sync (backup and recovery).** Local private state must sync
-across a user's devices so a replacement device can be provisioned and so
-state survives device loss — answering the [C16] open question ("does
-wallet state sync, or does each device keep independent storage over a
-shared chain-derived view"). Four normative rules:
-
-- **Minimise what syncs.** Only *non-reconstructable* secrets sync —
-  chiefly per-dApp witness inputs and recovery material. Anything
-  re-derivable is never synced: the device authoriser key is re-derived
-  from the passkey PRF (§2.1) and chain-visible state is rebuilt from the
-  view-key / indexer ([C17]). This is what keeps the blob at a few KB.
-- **Encrypt before sync.** The blob is sealed under the **ceremony
-  envelope** (§2.2) before it leaves the device. **Decided: the envelope
-  key is the passkey (PRF); on devices without passkey/PRF support it falls
-  back to a password (KDF).** The transport sees ciphertext only. Residual
-  risk: the passkey syncs through the user's vendor account, so backing the
-  ciphertext up to that *same* vendor cloud would hand the vendor lock and
-  key together. **Mitigation:** route the backup copy through the portable
-  #58 shared provider (Passport-mediated), not the vendor keystore, so the
-  vendor holding the passkey never also holds the ciphertext. Where the
-  native vendor-keystore backup path is used regardless, the residual
-  lock+key exposure is an accepted risk (security register).
-- **Vendor keystore is one adapter, not the mechanism.** Device-vendor sync
-  (Apple Keychain synchronizable items / iCloud Keychain; Android Block
-  Store or Keystore-backed backup) is attractive — no Passport-operated
-  infrastructure, platform E2E encryption, KB-scale items — but it is a
-  **native-platform capability**: a browser / PWA cannot write sync blobs
-  to it, and it does **not** cross ecosystems (Apple ↔ Android, or either ↔
-  web). It is therefore the native adapter behind a **Storage / sync seam**
-  whose portable counterpart is the shared private-storage provider (#58);
-  the web path uses the latter or accepts no sync. Cross-ecosystem
-  multi-device ([P3]) is satisfied only by the portable adapter.
-- **Sync is not recovery.** Vendor-synced backup is a convenience and a
-  fast-provisioning path; it is not a substitute for total-loss recovery
-  ([C14]/[C15]), which must work even when the vendor account is lost. Keep
-  C14 as the floor and treat vendor sync as an optimisation layered above
-  it — never an undesigned recovery authority.
-
-### 3.7 DID integration
-
-The SDK integrates with the
-[`midnight-did`](https://github.com/midnightntwrk/midnight-did) project —
-the reference implementation of the **`did:midnight`** method ([C3]):
-
-- **Create / update** — the SDK drives DID operations through
-  `@midnight-ntwrk/midnight-did-api`, anchored to the same account the ACC
-  represents. DID creation is part of onboarding (§3.1).
-- **Resolution** — DID documents resolve via the `midnight-did-resolver`
-  services against the indexer; responses follow DID Core
-  (`didDocument`, `didResolutionMetadata`, `didDocumentMetadata`).
-- **Signature alignment** — `midnight-did` ships
-  `@midnight-ntwrk/midnight-did-jubjub-schnorr`; this is the same
-  Schnorr-on-Jubjub primitive as [C5]. The requirement is **one signing
-  primitive** across ACC authorisation and DID operations — the SDK MUST
-  NOT introduce a second key hierarchy for DIDs.
-- **Credentials** — verifiable credentials over DIDs are delivered by
-  `midnight-verifiable-credentials` and connect to the attestation /
-  selective-disclosure components ([C18]–[C21]); the SDK exposes them
-  through the same surface.
-
-Open (tracked in [C3]): the exact relationship between
-`alice.passport.night`, the ACC address, and the `did:midnight` identifier
-— alias vs distinct-layer.
-
-### 3.8 Agent access and management (OWS)
-
-The SDK is the entry point for AI agents the user provisions and manages
-from their Passport account, aligned with the **Open Wallet Standard
-(OWS)** — the standard for local wallet storage, delegated agent access,
-and policy-gated signing (agents act **without ever seeing a plaintext
-key**, gated by a pre-signing policy engine).
-
-**Decided: adopt WingRiders' `ows-core` as the OWS implementation** (its
-Midnight plugin) rather than reimplement OWS. Passport's
-`adapter-agent-ows` **wraps `ows-core`** and maps the OWS agent model onto
-Passport's own authority model:
-
-- An agent the user provisions **is an OWS credential bound to a scoped
-  grant on the ACC** ([C10]/[C11]). `ows-core` supplies the agent-facing
-  surface and the pre-signing policy engine; Passport's **scoped grants are
-  the on-chain authority**, enforced by the ACC ([C12]). Issue, scope,
-  monitor, and revoke through the grant lifecycle — the same primitive that
-  backs dApp connections, for a non-human principal.
-- **Two enforcement layers:** the OWS policy engine gates the operation
-  client-side *before* key use; the ACC verifier rejects out-of-scope
-  operations on-chain regardless of the client.
-- **Keys / witness never reach the agent or its LLM context.** The agent
-  holds a policy-gated handle to a **grant authoriser** — a lesser, scoped,
-  revocable key — never the device/account key. This is the reconciliation
-  between `ows-core`'s key/vault model and ACC contract-custody: the "key"
-  OWS manages for an agent is a Passport grant authoriser, not the ACC key,
-  so the ACC stays the seat of authority.
-- **Presence vs delegation.** The §2.2 per-transaction ceremony is the
-  *human-presence* gate; an autonomous agent cannot perform it — that is
-  the point of delegation. The agent path substitutes **policy-gated
-  authority within a scoped grant** for human presence: the grant is issued
-  once under a ceremony, and the OWS policy engine plus on-chain scope bound
-  every subsequent agent action. This is the one exception to the
-  per-transaction ceremony rule.
-- Relates to [C26] (AI agent skills); OWS ships an MCP server that consumes
-  this surface and runs in a Node context (no passkey ceremony — hence
-  policy-gated). `ows-core` is consumed as an upstream dependency.
-
-### 3.9 dApp connector (developer-facing)
-
-Passport is **two-sided**. §3.2 is the *wallet* half — the SDK answering
-connection requests on behalf of the account. This surface is the **dApp
-half**: a lightweight connector a third-party developer imports so their
-dApp can rely on Passport — the other end of the same [C23] protocol
-(CAIP-25-shaped, EIP-6963-discoverable). The connector lets a dApp:
-
-- **Log in with Passport** — Sign-In-with-Passport / DecentralisedAuth
-  ([C23]); the dApp obtains an authenticated `alice.passport.night` session
-  and never handles keys.
-- **Request scoped grants** — operation × object × bound ([C10]/[C11]),
-  approved by the user under the ceremony (§2.2) and enforced on-chain by
-  the ACC ([C12]).
-- **Have its contract witnesses provisioned from Passport storage** —
-  instead of the dApp configuring its own `privateStateProvider`, the
-  user's Passport profile supplies witness values when the dApp's
-  `witness.ts` runs for a contract execution (the shared private-storage
-  provider, midnightntwrk/passport#58, over [C16]).
-- **Transfer assets to a Passport account** — pay a Passport user via the
-  §3.12 deposit mechanism (resolve the recipient → connect to their ACC →
-  call the deposit circuit). The one connector function that is a direct
-  chain interaction rather than a C23 message.
-
-**Security framing of witness provisioning (normative).** Passport-supplied
-private state MUST be **scoped, consented, and ceremony-gated**: a dApp
-reads only the private-state entries the user has granted it, released
-under a §2.2 ceremony, never blanket access to the profile. The shared
-provider is a Passport-mediated, per-dApp, consented read surface — not a
-data handout; otherwise it is a privacy hole.
-
-**Authorisation through-line.** Devices, agents (§3.8), and dApps are all
-principals holding scoped grants on the ACC ([C10]/[C11]/[C12]); they
-differ only in how the grant is issued and gated — device by passkey
-ceremony (§2.2), agent by OWS policy engine (§3.8), dApp by user consent
-plus ceremony. One primitive, three issuance paths.
-
-**Packaging.** The connector is a **separate, thin package**
-(`@midnight-ntwrk/mn-passport-connect`-shaped) with a minimal dependency footprint and its
-own threat model. A dApp MUST NOT pull in the wallet / custody / kernel
-core to integrate; the connector speaks the C23 protocol *to* the wallet
-across a trust boundary and never links against it.
-
-### 3.10 External wallet connections
-
-Passport connects to a user's **existing wallets**. The initial targets
-span three ecosystems and are **not** one integration — they attach by
-different mechanisms:
-
-| Wallet | Ecosystem / curve | Connection standard |
+| Key provider | Scheme | Usual registration |
 |---|---|---|
-| Lace | Midnight + Cardano / Ed25519 | Midnight connector · CIP-30 |
-| 1am | Midnight | Midnight connector |
-| Gero | Midnight + Cardano / Ed25519 | Midnight connector · CIP-30 |
-| MetaMask | EVM / secp256k1 | EIP-6963 / EIP-1193 |
-| Rabby | EVM / secp256k1 | EIP-6963 / EIP-1193 |
-| Phantom | Solana / Ed25519 (+ EVM) | Solana Wallet Standard · EIP-6963 |
+| Passkey | JubJub, from the PRF output of the passkey | Device |
+| Passkey on secp256r1 | p256, `wa-json134` WebAuthn profile only | Device or grant |
+| Embedded wallet of a WaaS provider | k256, envelope 0 | Device |
+| Midnight connector wallet | k256, envelope 1 (`signData` with `ecdsa_secp256k1_sha256`) | Device, or a read-only grant |
+| dApp per-origin key | JubJub, k256 (envelope 0), or p256 | Grant |
+| Agent key in OWS | JubJub or k256 (envelope 0) | Grant |
 
-This introduces a **wallet-connector client** — Passport connecting *out*
-to other wallets — distinct from the dApp connector (§3.9), where Passport
-is the wallet connected *to*. One adapter per standard. The connector may be
-**provider-supplied** (the wallet-infra provider's connectors, §2.4) or
-**direct** — the same managed-vs-decentralised split as custody (§2.1).
+[`architecture.md`](./architecture.md) owns the interface and the package of
+each key provider (section "Key providers"). These rules apply:
 
-**All three integration modes are in scope**; a given wallet may serve more
-than one:
+- **One p256 profile.** The `clientDataJSON` is exactly 134 bytes in a fixed
+  field order, with a 21-byte origin.
+- **The WaaS key enrolls from a signature**: the provider has no call to read
+  the public key. The SDK enrolls it from a signature over a known digest.
+- **One envelope for each k256 key.** The envelope does not change after
+  enrollment.
+- **Envelope 1 keys can only read as grants.** The scoped-grants MIP refuses
+  them on the spend seam.
+- **One grantee key for each account and each origin.**
 
-- **Bind as identity / authoriser** — a foreign-curve wallet signs a §2.3
-  binding and becomes a linked identity (and, via a grant authoriser, an
-  authoriser) of the ACC. Enables "connect your existing wallet" onboarding
-  and login. Primary for the foreign-curve wallets (MetaMask, Rabby,
-  Phantom) and the Cardano identities in Lace / Gero. Generalises §2.3
-  beyond ECDSA to any foreign scheme (secp256k1, Ed25519).
-- **Fund / bridge** — use the connected wallet to fund the account or move
-  assets across chains ([C25] / MCS). Applies to the foreign-chain wallets
-  (MetaMask, Phantom, and the Cardano side of Lace / Gero). Midnight-side
-  funding lands through the §3.12 deposit mechanism.
-- **Coexist / discover** — the Midnight-native wallets (Lace, 1am, Gero) are
-  peer wallets; Passport is discoverable alongside them through the same
-  connector standard (the §3.9 wallet side) and may import from or hand off
-  to them.
+### Signing digests
 
-The modes are not exclusive per wallet — e.g. Lace can coexist as a Midnight
-peer, fund / bridge from its Cardano side, and bind its Cardano identity.
-The `adapter-wallet-connect` client (architecture §4.2) feeds all three:
-binding → signer / §2.3, funding → [C25], coexistence → the §3.9 surface.
-Which mode(s) ship first is a v1 delivery-scope question.
+The ACC verifies these exact digests. `H` is SHA-256, `||` joins bytes, and `c`
+is the 32-byte challenge of the circuit:
 
-### 3.11 DUST sponsorship — Capacity Exchange
+| Arm | Digest that the key signs |
+|---|---|
+| k256, envelope 0 | `H(c)` |
+| k256, envelope 1 | `H(ASCII("midnight_signed_message:32:") \|\| c)`. The prefix is exactly 27 bytes. |
+| p256 | `H(authenticatorData \|\| H(exact clientDataJSON))`. The client data carries `c` as 43 unpadded base64url characters. |
+| JubJub | A Schnorr signature over the challenge, with the grinding rule of the ACC |
 
-Fees on Midnight are paid in DUST, which is non-transferable — the
-zero-DUST user is the [C24] problem. **Capacity Exchange** is the
-ecosystem's answer: a DUST-sponsorship marketplace in which liquidity
-providers (LPs), running open-source servers, sell DUST capacity so a user
-holding zero DUST can still transact. The SDK MUST support it as the
-sponsored fill of the **Fee seam** (`adapter-fee-capacity-exchange`), with
-user-held DUST as the provider-free default.
+The k256 arm never verifies the raw challenge directly. The SDK must build each
+challenge from the arguments of the circuit.
 
-**Flow (current upstream design — explicitly pre-launch, not the final
-launch workflow):**
+### Adding a key
 
-1. A dApp action requires DUST the user does not hold.
-2. The SDK requests quotes from LPs — **pure API, no on-chain transaction**
-   (upstream flags this as critical for launch usability).
-3. LPs return quotes: "I'll sponsor X DUST if you pay Y in token Z."
-4. The user selects a quote.
-5. The LP returns a **partial Midnight transaction**: an intent supplying
-   the DUST, plus an intent encoding the payment the LP expects (e.g. a
-   zSwap offer / payment leg).
-6. The SDK attaches the user's own dApp intent, supplies the input funds so
-   the transaction balances, and submits — ceremony-gated (§2.2), since the
-   composed transaction spends the user's token Z.
+A new key comes to the account through a signed request out of band, as a QR
+code or a link. It carries a scheme tag, a public key, a commitment, an account
+hint, a nonce, an expiry, and a label. A self-signature covers all of them.
 
-This is intent composition on the ledger's `Intent` primitive — [C24]
-already names `dust_actions` as the protocol primitive, and the abstraction
-Passport presents over intents is the [C22] workstream. Steps 2–4 are
-off-chain; nothing touches the chain until the user commits.
+The Passport app verifies the request before it shows any ceremony. The user
+then approves with a current device. A device request ends in
+`add_device_with_*`. A grant request also carries a requested scope, and it
+ends in `issue_grant_with_*`. Only the Passport app signs the approval.
+[`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md)
+owns the design of the request.
 
-**Adapter requirements** (tracking the upstream "Sponsor" spec, in
-progress):
+## Ceremonies
 
-- **One-method surface** — a dApp (or Passport flow) calls one method and
-  reliably gets a sponsored transaction back.
-- **Quote lifecycle** — expiry, replay protection, and handling for users
-  who abandon after selecting a quote.
-- **Token filtering** — only offer payment tokens the user actually holds
-  (needs the balance surface).
-- **LP preferences / whitelists** — which LPs to solicit and trust;
-  substitutable per [P8]. Upstream's fast-follow is a wallet-native API
-  where preferences make the UX mostly invisible — that wallet-native
-  surface is Passport's natural home.
-- **Quote-request privacy** — a quote request discloses spend-intent
-  metadata (amount class, payment token) to every solicited LP before any
-  commitment; solicit the minimum set per the whitelist.
-- **Packaging** — upstream ships a JS SDK plus an optional React
-  quote-selection component; the adapter wraps the upstream SDK, and the
-  official UI may consume or re-brand the selection component (upstream's
-  success criterion is that integrators can brand and customise copy).
+**The ceremony gate.** The SDK must get a passkey tap when Passport issues a
+grant, and when the handoff of private data completes. Both occur in the
+connection flow. After that, there is no tap and no Passport ceremony for each
+call. The exception is a grant key that is itself a passkey on the origin of
+the dApp.
 
-**Limits and phases:**
+Each passkey signature in the Passport app also needs a tap, so no process can
+make a device signature without the user. On the JubJub arm, the kernel of
+`core` derives the device key and the WPP account key from the PRF output, for
+one operation only. On the p256 arm, the key stays in the authenticator.
+[`architecture.md`](./architecture.md) owns the kernel invariant.
 
-- Capacity Exchange solves zero-DUST for a user who holds *some* payable
-  token. The fully-empty user at onboarding (ACC deploy + name claim,
-  §3.1) still needs a sponsor / faucet answer — [C24] remains open for that
-  case.
-- **Bridge-assisted payment** (multisig-operated bridge; in principle any
-  bridge) is upstream work-in-progress and composes with §3.10's
-  fund / bridge mode.
-- **Phase 2 (upstream roadmap):** wallet-native sponsor transactions and
-  preference management, and **passive LP leasing via auction** — a user
-  deposits "DUST rights" into a contract, active LPs bid, and the user
-  earns the bid proceeds. For Passport that is a future *earn* surface over
-  the user's DUST rights; out of v1 scope, noted so the Fee seam does not
-  preclude it.
-- Interplay with §2.5 path 2b: a sponsored partial transaction is one
-  candidate answer to "who balances and fee-pays before a prove+broadcast
-  server submits".
+**A device without PRF.** The JubJub arm and the WPP keys need the PRF
+extension. The p256 arm gives a device without PRF, but WPP still needs a
+secret. Open question 1 asks if a password fallback stays.
 
-### 3.12 Asset transfers into a Passport account (deposit mechanism)
+## Proving and fees
 
-Because of how the ACC is structured ([C1]/[C4] contract custody), **a
-Passport account is not payable by a plain transfer to an address** —
-funding it is a **contract call**. The SDK MUST expose, and ecosystem
-wallets and dApps MUST support, the following mechanism to send assets to
-a Passport user:
+### Transaction in, proof out
 
-1. **Resolve the recipient** — `alice.passport.night` → the user's ACC
-   contract address, via the name service ([C2]).
-2. **Connect to the user's ACC contract** — using the versioned contract
-   bindings and ZK assets (§8.2 artefact; the sender needs the deposit
-   circuit's assets to prove the call).
-3. **Call the deposit circuit** — `deposit_night` for unshielded assets,
-   `deposit_shielded` for shielded coins; the function routes by asset
-   type. Deposits are **permissionless by ACC design** — anyone may fund
-   an account; no grant, no recipient ceremony, no recipient interaction.
+The prover seam takes an unproven transaction and returns the proven
+transaction: `prove(unprovenTx, circuitIds) → provenTx`. These rules apply:
 
-Properties and consequences:
+- **The prover holds the proving keys**, or it makes them again, byte for byte,
+  from the ZKIR and the on-chain verifier key. A client never uploads them.
+- **A client loads about 1 MB for each contract:** the compiled module, the
+  ledger decoder, and the manifest. Only a client that verifies circuits loads
+  the ZKIR and the SRS.
+- **The keys change with the exact zkir and midnight-zk crate revisions.** The
+  version registry records these revisions.
 
-- **The sender pays.** The deposit is the *sender's* transaction: their
-  wallet proves, balances, fee-pays (their own DUST or §3.11 sponsorship),
-  and submits. The recipient does nothing and need not be online.
-- **Heavier than a plain transfer.** A deposit is a proven contract call —
-  the sending wallet must fetch the ACC deposit-circuit assets and generate
-  a proof. This is standard contract-call support, but wallets that only
-  implement address-to-address transfers cannot pay a Passport account —
-  which is exactly why this mechanism is normative in the custody MIP and
-  an ecosystem-adoption requirement, not an SDK-internal detail.
-- **Never present the raw ACC address as a payment address.** Assets sent
-  to the contract address *outside* the deposit circuit are held but
-  unaccounted (they bypass the ACC's balance bookkeeping — a known
-  prototype blind spot). UIs and integrations MUST surface the Passport
-  name / deposit flow, not a copyable contract address.
-- **Who must implement it:** the dApp connector (§3.9) exposes it as a
-  one-call function for dApps (checkout, payouts, refunds); external
-  wallets (§3.10) support it natively so their users can pay
-  `alice.passport.night`; Passport itself uses the same mechanism for
-  Passport→Passport transfers.
+**What the V1 prover sees.** The prover gets the unproven transaction. Thus, it
+sees the coin and the amount, and the SDK must tell the user this. Encryption of
+the proving input to an enclave becomes mandatory when a trusted-hardware prover
+exists. The SDK does not do remote attestation.
 
-Packaging note: the deposit function is a direct chain interaction, not a
-C23 wallet message — it rides the typed contract bindings
-(`mn-passport-contract`), not the kernel. Surfacing it through the dApp
-connector does not breach the "connector never links the core" rule (§3.9):
-the contract package is a foundation dependency, not the custody core.
+**No proofs in the tab in V1.** The ACC circuits are at k=15 to 17, with
+proving keys of 112 to 224 MB. The zkir WASM package has no key generation.
 
-### 3.13 Partner-origin onboarding
+### Fees and broadcast
 
-A partner dApp can **issue a Passport itself**: create a passkey under the
-Passport RP ID via a WebAuthn **Related Origin Request**, deploy the user's
-ACC via a **direct connection to the third-party proving and DUST
-sponsorship service** (fees sponsored, so a zero-DUST user onboards from the
-partner origin; no provider in the loop — the provider-routed topology is
-the managed path's), and stamp the deployed ACC
-address onto the credential via the **largeBlob** extension so the Passport
-app later *recognises* the account from one ceremony. Detailed design:
-[`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md); mechanism validated in
-`experiments/passkey-prf-linking/` (2026/08/18, including on a real
-authenticator).
+- **No user-held DUST.** No SDK path can assume that the user holds DUST.
+- **Broadcast.** The client gives the proven transaction to the sponsor, which
+  pays the fees and broadcasts it. The client monitors it until it is final.
+- **Bounded waits.** The broadcast client uses bounded waits, and submits again
+  when a transaction does not arrive.
+- **Onboarding.** A sponsor pays the fees of account creation and the opening
+  balance.
 
-Normative rules:
+**The Capacity Exchange** is the other fee route. Liquidity providers sell DUST
+capacity for a token that the user holds. The SDK gets quotes off chain, and
+the user selects one. The provider returns a partial transaction, and the SDK
+adds the intent of the user. NIGHT that a contract holds cannot make DUST, so
+this route matters for ACC funds.
 
-- **One implementation.** The capability ships as the
-  `@midnight-ntwrk/mn-passport-onboard` **facade over `mn-passport-core`**
-  and the adapters — issuance is custody work, so the kernel is embedded,
-  never reimplemented. The facade exposes **issuance and recognition only**
-  (`createPassport`, `signIn`); the full account lifecycle stays in the
-  Passport app. The §3.9 rule is unchanged: `mn-passport-connect` never
-  links the core.
-- **Shared constants come from `mn-passport-protocol`**: the Passport RP ID
-  (config-overridable — the domain may change), the PRF device-key salt, and
-  the versioned largeBlob payload schema. Partner and Passport MUST agree on
-  all three or recognition breaks.
-- **The largeBlob is a cache, never the source of truth.** A blob miss or a
-  stale blob degrades to an indexer/registry lookup by device commitment;
-  a blob hit is verified against chain state before it is trusted.
-- **The redirect fallback is mandatory.** Below the ROR/PRF compatibility
-  floor the integration MUST fall back to first-party onboarding in the
-  Passport app (the C23 surface); capability detection is part of the facade
-  — noting it can gate only on browser capability, not on the live
-  related-origins listing, so a `SecurityError` at ceremony time still
-  routes to the same fallback.
-- **Enclave-key provenance on the direct path.** §2.5 delegates enclave
-  attestation to "the provider / upstream"; with no provider in this loop,
-  **the service publishes its attestation-backed enclave key and the
-  Passport deployment pins it** (provider-integration §5.1) — the same
-  accepted residual risk, with the pinning duty reassigned from the
-  provider to Passport configuration.
-- **The related-origins list is governed.** Every listed origin can exercise
-  Passport credentials; listing is a recorded security decision, bounded by
-  the ~5-label client cap — the partner set is curated by design.
-- **Direct service connection (passkey/PRF path).** The facade connects
-  **directly** to the third-party proving and DUST sponsorship service — the
-  deploy preimage sealed to the service's enclave key (§2.5) — with no
-  provider in the loop; provider *routing* belongs to the managed path.
-- **Managed variant — future iteration.** Behind the same signer seam, a
-  wallet-infrastructure provider may supply the authoriser and presence gate
-  (§2.6) instead of the PRF-derived key — same ACC, migration per §2.1. Its
-  partner-origin flow is not yet documented
-  ([`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md) §5).
-- **Authorising additional keys from new platforms.**
-  When the existing credential cannot follow the user to a new platform,
-  the platform exposes a signed authoriser request (QR) and the **Passport
-  app approves it** with an existing authorised key — per §3.5, never a
-  platform-side write to the authoriser key set
-  ([`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md) §6).
+The fee adapter must handle quote expiry, replay, and abandoned quotes. It must
+ask only trusted providers, because a quote request shows the amount class and
+the payment token.
 
-## 4. Reference implementations (UI / App)
+The fee seam is shared, because dApp and agent calls also pay fees.
 
-The first consumers of the SDK, validating its surface. Tracked as
-expectations on the SDK, not as SDK deliverables:
+## Services
 
-1. **Official UI implementation** built on the Passport SDK (Midnight
-   Foundation).
-2. **A reference Midnight dApp** integrating via the Passport dApp
-   connector (§3.9), exercising Sign-In-with-Passport, scoped-grant
-   requests, and Passport-provisioned contract witnesses.
+Each service is replaceable behind a seam.
 
-## 5. References
+| Process | Service | What it can see or do |
+|---|---|---|
+| Proving | The prover | The coin and the amount of each transaction |
+| Fees and broadcast | The sponsor | The proven transaction |
+| Fee swaps | The Capacity Exchange | The amount class and the payment token of a quote |
+| dApp onboarding | The WaaS provider | It holds a full-authority key, and it reads the account metadata |
+| Private-data storage | WPP storage | Ciphertext only |
+| Chain reads | The indexer | What the viewing key opens, if the client gives it |
+| Total-loss recovery | Guardians | Their own shares only |
 
-- Components: [components/README.md](https://github.com/midnightntwrk/passport/blob/main/docs/plans/components/README.md) ·
-  Promises: [PROMISES.md](https://github.com/midnightntwrk/passport/blob/main/docs/plans/PROMISES.md)
-- Shared private-storage provider: midnightntwrk/passport#58
-- `did:midnight`: <https://github.com/midnightntwrk/midnight-did>
-- Wallet-infrastructure provider — enclave / passkey-gated custody at
-  launch, MPC / TSS threshold custody in the second wave. Specific provider
-  intentionally unnamed here.
+The WaaS provider needs the most trust.
+[`provider-integration.md`](./provider-integration.md) owns the contract with
+the WaaS provider and the prover.
+
+## Onboarding
+
+Onboarding has two routes. On each route, the SDK deploys the ACC, activates
+the first device, and claims the name.
+
+**Waves.** The deploy planner packs the circuits into waves within a
+15,000-byte verifier budget. It uses the actual artifacts, so the wave count is
+not fixed. On 2026/10/09, the account with caller pins took seven waves. The
+account with the p256 arm took ten waves. The contract binding must accept a
+partly deployed account, and a client checks only the circuits that it calls.
+
+### In the Passport app
+
+1. The user makes a passkey. It becomes the first device.
+2. The app deploys the ACC in waves, and the sponsor pays.
+3. The app claims a free, first-come, first-served name under `passport.night`.
+4. The app creates the DID of the account.
+5. The app can enroll the embedded wallet of a WaaS provider as a second device.
+
+**Recognition.** `core` recognizes an account from the passkey and its
+largeBlob. The largeBlob is a cache, never the source of truth: a hit is checked
+against the chain. The RP ID, the PRF salt, and the largeBlob schema come from
+`mn-passport-protocol`.
+
+### In a dApp, through a WaaS provider
+
+A dApp onboards a new user only through a WaaS provider that supports metadata
+on the key of the user. The entry point `mn-passport-connect/onboard` deploys
+the ACC, activates the provider key as the first device, and claims the name.
+Then it writes the ACC address and the viewing key to the metadata.
+
+It does not issue a grant. The dApp gets its grant through the usual grant
+ceremony. The user approves it in the Passport app, signed in with the same
+provider. The metadata finds the account, and the provider key signs
+`issue_grant`.
+
+The WaaS provider must sign raw ACC challenges with the key of the user. It
+must keep metadata on that key, readable from each origin that it serves. It
+must let the Passport app sign in as the same user. These rules apply:
+
+- **No device secret in the dApp.** No dApp or agent gets a device key.
+- **The provider key only for onboarding.** After that, the dApp acts only
+  through its grant key. Owner use of the provider key occurs only from the
+  Passport app.
+- **Small, versioned metadata.** Each entry has a namespace and a version. Each
+  write reads, merges, writes, and reads back. Some providers keep only 2 KB.
+- **The user is told** that the provider can read the metadata and see what the
+  account receives. The account is only as safe as the signing security of the
+  provider, because it holds a full-authority key.
+
+**Known risk.** During activation, the page of the dApp drives the signatures of
+the provider. A hostile dApp can try to get more than the activation signed.
+Open question 2 asks which guard closes this risk.
+
+**The redirect fallback.** A dApp without a WaaS provider sends a new user to
+the Passport app, and the user returns through the grant ceremony. A dApp must
+never create a Passport with a device secret in its own code.
+
+## dApps
+
+### Connection
+
+A dApp connects through the grant ceremony of the scoped-grants MIP (§9), with
+the browser profile:
+
+1. `mn-passport-connect` makes a key for the origin of the dApp.
+2. It sends the user to the Passport authorizer page with a `GrantRequest` and
+   a possession proof. Both bind the web origin of the dApp.
+3. If the user has no account, the authorizer page helps the user make one.
+4. The user approves the grant with a passkey tap, and Passport submits
+   `issue_grant`.
+5. The user gives separate consents for private-state access and, with read
+   access only, for the viewing key.
+6. Passport completes the handoff and redirects back to the dApp.
+7. The dApp reads the grant from the chain. It verifies the scope and the key
+   binding before it trusts the grant.
+
+Passport has no request and response channel through which it acts for a
+Midnight dApp. [`dapp-connection.md`](./dapp-connection.md) owns the full flow
+and its acceptance test.
+
+### Calls
+
+The dApp builds the circuit that composes the ACC of the user. The SDK supplies
+the interface of the ACC, the challenge, and the grant signature. The SDK does
+not compose the call.
+
+A called contract cannot run a witness. Each shielded spend of the ACC uses the
+witness `held_coin`. Thus:
+
+| A dApp circuit can call it | It must start its own intent |
+|---|---|
+| Deposits, unshielded withdrawals, device and grant management, `append_inbox_with_*` | `withdraw_shielded_*`, `withdraw_shielded_to_contract_*`, and their grant forms |
+
+A shielded spend from the ACC thus needs two intents in one transaction. The
+**transaction joiner** in `mn-passport-account` joins them with `addIntent`,
+never `merge`.
+
+### Independent operation
+
+After the grant and the handoff, the dApp operates with the Passport app
+closed. It signs with its own grant key, never through Passport. It tracks
+confirmation and keeps its own state, also after a reload or a retry. A revoked,
+expired, or exhausted grant stops the authorization. To change a grant, the dApp
+goes back to Passport. An operation must not need a live Passport tab, an
+iframe, or an owner ceremony.
+
+`connect` also supplies Pay with Passport, a sign-in button, and a starter
+project as an AI-agent skill. A user without a Passport goes to the Passport app
+and back.
+
+**`connect` never links `core`.** A dApp must not pull in the kernel of the
+Passport app. Shared code goes into `mn-passport-account`.
+
+## Agents
+
+An agent uses the same grant message as a dApp, with the **agent profile**. The
+library is `mn-passport-agent`, for Node.js. It never links `core`.
+
+1. The agent backend makes its key in OWS.
+2. The library builds a grant request with no web origin. It binds the agent key
+   with a self-signature, a nonce, an expiry, and a label.
+3. The agent provider shows the request as a QR code or as a link. The user
+   approves a scope in the Passport app, which shows the agent profile.
+4. The agent gets the readable scope and its salt, because the chain stores most
+   limits as salted commitments.
+
+**On-chain grant status.** Before OWS signs, the library reads the grant from
+the ACC: its status and the commitments that the readable scope opens. OWS then
+enforces the grant as its policy. This is a read of the chain, not a check on a
+server.
+
+**Execution.** The library gets the artifacts of a dApp from a registry, by
+content hash. It makes the verifier key again from the ZKIR and compares it
+with the key on chain. Then it runs the circuit. OWS signs, the prover proves,
+and the sponsor broadcasts, with the Passport app closed. In V1, the agent
+verifies the client code against a hash that the dApp publishes.
+
+## Private data
+
+The witness functions of a dApp read its private state from a midnight-js
+`PrivateStateProvider`. After the handoff, the dApp reads and writes that state
+without Passport, and its witness code does not change.
+
+- **WPP.** Passport keeps the private data and makes backups through the
+  Witness Protection Program (WPP). No plaintext crosses the storage seam.
+- **Three consents.** The grant, private-state access, and the viewing key are
+  three separate consents. The viewing key comes only with read access.
+- **The handoff.** After the passkey tap, `core` makes a key for the WPP package
+  of the dApp, and only for that package. The dApp never sees other packages,
+  the full profile, or a bulk export.
+- **Write-back.** The dApp writes new state only after the transaction finalizes
+  with `SucceedEntirely`, on each submit path. If the write fails, the dApp
+  keeps the state locally as not yet saved and tries again.
+- **Private-state revocation.** A revocation does not take back data that the
+  dApp already read. Thus, Passport rotates the key of that package and tells
+  the user.
+- **Read revocation.** A revocation does not take back the viewing key. Thus,
+  Passport rotates the encryption key (`rotate_enc_key_with_*`) and tells the
+  user. Notes sealed before the rotation stay readable to the revoked party.
+
+| Data | Tier | Where |
+|---|---|---|
+| The private state of a dApp | Irreplaceable | WPP |
+| The coin store of the ACC | Passport can make it again with the viewing key | Local cache only |
+| Viewing key, ACC address, grant references | Small, rarely changed | WPP metadata, the passkey largeBlob, or the WaaS metadata |
+| Device keys | Passport can make them again from the passkey | Not stored |
+
+WPP storage uses a folder that the user can see (the `drive.file` scope). A
+hidden `appDataFolder` is only a cache. When two histories conflict, WPP keeps
+each one. The SDK reports when the freshness of a backup is unknown.
+[`storage-and-recovery.md`](./storage-and-recovery.md) owns the storage design.
+
+## Recovery
+
+Recovery has two parts: control of the account, and the private state.
+
+| Case | How the user recovers control |
+|---|---|
+| A lost device | A current device removes it. The limits of errata 7 and 8 apply. |
+| Total loss | Guardians or paper keys recover a secret, and the ACC enrolls a new device |
+| A WaaS account | The user signs in with the same provider, and the provider key approves a new device |
+
+**Total loss.** Guardians keep no state for each account. The ACC stores a
+recovery artifact and a commitment that gates the recovery. A veto window lets
+a current device cancel a recovery. A finished recovery retires the old
+devices.
+
+**Private state.** The recovery secret also decrypts the viewing key, which the
+ACC stores in encrypted form. With it, Passport makes the coin store again. WPP
+key recovery restores the private data of dApps, and it does not replace account
+recovery. The account-recovery MIP owns the protocol, and `adapter-recovery`
+implements it behind `core`.
+
+## Identity (DID)
+
+A `did:midnight` identifier is its own contract, with one deployment for each
+DID. A JubJub Schnorr key controls it, and a separate key recovers it. Each
+update reads a timestamp witness, so the DID can only start a transaction. Thus,
+the ACC cannot be its controller today.
+
+**In V1, the Passport app operates the DID** through `adapter-did`, behind
+`core`. It creates the DID with the account. It links them: `alsoKnownAs`
+carries the Passport name, and a service entry names the ACC. It holds the
+controller and recovery keys (open question 4), signs each update, and resolves
+from the indexer.
+
+**One signing primitive.** The DID key uses JubJub Schnorr, as the JubJub arm of
+the ACC does. The SDK must not add a different signature scheme for DIDs (open
+question 5).
+
+**The target: a DID that the ACC controls.** The DID contract stores the ACC
+address as its controller. Each update calls the ACC, which checks for a grant
+to act on that DID. This needs three changes:
+
+| Where | Change | Owner |
+|---|---|---|
+| DID contract | A controller mode for account contracts, on ledger 9 | The DID team |
+| ACC | An exported authorization circuit with no witness | Passport (contract) |
+| Scoped-grants MIP | A grant operation to act on a different contract | Passport (standards) |
+
+`midnight-did` pins ledger 8, but the ACC is on ledger 9.
+[`compatibility.md`](./compatibility.md) records this gap.
+
+## Payments
+
+**Deposit, not address.** A Passport account is not payable by a plain transfer
+to an address. A payment to an account is a deposit call. Deposits are
+permissionless: no grant, no ceremony, and no action from the recipient.
+
+| Recipient | Circuit | What the payer must supply |
+|---|---|---|
+| A shielded wallet | `withdraw_shielded_*` | The full shielded address |
+| Another Passport, from a Passport | `withdraw_shielded_to_contract_*`, joined with `deposit_shielded` | A 192-byte inbox entry, sealed to the `enc_key` of the recipient |
+| A Passport, from a different wallet | `deposit_unshielded` or `deposit_shielded` | The ACC address, from the name service |
+| An unshielded address | `withdraw_unshielded_*` | An `mn_addr` address |
+
+These rules apply:
+
+- **A full shielded address.** midnight-js needs the encryption public key to
+  build the note. Both halves come from one parsed address.
+- **The recipient key at the time of the seal.** A payment reads the `enc_key`
+  of the recipient when it seals, and again for each retry.
+- **The change coin.** Before a spend, the coin store reads the position of the
+  change coin from the indexer.
+- **No raw ACC address.** Assets sent outside the deposit circuit are not in the
+  bookkeeping of the ACC. A user interface must show the Passport name.
+- **Disclosure.** A payment between two Passports links the two accounts in
+  public. No circuit moves NIGHT between two accounts.
+
+Wallets that only do address-to-address transfers cannot pay a Passport. Thus,
+the deposit is an ecosystem requirement. `connect` exposes it as Pay with
+Passport, without `core`.
+
+## External wallets
+
+An external wallet can sign for the ACC only on an arm that the ACC verifies.
+
+| Wallet type | Status |
+|---|---|
+| Midnight connector wallet with `ecdsa_secp256k1_sha256` | Supported: k256 envelope 1, as a device or a read-only grant |
+| Midnight connector wallet with a different scheme | Not supported |
+| Ethereum-style wallet (EIP-191) | Not supported: it cannot sign a raw digest |
+| Solana wallet (Ed25519) | Not supported: the ACC has no Ed25519 arm |
+
+An Ethereum-style wallet needs a new k256 envelope with keccak-256 in the
+circuit, or a provider wallet that signs a raw digest (open question 6).
+
+**After V1.** [`architecture.md`](./architecture.md) shows three directions for
+other chains: `adapter-multi-chain`, `mn-passport-ecosystems`, and EVM and
+Solana wallets as signers on new ACC arms. A dApp on a different chain cannot
+hold a grant. Thus, the Passport app approves each of its requests with a
+passkey tap. Only in this flow does Passport act for each request.
+
+## Reference implementations
+
+These are expectations on the SDK, not SDK deliverables:
+
+1. **The Passport app** of the Midnight Foundation, built on `core`.
+2. **A reference Midnight dApp.** It holds a grant and passes the acceptance
+   test of [`dapp-connection.md`](./dapp-connection.md). It can create Passports
+   through a WaaS provider.
+
+## Normative rules
+
+The `conformance` lens checks these rules. The sections above give the detail.
+
+| # | Rule |
+|---|---|
+| 1 | **Ceremony gate:** a passkey tap at grant issuance and at the handoff. No tap for each call, except for a passkey grant key on the dApp origin. |
+| 2 | **Prover disclosure:** the V1 prover sees the coin and the amount, and the user is told. Enclave encryption is mandatory once a trusted-hardware prover exists. |
+| 3 | **Deposit, not address:** a payment to an account is a deposit call, with an inbox entry for a payment from a Passport. |
+| 4 | **`connect` and `mn-passport-agent` never link `core`.** Shared code goes into `mn-passport-account`. |
+| 5 | **Two version axes:** the wire axis (the MIP §9 messages) and the binding axis (`mn-passport-contract` and the deployed ACC). [`compatibility.md`](./compatibility.md) owns them. |
+| 6 | **A full shielded address**, with both halves from one parsed address. |
+| 7 | **The recipient key at the time of the seal**, and again for each retry. |
+| 8 | **Write-back after `SucceedEntirely`**, on each submit path. After a failed write, the dApp keeps the state locally and tries again. |
+| 9 | **Independent operation:** after the grant and the handoff, a dApp or an agent signs with its own grant key, with Passport closed. |
+| 10 | **One grantee key** for each account and each origin. |
+| 11 | **WaaS onboarding only:** a dApp never holds a device secret. The user is told what the provider can read and hold. |
+| 12 | **The WaaS key only for onboarding.** Owner use of that key occurs only from the Passport app. |
+| 13 | **Rotation on revocation:** the encryption key after a read grant, the package key after private-state access. The user is told. |
+| 14 | **No user-held DUST** on any SDK path. |
+
+## Open questions
+
+1. **Password fallback (decision D).** On a device without PRF, does the
+   ceremony use a password with a key-derivation function? This is open.
+2. **The activation guard.** Which guard makes sure that the WaaS provider signs
+   only the activation (realignment open question 15)?
+3. **Agents and private data.** Can an agent backend get the private data of a
+   dApp (realignment open question 3)?
+4. **DID keys in V1.** Is the DID controller key derived from the PRF output, or
+   kept in WPP? Where does its recovery key go (realignment open question 12)?
+5. **One signing primitive.** Is a separate JubJub DID key acceptable until the
+   ACC controls the DID (realignment open questions 12 and 14)?
+6. **Ethereum-style wallets.** A new EIP-191 envelope, or a provider wallet
+   (realignment open question 13)?
+7. **Sign-in.** Is sign-in a grant with read scope, or does it wait for a
+   sign-in MIP (realignment open question 1)?
+8. **The viewing key.** How does it get to OWS and to dApps with read grants
+   (realignment open question 4)?
+9. **The WaaS key scheme.** k256 envelope 0, or p256 within `wa-json134`
+   (realignment open question 11)?
+10. **The recipient encryption key.** Must the signed challenge cover it
+    (realignment open question 9)?
+11. **Contract signing keys.** Does Passport or the dApp keep the per-contract
+    signing key (realignment open question 10)?
+12. **The registry.** Where do dApps publish their artifacts (realignment open
+    question 5)?
+
+## Sources
+
+- Realignment proposal:
+  [`2026-09-25-sdk-realignment.md`](./proposals/2026-09-25-sdk-realignment.md),
+  §2 to §9, §12, and §13.
+- Deliverables:
+  [`2026-09-25-sdk-deliverables.md`](./proposals/2026-09-25-sdk-deliverables.md),
+  §4 and §6.
+- Planning workspace (`midnightntwrk/passport`): the scoped-grants MIP (§3.2,
+  §9, §10), the signature-schemes MIP (§2), the account-recovery MIP,
+  `contract/contracts/account.compact` (`spec_version = 3`),
+  `contract/README.md` (waves), `contract/GRANTS-CALLER.md`, and
+  `contract/WEBAUTHN.md`; PRs #170, #175, #176, and #180.
+- `did:midnight`: <https://github.com/midnightntwrk/midnight-did>.
+- midnight-js `PrivateStateProvider` and `submitCallTx`, at `v5.0.0-beta.7`.
+- Capacity Exchange: the upstream sponsor design (pre-launch).
