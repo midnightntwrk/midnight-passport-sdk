@@ -7,8 +7,8 @@ description: Drive a Midnight Passport SDK feature spec from plan to merged PRs.
 
 The spine of the mn-passport-skills workflow (`docs/development-workflow.md` §2–3).
 The unit of work is a **per-feature spec** derived from
-`docs/sdk-requirements.md` + `docs/architecture.md` (v1 scope:
-`docs/beta-scope.md`). Those docs are the source of truth; the spec is what
+`docs/sdk-requirements.md` + `docs/architecture.md` (v1 scope: the beta cut in
+`docs/roadmap/roadmap.md`). Those docs are the source of truth; the spec is what
 gets driven.
 
 ## Hard rules

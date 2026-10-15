@@ -13,7 +13,6 @@ mn-passport-skills/
 .claude-plugin/
 .github/
 .mn-passport-skills/
-packages/contract/artefact/
 /experiments/
 renovate.json
 CODEOWNERS

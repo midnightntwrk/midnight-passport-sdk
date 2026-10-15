@@ -14,9 +14,10 @@ connector all resolve to authorised interactions with that on-chain account.
 The design lives in [`docs/`](./docs):
 
 - [`sdk-requirements.md`](./docs/sdk-requirements.md) — what the SDK must do, and why.
-- [`architecture.md`](./docs/architecture.md) — how it's built: layered core, seams, adapters, worked examples.
+- [`architecture.md`](./docs/architecture.md) — how it's built: packages, seams, adapters, worked examples.
+- [`provider-integration.md`](./docs/provider-integration.md) — what the WaaS provider, the prover, and the sponsor must do.
 - [`development-workflow.md`](./docs/development-workflow.md) — the `mn-passport-skills-*` skills that drive development, spec orchestration, and PR / issue traceability.
-- [`beta-scope.md`](./docs/beta-scope.md) — the reduced first version.
+- [`roadmap/roadmap.md`](./docs/roadmap/roadmap.md) — the order of work.
 
 Component (`[C…]`) and promise (`[P…]`) references in these docs point to the
 Midnight Passport **planning workspace**
@@ -25,13 +26,16 @@ where the component canvases and promises are maintained.
 
 ## Packages (planned)
 
-Published under the `@midnight-ntwrk/` scope:
+Published under the `@midnight-ntwrk/` scope. Development was reset on
+2026/10/15, so no package exists yet.
 
-- `mn-passport-core` — kernel, flows, and seam interfaces (wallet / agent side).
-- `mn-passport-protocol` — shared C23 wire types (dApp ↔ wallet).
-- `mn-passport-contract` — typed ACC bindings over the externally-owned contract artefact.
-- `mn-passport-connect` — the thin dApp-side connector.
-- `mn-passport-adapter-*` — platform (browser, node) and seam adapters (signer, prover, storage, …).
+- Entry libraries: `mn-passport-core` (the Passport app), `mn-passport-connect`
+  (dApps), and `mn-passport-agent` (agents).
+- Foundation: `mn-passport-account`, `mn-passport-contract`, and
+  `mn-passport-protocol`.
+- `mn-passport-adapter-*`: the shared and Passport-app adapters.
+
+[`architecture.md`](./docs/architecture.md) has the full package map.
 
 ## Development
 
