@@ -1,23 +1,19 @@
 #!/usr/bin/env node
-// Import-level dependency-boundary lint (FS-0.1 D-3; architecture §4.4).
-// Every workspace package may import only the @midnight-ntwrk/mn-passport-*
-// packages the architecture permits — most critically, `connect` must never
-// import `core` or any adapter, so a dApp can never pull the kernel into its
-// bundle. Also enforces platform neutrality at the import level: the four
-// packages that reach browser/PWA bundles (`protocol`, `contract`, `core`,
-// and `connect` — architecture §4.4) must not import Node built-ins; only
-// adapters may be platform-specific. The manifest-level twin lives in
-// tests/dependency-rules.test.mjs; both consume scripts/dependency-graph.mjs.
+// Import-level dependency-boundary lint (docs/architecture.md, "Dependency
+// rules"). Each workspace package can import only the
+// @midnight-ntwrk/mn-passport-* packages that the graph permits. Most
+// important: `connect` and `agent` never import `core`. Platform-neutral
+// packages must not import Node built-ins. The graph lives in
+// scripts/dependency-graph.mjs.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { ALLOWED, SCOPE } from './dependency-graph.mjs';
+import { ALLOWED, PLATFORM_NEUTRAL, SCOPE } from './dependency-graph.mjs';
 
 // Matches static imports, re-exports, side-effect imports, require(), and
 // dynamic import() — with ', ", or ` around the specifier.
 const IMPORT_RE =
   /(?:\bfrom|\bimport|\brequire)\s*\(?\s*['"`](@midnight-ntwrk\/mn-passport-[^'"`/]+)/g;
 const NODE_BUILTIN_RE = /(?:\bfrom|\bimport|\brequire)\s*\(?\s*['"`](node:[^'"`]+)/g;
-const PLATFORM_NEUTRAL = new Set(['protocol', 'contract', 'core', 'connect']);
 // Ambient global declarations bypass import scanning, so they are gated by
 // an explicit allowlist: only cross-platform standards may be assumed.
 const GLOBAL_DECLARATION_RE = /declare\s+(?:const|var|let|function)\s+(\w+)/g;
@@ -50,20 +46,22 @@ for (const [pkg, allowed] of Object.entries(ALLOWED)) {
     for (const match of text.matchAll(IMPORT_RE)) {
       const target = match[1] ?? '';
       if (!allowedNames.has(target)) {
-        violations.push(`${file}: "${pkg}" must not import "${target}" (architecture §4.4).`);
+        violations.push(
+          `${file}: "${pkg}" must not import "${target}" (architecture, Dependency rules).`,
+        );
       }
     }
     if (PLATFORM_NEUTRAL.has(pkg)) {
       for (const match of text.matchAll(NODE_BUILTIN_RE)) {
         violations.push(
-          `${file}: "${pkg}" must not import "${match[1]}" — it ships to browser/PWA bundles (architecture §4.4).`,
+          `${file}: "${pkg}" must not import "${match[1]}" — it ships to browser/PWA bundles (architecture, Dependency rules).`,
         );
       }
       for (const match of text.matchAll(GLOBAL_DECLARATION_RE)) {
         const name = match[1] ?? '';
         if (!ALLOWED_GLOBALS.has(name)) {
           violations.push(
-            `${file}: "${pkg}" declares ambient global "${name}" — only allowlisted cross-platform globals are permitted (architecture §4.4).`,
+            `${file}: "${pkg}" declares ambient global "${name}" — only allowlisted cross-platform globals are permitted (architecture, Dependency rules).`,
           );
         }
       }
@@ -75,4 +73,4 @@ if (violations.length > 0) {
   for (const v of violations) console.error(`Boundary violation — ${v}`);
   process.exit(1);
 }
-console.log('Dependency boundaries respected (architecture §4.4).');
+console.log('Dependency boundaries respected (architecture, Dependency rules).');
