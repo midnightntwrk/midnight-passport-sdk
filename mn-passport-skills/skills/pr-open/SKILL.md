@@ -53,8 +53,8 @@ bash mn-passport-skills/scripts/check-diff-size.sh   # same script and numbers a
 <justification if over 400>
 ```
 
-CI will reject a description without a `Refs #NN` / `Closes #NN` issue
-reference, and re-run the same size and cooldown checks.
+CI re-runs the same size and cooldown checks. It does not check the issue
+reference, so add `Refs #NN` / `Closes #NN` whenever an issue exists.
 
 ## 4. Stop
 
