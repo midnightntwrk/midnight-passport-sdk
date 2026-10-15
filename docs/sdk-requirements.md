@@ -4,8 +4,9 @@
 > **Owns:** what the SDK must do, and the normative rules (the MUSTs) that the
 > `conformance` lens checks.
 > **Companions:** [`architecture.md`](./architecture.md) (packages, seams, and
-> adapters), [`compatibility.md`](./compatibility.md) (the version axes), and
-> [`beta-scope.md`](./beta-scope.md) (what beta contains).
+> adapters), [`provider-integration.md`](./provider-integration.md) (the WaaS
+> provider, the prover, and the sponsor), and
+> [`roadmap.md`](./roadmap/roadmap.md) (what beta contains).
 
 ## Summary
 
@@ -118,8 +119,6 @@ The Passport app verifies the request before it shows any ceremony. The user
 then approves with a current device. A device request ends in
 `add_device_with_*`. A grant request also carries a requested scope, and it
 ends in `issue_grant_with_*`. Only the Passport app signs the approval.
-[`onboarding-and-key-authorisation.md`](./onboarding-and-key-authorisation.md)
-owns the design of the request.
 
 ## Ceremonies
 
@@ -280,8 +279,8 @@ the browser profile:
    binding before it trusts the grant.
 
 Passport has no request and response channel through which it acts for a
-Midnight dApp. [`dapp-connection.md`](./dapp-connection.md) owns the full flow
-and its acceptance test.
+Midnight dApp. Realignment §8.2 and §8.5 give the full flow. Deliverable D13
+gives its acceptance test.
 
 ### Calls
 
@@ -373,7 +372,7 @@ without Passport, and its witness code does not change.
 WPP storage uses a folder that the user can see (the `drive.file` scope). A
 hidden `appDataFolder` is only a cache. When two histories conflict, WPP keeps
 each one. The SDK reports when the freshness of a backup is unknown.
-[`storage-and-recovery.md`](./storage-and-recovery.md) owns the storage design.
+Realignment §8.5 gives the storage design.
 
 ## Recovery
 
@@ -423,8 +422,8 @@ to act on that DID. This needs three changes:
 | ACC | An exported authorization circuit with no witness | Passport (contract) |
 | Scoped-grants MIP | A grant operation to act on a different contract | Passport (standards) |
 
-`midnight-did` pins ledger 8, but the ACC is on ledger 9.
-[`compatibility.md`](./compatibility.md) records this gap.
+`midnight-did` pins ledger 8, but the ACC is on ledger 9. This gap stays open
+until `midnight-did` moves to ledger 9.
 
 ## Payments
 
@@ -482,7 +481,7 @@ These are expectations on the SDK, not SDK deliverables:
 
 1. **The Passport app** of the Midnight Foundation, built on `core`.
 2. **A reference Midnight dApp.** It holds a grant and passes the acceptance
-   test of [`dapp-connection.md`](./dapp-connection.md). It can create Passports
+   test of deliverable D13. It can create Passports
    through a WaaS provider.
 
 ## Normative rules
@@ -495,7 +494,7 @@ The `conformance` lens checks these rules. The sections above give the detail.
 | 2 | **Prover disclosure:** the V1 prover sees the coin and the amount, and the user is told. Enclave encryption is mandatory once a trusted-hardware prover exists. |
 | 3 | **Deposit, not address:** a payment to an account is a deposit call, with an inbox entry for a payment from a Passport. |
 | 4 | **`connect` and `mn-passport-agent` never link `core`.** Shared code goes into `mn-passport-account`. |
-| 5 | **Two version axes:** the wire axis (the MIP §9 messages) and the binding axis (`mn-passport-contract` and the deployed ACC). [`compatibility.md`](./compatibility.md) owns them. |
+| 5 | **Two version axes:** the wire axis (the MIP §9 messages) and the binding axis (`mn-passport-contract` and the deployed ACC). |
 | 6 | **A full shielded address**, with both halves from one parsed address. |
 | 7 | **The recipient key at the time of the seal**, and again for each retry. |
 | 8 | **Write-back after `SucceedEntirely`**, on each submit path. After a failed write, the dApp keeps the state locally and tries again. |
