@@ -1,435 +1,350 @@
-# Development workflow — the `mn-passport-skills` family
+# Development workflow
 
-> **Status:** draft · 2026/07/31
-> **Companion to:** [`sdk-requirements.md`](./sdk-requirements.md) (the *what/why*)
-> and [`architecture.md`](./architecture.md) (the *how*). This document is the
-> *how we build it* — the Claude-harness skills that drive SDK development and
-> how they orchestrate a spec from plan to merged PR.
+> **Status:** draft · 2026/10/15
+> **Owns:** how the team builds the SDK: the `mn-passport-skills` plugin, the
+> tranche loop, `STATE.md`, the registers, and the CI checks.
+> **Companions:** [`sdk-requirements.md`](./sdk-requirements.md) (what the SDK
+> must do) and [`architecture.md`](./architecture.md) (how the SDK is built).
 
-**Naming:** development-time skills are prefixed **`mn-passport-skills-*`**
-(invoked `mn-passport-skills:<name>`); the shipped runtime packages are
-**`@midnight-ntwrk/mn-passport-*`** (§4.4 of the architecture). The `-skills`
-infix and the `@midnight-ntwrk/` scope tell them apart: `mn-passport-skills-*`
-build the SDK; `@midnight-ntwrk/mn-passport-*` *are* the SDK.
+## Summary
 
----
+- The unit of work is a **feature spec**. A spec comes from the requirements,
+  the architecture, and the deliverables proposal. It names a GitHub issue.
+- `spec-author` writes the spec. `spec-driver` cuts it into **tranches**, one
+  for each PR. Each tranche is 400 net changed lines or fewer (600 at most).
+- For each tranche, the loop implements the change and runs 4 **review
+  lenses**: conformance, security, style, and verify.
+- `pr-open` prepares the branch and the PR description, and then it stops.
+  **A human pushes, opens, and merges.**
+- `STATE.md` is committed and shows done, in-progress, and backlog work. The
+  registers of open risks are never committed to this repository.
+- Skills judge. Hooks and CI enforce. The docs are the source of truth, and
+  `doc-sync` keeps them true.
 
-## 1. Rationale
+## Naming
 
-A development workflow has to do two things, and it is easy to build one that
-only does the first:
+| Prefix | What it is |
+|---|---|
+| `mn-passport-skills:<name>` | A development skill. The skills build the SDK. |
+| `@midnight-ntwrk/mn-passport-*` | A runtime package. The packages are the SDK. |
 
-1. **Produce and check code** — plan the work, write it, and review it for
-   design conformance, security, and style.
-2. **Close two feedback loops** — *does it actually run?* and *did we just
-   learn the docs are wrong?*
+One plugin, `mn-passport-skills`, holds the skills, the hooks, and the scripts.
 
-The second is where the real surprises live. On this project specifically,
-the two largest course-corrections during planning were exactly those loops
-firing: discovering how the managed flow *actually* executes a contract call
-(a "does it run" finding), and correcting the managed-path model in the docs
-afterwards (a "the docs were wrong" finding). A workflow with no first-class
-home for either will drift — the code stops matching reality, and the docs
-stop matching the code.
+## Principles
 
-Two principles fall out and shape everything below:
+1. **Skills assist and judge. Hooks and CI enforce.** A rule that must always
+   hold goes into a hook or a CI job, because a model cannot guarantee it.
+2. **The docs are the source of truth.** A spec is derived from the docs.
+   Conformance checks code against the docs. `doc-sync` corrects the docs when
+   the code shows that they are wrong.
+3. **Two feedback loops.** `verify` asks "does it run?". `doc-sync` asks "are
+   the docs wrong?". Without these loops, the code and the docs drift apart.
+4. **No outward action from the loop.** The loop prepares work. The human
+   pushes, opens, and merges. The one exception is the push of the security
+   register to the private debts repository.
 
-- **Skills assist and judge; hooks/CI enforce.** Anything that must be
-  *guaranteed* — security findings never land in this repo, dependencies
-  respect the cooldown — lives in the deterministic
-  layer (hooks/CI), because the harness runs it, not the model. Skills draft,
-  review, and advise; they never *guarantee*.
-- **`sdk/docs` is the source of truth; conformance gives it teeth; doc-sync
-  keeps it true.** Per-feature specs are *derived from* the requirements and
-  architecture. `mn-passport-skills-conformance` checks code against those docs, so
-  they must stay current — which is `mn-passport-skills-doc-sync`'s job. Without the
-  sync loop, conformance quietly validates against stale truth.
+## Where specs come from
 
----
+A new feature spec is authored from these sources:
 
-## 2. The skills
+- [`sdk-requirements.md`](./sdk-requirements.md): the requirements and the
+  normative rules.
+- [`architecture.md`](./architecture.md): the packages, the seams, the adapters,
+  and the dependency rules.
+- [`provider-integration.md`](./provider-integration.md): the contract with the
+  WaaS provider and the proving & settlement service.
+- The deliverables proposal
+  ([`2026-09-25-sdk-deliverables.md`](./proposals/2026-09-25-sdk-deliverables.md)).
+  Each spec names the deliverable IDs (D1, D2, and so on) that it serves.
 
-All prefixed `mn-passport-skills-`. Each entry: what it does, when it fires, and what
-existing tooling it leans on (we wire, we do not reinvent).
+The roadmap folder ([`roadmap/roadmap.md`](./roadmap/roadmap.md)) holds the plan
+when the team rebuilds it. Until then, the deliverables proposal sets the order:
+the foundation lane first, then the other lanes in parallel.
+
+The docs themselves come from the Midnight Passport planning workspace, the
+`midnightntwrk/passport` repository. Conformance also checks changes against
+that workspace.
+
+## The skills
+
+| Skill | Role | When it runs |
+|---|---|---|
+| `spec-author` | Writes a feature spec | Before planning |
+| `spec-driver` | Plans tranches, then runs the loop | For each spec |
+| `conformance` | Design lens | For each tranche, and at plan time |
+| `security-audit` | Key-management lens | For each tranche |
+| `code-style` | Conventions lens | For each tranche |
+| `verify` | "Does it run?" lens | For each tranche |
+| `doc-sync` | Corrects the docs and records an ADR | On a justified divergence |
+| `pr-open` | Prepares the branch and the PR, then stops | After the lenses pass |
+| `deps` | Dependency watcher | On a schedule, and on each dependency change |
+| `devenv` | Environment gate | Before each tranche |
 
 ### Spine
 
-**`mn-passport-skills-spec-author`** — write the spec. Expands a feature-spec brief in
-`docs/roadmap/milestones/` into a full per-feature spec in `docs/roadmap/specs/` (scope, decisions, interfaces,
-acceptance, verify plan, and a *proposed* tranche outline), derived from the
-source docs and checked against the planning workspace. Names the spec's GitHub
-issue — **stops and asks if there is none** — so planning never stalls. Authors
-only: it does not finalise the gated tranches (that is `spec-driver`), write
-code, or perform outward actions.
+**`spec-author`** expands the sources into one full spec. The spec has these
+parts:
 
-**`mn-passport-skills-spec-driver`** — plan, then loop.
-- *Plan phase* (harness plan mode): a per-feature spec → an ordered set of
-  **tranches, each sized to one small/medium PR**, each with an acceptance
-  gate. **Every tranche carries a size estimate** (files touched, rough net
-  lines), against the **tranche budget**: target **≤ ~400 net changed lines**,
-  hard split above **600** (both excluding lockfiles, generated code, test
-  fixtures, and the standalone `experiments/` tree — cheap-to-review
-  mechanical lines and non-tranche exploratory work don't count). A plan with
-  a tranche estimated over budget is **invalid** — it gets re-split at plan
-  time, when splitting is cheap, not after the code exists. The estimate is
-  what lets the human reviewer catch an oversized tranche during plan review.
-  PR boundaries are decided here, up front — not bolted on later. The
-  plan phase also **requires the spec's GitHub issue** (from
-  `midnightntwrk/passport/issues`); if the spec names none, it **stops and
-  asks for it** before planning — no untraceable work.
-- *Loop phase* (harness `/loop`): per tranche → implement → run the review
-  lenses → `mn-passport-skills-pr-open` → **stop for human review/merge** → next
-  tranche. On each tranche's completion or slip it updates **`STATE.md`**
-  (§3) so the progress and backlog view stays current.
+- objective and scope;
+- decisions, each with a citation to a source doc;
+- interfaces and the flow;
+- dependencies and external gates;
+- acceptance criteria and a verify plan;
+- a proposed tranche outline, open questions, and the GitHub issue.
 
-### Review lenses (run per tranche, parallelisable, each also invokable alone)
+It derives each normative statement from the docs and does not invent rules.
+If the docs are silent, it records an open question and flags `doc-sync`. If
+the spec has no issue, it stops and asks. It writes no code and makes no
+outward action.
 
-**`mn-passport-skills-conformance`** — the design guard. Checks the change against the
-requirements + architecture: seam/adapter structure, package-dependency rules
-(`connect` never links `core`; deposits ride `contract` — arch §4.4), the
-normative MUSTs (ceremony gate §2.2, deposit-not-address §3.12,
-encrypt-preimage-to-enclave §2.5), naming, and the two version axes. Its
-checklist is *derived from* `sdk/docs`, which are themselves derived from the
-**Midnight Passport planning workspace** — so conformance also checks the
-change against that upstream (the `passport` repo: the component canvases
-`[C…]`, promises `[P…]`, and recorded decisions), resolved at `../passport`
-locally or the public `github.com/midnightntwrk/passport` when there is no
-local checkout. Consulted at plan time so the plan aligns; enforced at review
-time so the code does.
+**`spec-driver`** has two phases:
 
-**`mn-passport-skills-security-audit`** — key-management review. Two outputs:
-1. *Blocking findings* — fixable mismanagement (secret in the wrong place,
-   witness not zeroised, missing ceremony gate) → fix now.
-2. *Residual-risk register* — "insecure but not resolvable right now" items,
-   each with **risk → why it can't be fixed yet → mitigations**, appended to
-   the **security register in the private sibling repo
-   `../mn-passport-sdk-debts`** (checked out at the same level as this repo),
-   then committed and pushed there (§4). Security findings live in a private
-   repo, not this one — they must never land in the SDK's public history.
-   This is the demo's hand-written `DECISIONS.md` "Known gaps" list,
-   automated and maintained per PR.
+- **Plan.** It confirms the issue, or it stops and asks. It applies the
+  conformance rules, so the plan follows the layering of the architecture.
+  It cuts the spec into ordered tranches. Each tranche has a goal, the
+  expected files, a size estimate, and an acceptance gate. A plan with a
+  tranche over budget is not valid, and the skill splits it again. It adds
+  all tranches to the `STATE.md` backlog.
+- **Loop.** For each tranche, it runs the steps in
+  [The loop for each tranche](#the-loop-for-each-tranche).
 
-**`mn-passport-skills-code-style`** — project coding preferences. Grounded in
-`.claude/rules/` (British English + Oxford comma, `YYYY/MM/DD` dates, Rust
-style) plus TS conventions, and the **Midnight** brand for any UI —
-Midnight Passport is a Midnight-branded product, not an IOG-branded one.
-Judgment layer (prose in comments/docs, brand adherence, i18n,
-error-taxonomy consistency); the mechanical part (format/lint) is
-backstopped in CI.
+### Review lenses
 
-**`mn-passport-skills-verify`** — *does it run?* Drives the affected flow end-to-end
-rather than trusting that review passed. Leans on the repo's existing
-`midnight-verify` (`/verify`, devnet, contract/witness/sdk testers) and
-`midnight-cq` (test runner, test-quality). A change that passes conformance,
-security, and style but does not prove or submit is not done. Open
-validations it cannot close (e.g. a `[PROVISIONAL]` item awaiting a real
-account) are recorded in the **verify register** (§4), owned here jointly
-with doc-sync.
+The 4 lenses run in parallel. Each lens can also run alone. Each lens
+classifies a finding as blocking, advisory, or a divergence.
+
+**`conformance`** checks the change against `sdk-requirements.md`,
+`architecture.md`, and the planning workspace. It checks the dependency rules,
+the kernel invariant, the naming, and these normative rules:
+
+| Rule | What conformance checks |
+|---|---|
+| Ceremony gate | A passkey tap occurs when Passport issues a grant and when the handoff completes. There is no tap for each call, unless the grant key is a passkey on the origin of the dApp. |
+| Prover disclosure | In V1, the prover gets the unproven transaction and sees the coin and the amount. The user is told this. Encryption to an enclave becomes mandatory when a trusted-hardware prover exists. |
+| Deposit, not address | A payment to an account is a deposit contract call, never a transfer to a raw ACC address. Unshielded value goes in through `deposit_unshielded`. |
+| No `core` in clients | `connect` and `mn-passport-agent` never link `core` or a Passport-app adapter. Shared code goes into `mn-passport-account`. |
+| Two version axes | The wire axis (`mn-passport-protocol`, the grant messages) and the binding axis (`mn-passport-contract` and the deployed ACC) stay separate. |
+
+A decided component of the planning workspace wins over a stale SDK doc. In
+that case, conformance reports a divergence and routes it to `doc-sync`.
+
+**`security-audit`** reviews key management. It has two outputs:
+
+1. **Blocking findings**, which the loop fixes before `pr-open`. Examples: a
+   secret outside the kernel; no ceremony gate at grant issuance or at the
+   handoff; a secret in a log; a dApp or an agent with more than its grant key.
+2. **Residual risks**, which the team cannot fix now. The skill appends them to
+   the security register in the private repository `../mn-passport-sdk-debts`,
+   and then it commits and pushes there. Each entry states the risk, why it
+   cannot be fixed yet, and the mitigations.
+
+It records the accepted risks of the design when the related code lands. One
+example is the V1 prover that sees the coin and the amount.
+
+**`code-style`** checks the project conventions. These include the spelling
+and date rules, the Midnight brand, and the TypeScript rules. The TypeScript
+rules are: no `any`, `unknown` only with a reason and an owner, no
+module-global singletons, and one error taxonomy. Format and lint are CI jobs,
+not review comments.
+
+**`verify`** drives the affected flow for real. It builds, runs the tests, and
+then proves and submits on a devnet. A change that passes the other lenses but
+does not prove or submit is not done. It records open validations in the
+verify register.
 
 ### Feedback
 
-**`mn-passport-skills-doc-sync`** — *did we learn the docs are wrong?* When
-implementation diverges from `sdk/docs` (reality contradicts an assumption),
-the defined path is: update the requirements/architecture **and record the
-decision as an ADR**. Closes the loop that conformance depends on. Leans on
-the repo's existing ADR / `arcsop` machinery. Owns the **verify register** of
-provisional decisions and open validations that still need re-checking.
+**`doc-sync`** runs when the code diverges from the docs for a good reason. It
+updates the docs and records an ADR in [`adr/`](./adr/). It also sweeps the
+verify register: it closes the entries that the new learning settles. If the
+change makes a conformance check wrong, it updates that skill in the same PR.
 
 ### Ship
 
-**`mn-passport-skills-pr-open`** — sizing check against the **same tranche budget as
-the plan phase** (soft flag past ~400 net changed lines, split required past
-600 — estimates drift, so this is the backstop) and the **PR description** ("what's being built" + link to
-the spec tranche **and the spec's GitHub issue** — `Refs #NN`, or `Closes #NN`
-on the tranche that finishes it). **Prepares** the branch, commits, and
-description, then **stops for explicit human confirmation before
-pushing/opening** — the loop never performs the outward action on its own.
+**`pr-open`** runs the size check with the same script and numbers as CI. Over
+400 net lines, it warns and needs a justification in the PR. Over 600, it
+stops and proposes a split. It prepares the branch, the commits, and the
+description. If the spec has an issue, the description carries `Refs #NN`, or
+`Closes #NN` on the last tranche. Then it stops and gives the human a
+pre-filled compare URL and a copy of the description.
 
-### Watchers (fire on a schedule / on dependency changes, not per tranche)
+### Watchers
 
-**`mn-passport-skills-deps`** — upstream drift and supply-chain hygiene. Midnight
-breaks often, and the SDK pins midnight-js / ledger / zkir / compact **and**
-the ACC artefact (arch §8.2). This skill:
-- **Never adopts a package version younger than 7 days.** A version published
-  less than 7 days ago sits in a **cooldown quarantine** — the window in which
-  a supply-chain compromise of an underlying library is most often caught and
-  yanked. Adoption (new dependency or version bump) waits out the 7 days.
-  Checked against registry publish time (`npm view <pkg> time`). The only
-  override is an urgent security patch, taken as a *conscious, recorded*
-  decision — never silently.
-- Pins **exact versions** with a committed lockfile; verifies versions with
-  `npm view`, never from memory; adds **no custom registry config**
-  (`@midnight-ntwrk/*` are on public npm).
-- Maintains the **compatibility matrix** — the two version axes (wire:
-  `mn-passport-protocol`; binding: `mn-passport-contract` ↔ deployed ACC,
-  arch §4.6) — and flags when an upstream bump requires a matrix update.
-Leans on `release-notes` and `troubleshooting`.
+**`deps`** keeps dependencies safe and pinned:
 
-**`mn-passport-skills-devenv`** — guards the dev environment. Passkeys require an
-**HTTPS / secure context even locally** (a `localhost` HTTP redirect will not
-do), alongside devnet + proof server + compact CLI. Also confirms the
-**private debts repo is present and pushable** — `../mn-passport-sdk-debts`
-checked out beside this repo, with a working remote — since `security-audit`
-cannot record findings without it. Leans on `midnight-tooling:*` (devnet,
-proof-server, doctor).
+- **7-day cooldown.** It never adopts a version that is less than 7 days old.
+  It reads the publish time with `npm view <name> time`. The only exception is
+  an urgent security patch. The PR records it with a `Cooldown-override:` line.
+- **Exact pins** with a committed lockfile. No `^` or `~`, and no custom
+  registry configuration.
+- **Toolchain pins.** The build pins one midnight-js version and states which
+  behavior it uses. It also pins the exact zkir and midnight-zk crate
+  revisions, because proving keys change with the crate revision.
+- **Compatibility matrix.** It keeps the two version axes current. A bump that
+  moves an axis updates the matrix in the same PR.
 
-### Deferred (named, not built yet)
+It turns drift into backlog items through `spec-driver`. It never bumps a
+dependency silently inside an unrelated tranche.
 
-**`mn-passport-skills-release`** — version bump + changelog + publishing the
-compatibility matrix. Publish-time; sequence after the core loop is proven.
+**`devenv`** checks the environment before a tranche starts:
+
+- the private debts repository is present and can receive a push;
+- the local dev origin serves HTTPS, because passkeys need a secure context;
+- the devnet, the proof server, and the Compact CLI are ready;
+- the Node toolchain and the lockfile match the repository.
 
 ### Not skills
 
-- **Generic bug / quality review** — the harness's `/code-review` and
-  `/review` already do this; the lenses above encode *our* rules, which a
-  generic reviewer cannot know.
-- **The merge decision** — human.
-- **Per-feature spec *authoring*** — now its own Spine skill,
-  `mn-passport-skills-spec-author`, feeding `mn-passport-skills-spec-driver`.
+- **A generic code review.** The harness review commands do this. The lenses
+  hold the project rules only.
+- **The merge decision.** A human makes it.
 
-Fold-ins (not new skills): error-taxonomy + proof-provenance → conformance;
-UX / a11y / i18n + brand → code-style.
+## The loop for each tranche
 
----
+1. `devenv` confirms that the environment is ready.
+2. `spec-driver` moves the tranche to **In progress** in `STATE.md`.
+3. The agent implements the tranche. If the diff goes past 600 lines, it stops
+   and splits.
+4. The 4 lenses run in parallel. The agent fixes each blocking finding and runs
+   the lens again.
+5. `security-audit` pushes residual risks to the debts repository. `verify`
+   and `doc-sync` update the local verify register.
+6. If the code diverges from the docs for a good reason, `doc-sync` updates
+   the docs and records an ADR.
+7. `pr-open` prepares the branch and the description, and stops.
+8. The human pushes and opens the PR. CI runs. The human reviews and merges.
+9. `spec-driver` moves the tranche to **Done**, with the PR and issue links.
 
-## 3. Orchestrating a spec
-
-The unit of work is a **per-feature spec derived from `sdk/docs`** (the big
-docs are the source; a feature spec is what gets driven).
-
-0. **Author the spec** — `mn-passport-skills-spec-author` expands a
-   `docs/roadmap/milestones/` brief
-   into a concrete feature spec (scope, decisions, interfaces, acceptance,
-   verify plan, a proposed tranche outline), derived from requirements +
-   architecture and checked against the planning workspace, naming its
-   **GitHub issue** (stops and asks if none).
-1. **Plan** — `mn-passport-skills-spec-driver` reads that spec and turns it into
-   PR-sized, gated tranches; if the spec named no issue, it **stops and asks**
-   before planning.
-2. **Loop** — for each tranche:
-   a. `mn-passport-skills-devenv` confirms the environment is ready.
-   b. Implement the tranche.
-   c. Run the lenses in parallel: `conformance`, `security-audit`,
-      `code-style`, `verify`. Blocking findings are fixed before proceeding.
-   d. Registers update: security-audit → security register (committed and
-      pushed to the private `../mn-passport-sdk-debts` repo); verify/doc-sync
-      → verify register (gitignored, local).
-   e. If conformance finds the code diverging from the docs for a *good*
-      reason, `mn-passport-skills-doc-sync` updates `sdk/docs` + records an ADR — the
-      docs are corrected, not the code bent to a stale doc.
-   f. `mn-passport-skills-pr-open` prepares the branch + description, links the PR to
-      the spec's GitHub issue, and **stops**.
-   g. The hooks/CI gate runs; a human reviews and merges.
-3. **Repeat** until the spec's tranches are done. `STATE.md` reflects done /
-   in-progress / backlog throughout; anything not completed lands in the
-   backlog with a reason, never silently dropped.
-
-Running alongside, on their own cadence: `mn-passport-skills-deps` (drift + cooldown +
-matrix) and `mn-passport-skills-devenv`.
-
-### The PR feedback loop (`gh`)
-
-With an authenticated GitHub CLI (`gh auth login`), the review conversation
-moves onto the PR itself — recommended, because it keeps feedback anchored
-to the exact line it concerns and leaves a public record of the reasoning:
-
-1. **Claude opens the PR with `gh pr create`** (title and full description
-   in place) once a tranche passes its lenses — on the human's explicit go,
-   as always.
-2. **The developer reviews on GitHub**, leaving feedback as PR review
-   comments (inline on a line, or on the PR as a whole) — questions,
-   objections, and change requests alike.
-3. **The developer asks Claude to pick them up** ("check the comments on
-   PR #N"). Claude reads the threads (`gh api` / the REST API), works out a
-   solution, and — **before committing anything — presents the proposed fix
-   and its reasoning, and waits for the human to confirm they agree.**
-4. On confirmation, Claude commits (staging explicit paths only), pushes to
-   the PR branch, and **replies on the review thread** so the resolution is
-   recorded where the question was asked.
-
-The outward-action rule is unchanged: pushes, PR creation, and inline
-replies happen on the human's instruction; merging stays human. Without
-`gh`, the read-only fallback is the public REST API plus pre-filled compare
-URLs (the `pr-open` convention).
-
-### Diagram — the orchestration loop
-
-*(All skills prefixed `mn-passport-skills-`; shortened in nodes.)*
+A tranche that slips, blocks, or leaves scope goes to the backlog with a
+reason. The loop never drops work silently.
 
 ```mermaid
 flowchart TB
-  DOCS["sdk/docs: requirements + architecture (source of truth)"]
-  SPEC["per-feature spec (derived)"]
-  PLAN["spec-driver · PLAN: PR-sized gated tranches"]
+  DOCS["docs: requirements, architecture, deliverables"]
+  ISSUE["GitHub issue (midnightntwrk/passport)"]
+  AUTHOR["spec-author"]
+  PLAN["spec-driver plan: gated tranches"]
   IMPL["implement tranche"]
-  PR["pr-open: prepare branch + description — STOP for human"]
-  GATE["hooks / CI gate"]
-  HUMAN["human review / merge"]
-  DONE["feature complete"]
+  PR["pr-open: prepare, then STOP"]
+  HUMAN["human: push, open, review, merge"]
+  CI["CI checks"]
 
-  ISSUE["GitHub issue (midnightntwrk/passport)"] --> AUTHOR["spec-author: write the spec"]
-  DOCS --> AUTHOR --> SPEC --> PLAN --> IMPL
-  IMPL --> CONF["conformance (vs docs)"]
-  IMPL --> SEC["security-audit"]
-  IMPL --> STYLE["code-style"]
-  IMPL --> VERIFY["verify (runs the flow)"]
-  CONF --> PR
-  SEC --> PR
-  STYLE --> PR
-  VERIFY --> PR
-  PR --> GATE --> HUMAN
+  ISSUE --> AUTHOR
+  DOCS --> AUTHOR --> PLAN --> IMPL
+  DEVENV["devenv"] -. gate .-> IMPL
+  IMPL --> CONF["conformance"] & SEC["security-audit"] & STYLE["code-style"] & VER["verify"]
+  CONF & SEC & STYLE & VER --> PR --> HUMAN
+  HUMAN --> CI
   HUMAN -->|next tranche| IMPL
-  HUMAN -->|done| DONE
-  HUMAN -. updates .-> STATE["sdk/STATE.md: done / backlog (committed)"]
-
-  SEC -. "appends + pushes" .-> SREG["../mn-passport-sdk-debts: security register (private repo)"]
-  VERIFY -. open items .-> VREG[".mn-passport-skills/verify-register.md (gitignored)"]
-  CONF -. divergence .-> SYNC["doc-sync: update docs + ADR"]
+  HUMAN -. updates .-> STATE["STATE.md (committed)"]
+  SEC -. push .-> SREG["security register (private debts repo)"]
+  VER -. open items .-> VREG["verify register (gitignored)"]
+  CONF -. divergence .-> SYNC["doc-sync: docs + ADR"]
   SYNC -. corrects .-> DOCS
-
-  DEPS["deps: 7-day cooldown + compat matrix"] -. drift .-> DOCS
-  DEVENV["devenv: HTTPS + devnet ready"] -. gate .-> IMPL
+  DEPS["deps"] -. drift .-> PLAN
 ```
 
-### Diagram — the family by role
+### Review on the PR
 
-```mermaid
-flowchart LR
-  subgraph DRIVE["Author + drive"]
-    D0["spec-author"]
-    D1["spec-driver"]
-    D0 --> D1
-  end
-  subgraph LENSES["Per-tranche lenses"]
-    C1["conformance"]
-    C2["security-audit"]
-    C3["code-style"]
-    C4["verify"]
-  end
-  subgraph FEEDBACK["Feedback"]
-    F1["doc-sync"]
-  end
-  subgraph SHIP["Ship"]
-    S1["pr-open"]
-  end
-  subgraph WATCH["Watchers"]
-    W1["deps"]
-    W2["devenv"]
-  end
-  subgraph ENFORCE["Enforce — hooks / CI"]
-    E1["diff-size · gitignore · format+lint · 7-day dep cooldown"]
-  end
+With an authenticated GitHub CLI, the review happens on the PR:
 
-  DRIVE --> LENSES --> SHIP --> ENFORCE
-  LENSES --> FEEDBACK
-  WATCH -.-> DRIVE
-```
+1. The developer leaves review comments on GitHub.
+2. The developer asks the agent to read the comments of the PR.
+3. The agent proposes a fix and its reasons. It commits nothing before the
+   human agrees.
+4. After the human agrees, the agent commits with explicit paths. It pushes and
+   replies on the thread only on the instruction of the human.
 
-### `STATE.md` — progress and backlog
+Without the CLI, the agent reads the public REST API and gives pre-filled
+compare URLs.
 
-`sdk/STATE.md` is the human-readable, **committed** record of SDK development
-— distinct from the registers (§4), which are kept out of this repo because
-findings and open risks are not meant to ship with the code. `mn-passport-skills-spec-driver` maintains it as tranches land
-or slip, in three parts:
+## `STATE.md`
 
-- **Done** — completed tranches / PRs, each with its issue and PR links.
-- **In progress** — the tranche currently in the loop.
-- **Backlog** — tranches planned but **not completed** (deferred, blocked, or
-  descoped), each with a reason and its issue. This is where non-completed
-  tasks live so nothing is silently dropped.
+[`STATE.md`](../STATE.md) at the repository root is the committed record of
+progress. `spec-driver` updates it at each tranche transition. It has three
+parts:
 
-Because every entry carries an issue number (below), "what's done / what
-remains" is always traceable to the issue tracker.
+| Part | Content |
+|---|---|
+| Done | Completed tranches, each with its PR and issue links |
+| In progress | The one tranche in the loop now |
+| Backlog | Planned tranches that are not complete, each with a reason |
 
-### Issue traceability
+## Issue traceability
 
-Every per-feature spec **must name a GitHub issue** from
-[`midnightntwrk/passport/issues`](https://github.com/midnightntwrk/passport/issues).
-The chain runs **issue → spec → tranches → PRs → `STATE.md`**:
+The chain is issue, then spec, then tranches, then PRs, then `STATE.md`.
 
-- A spec without an issue → `mn-passport-skills-spec-driver`'s plan phase **stops and
-  asks** before starting work.
-- `mn-passport-skills-pr-open` links each PR back to that issue (`Refs #NN`, or
-  `Closes #NN` on the finishing tranche).
-- CI does not check the issue reference. `pr-open` adds it.
-- `STATE.md` entries carry the issue number, closing the loop.
+- Each spec names a GitHub issue in `midnightntwrk/passport`. Without an issue,
+  `spec-author` and the `spec-driver` plan phase stop and ask.
+- `pr-open` adds `Refs #NN` or `Closes #NN` to the PR description when an issue
+  exists.
+- CI does not check the issue reference.
+- Each `STATE.md` entry carries its issue number.
 
----
+## Registers
 
-## 4. Enforcement layer (hooks / CI)
+| Register | Owner | Location | Committed |
+|---|---|---|---|
+| Security register | `security-audit` | `../mn-passport-sdk-debts` (private repository) | There only, never here |
+| Verify register | `doc-sync`, fed by `verify` | `.mn-passport-skills/verify-register.md` | No, gitignored |
 
-Deterministic guarantees, run by the harness/CI rather than judged by a skill:
+Both registers only grow. A resolved entry is marked as resolved, with a date
+and a PR. Nobody deletes it.
 
-- **Diff-size guardrail** — the same numbers as the tranche budget: **soft
-  warning past 400 net changed lines, hard past 600** (excluding lockfiles,
-  generated code, test fixtures, and the standalone `experiments/` tree —
-  exploratory prototypes, not tranche work), pointing back to
-  `mn-passport-skills-pr-open`'s split suggestion. **In CI both thresholds
-  are advisory** (warnings on the PR, never blocking) — the hard split is
-  enforced inside the loop by `spec-driver`/`pr-open`, and merging an
-  exceptional over-budget PR (a migration, a large generated change) is a
-  human decision. Running the script locally without `--ci` still fails
-  hard past 600, which is what the loop obeys.
-- **Security register never in this repo** — security findings live in the
-  private sibling repo `../mn-passport-sdk-debts`; `.mn-passport-skills/` stays
-  git-ignored as a backstop so no register file can be committed here.
-- **Verify register gitignored** — `.mn-passport-skills/` is git-ignored; the verify
-  register lives there and never pushes.
-- **`STATE.md` committed** — `sdk/STATE.md` is *not* under `.mn-passport-skills/`;
-  progress and backlog are shared project state, tracked in the repo.
-- **Format + lint** pass.
-- **7-day dependency cooldown** — CI rejects a lockfile that introduces a
-  package version published less than 7 days ago, unless an override marker
-  (with a recorded reason) is present. The cooldown is also enforced
-  **natively at resolution time**: pnpm's `minimumReleaseAge: 10080` (with
-  `blockExoticSubdeps` and `trustPolicy: no-downgrade`) in
-  `pnpm-workspace.yaml`, and npm's `min-release-age = 7` in `.npmrc` — the
-  CI script remains the reviewed-delta check and carries the recorded
-  urgent-override mechanism.
+## Enforcement (hooks and CI)
 
-`.mn-passport-skills/` joins the repo's existing gitignored working dirs (`.planning/`,
-`.serena/`).
+| Check | Where | Behavior |
+|---|---|---|
+| Outward-action guard | Plugin hook | `git push`, `gh pr create`, `gh pr merge`, and `npm publish` from the agent need a human confirmation. |
+| Tranche budget | CI and `check-diff-size.sh` | Counts net changed lines. Lockfiles, generated code, test fixtures, and `experiments/` do not count. In CI, 400 and 600 are warnings. Locally, the script fails past 600. |
+| 7-day dependency cooldown | CI and `check-dep-cooldown.mjs` | Rejects a lockfile with a version less than 7 days old, unless the PR has a `Cooldown-override:` line. |
+| Cooldown at install | `pnpm-workspace.yaml`, `.npmrc` | pnpm and npm refuse versions less than 7 days old. Exact pins and no install scripts. |
+| Registers never tracked | CI | Fails if a path under `.mn-passport-skills/` is tracked or no longer gitignored. |
+| Lint, format, build, and test | CI | All must pass. |
 
----
+A human decides to merge an exceptional PR over budget, such as a migration.
 
-## 5. Conventions adopted
+## Readability standard
 
-Stated so the doc is decisive; each is revisitable.
+Each doc in `docs/` follows these rules:
 
-- **Prefix** `mn-passport-skills-` for every development skill.
-- **Specs are per-feature**, derived from `sdk/docs`; the big docs are the
-  source of truth.
-- **Tranche budget: 400 soft / 600 hard** net changed lines (excluding
-  lockfiles, generated code, test fixtures, and the standalone
-  `experiments/` tree). Applied three times with the same numbers:
-  plan-phase estimates (a plan with an over-budget tranche is invalid),
-  `pr-open`'s backstop check, and the CI guardrail.
-- **Two registers, two homes.** The *security register* (owned by
-  `security-audit`) lives in the **private sibling repo
-  `../mn-passport-sdk-debts`** and is committed + pushed there per PR. The
-  *verify register* of provisional / open-validation items (owned by
-  `doc-sync`, fed by `verify`) stays gitignored under `.mn-passport-skills/`.
-  Both persistent and appended — accepted risks and open validations
-  accumulate and are re-checked, not regenerated.
-- **The loop stops before outward actions** — it prepares PRs; it does not
-  push or open them without explicit human go. **One recorded exception:**
-  pushing the security register to the private `../mn-passport-sdk-debts`
-  repo, which exists precisely to receive those findings.
-- **Enforcement in hooks/CI, judgment in skills.**
-- **Packaged as one `mn-passport-skills` plugin** — the skills and their backing
-  hooks travel together.
-- **Every spec names a GitHub issue**; planning refuses to start without one.
-  Traceability runs issue → spec → tranches → PRs → `STATE.md`.
-- **`STATE.md` (committed)** tracks done / in-progress / backlog; the two
-  registers — security (private debts repo) and verify (gitignored) — track
-  residual risks and open validations.
+- **Shape.** A header block with status, date, and what the doc owns. A summary
+  first. One topic for each section, with heading depth three at most. Open
+  questions near the end. Sources last.
+- **Language.** ASD-STE100 Simplified Technical English: sentences of 25 words
+  or fewer, paragraphs of six sentences or fewer, active voice, and no
+  contractions. Use `must` for a rule and `can` for a possibility.
+- **Spelling.** American English, the Oxford comma, and dates as `YYYY/MM/DD`.
+  Code identifiers and quoted titles keep their spelling.
+- **Content.** Describe the current design only. History goes in ADRs and git.
+  Use no vendor names: write "the WaaS provider" and "the proving & settlement
+  service".
+- **Scanning.** Tables for parallel items, one Mermaid diagram for each main
+  flow, and few reference codes in the text.
 
----
+A checker script, `mn-passport-skills/scripts/check-ste.py`, is planned. It
+will check sentence length, paragraph length, contractions, and unapproved
+words. It is not in the repository yet.
 
-## 6. Open items
+## Open questions
 
-- Whether `mn-passport-skills-verify` is a distinct skill or simply "the loop always
-  runs `/verify` before `pr-open`". Drafted here as distinct (it wraps
-  existing tooling and owns register entries), revisitable.
-- ~~Whether per-feature spec authoring warrants its own skill.~~ **Resolved:**
-  authoring is now `mn-passport-skills-spec-author` (§2 Spine).
+1. **Release skill.** A future `release` skill will bump versions, write the
+   changelog, and publish the compatibility matrix. It starts after the loop
+   is proven.
+2. **STE checker in CI.** When `check-ste.py` lands, does CI run it on each
+   changed doc?
+
+## Sources
+
+- [`sdk-requirements.md`](./sdk-requirements.md): the normative rules.
+- [`architecture.md`](./architecture.md): the dependency rules and the kernel
+  invariant.
+- [`provider-integration.md`](./provider-integration.md): the provider contract.
+- SDK deliverables:
+  [`2026-09-25-sdk-deliverables.md`](./proposals/2026-09-25-sdk-deliverables.md).
+- SDK realignment:
+  [`2026-09-25-sdk-realignment.md`](./proposals/2026-09-25-sdk-realignment.md),
+  the normative rules and the external dependencies.
+- The skills: `mn-passport-skills/skills/*/SKILL.md`.
+- The CI checks: `.github/workflows/pr-checks.yml`, `mn-passport-skills/scripts/`.
+- [`CLAUDE.md`](../CLAUDE.md): the short orchestration guide.
