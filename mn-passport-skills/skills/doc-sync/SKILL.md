@@ -27,7 +27,7 @@ never bent to a stale doc.
 1. **Confirm the divergence is justified.** If the code is simply wrong,
    this is a conformance blocking finding — fix the code instead.
 2. **Update the docs** — `docs/sdk-requirements.md`, `docs/architecture.md`,
-   `docs/beta-scope.md`, or `docs/development-workflow.md` — minimally and
+   `docs/provider-integration.md`, or `docs/development-workflow.md` — minimally and
    precisely; bump the affected doc's status date (YYYY/MM/DD).
 3. **Record an ADR** at `docs/adr/NNNN-<slug>.md` (create the directory on
    first use; NNNN is sequential):

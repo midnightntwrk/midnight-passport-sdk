@@ -25,20 +25,18 @@ checks changes against it too.
 - [`docs/sdk-requirements.md`](./docs/sdk-requirements.md) — what / why.
 - [`docs/architecture.md`](./docs/architecture.md) — how (kernel, seams, adapters, packaging).
 - [`docs/provider-integration.md`](./docs/provider-integration.md) — the provider + proving-&-settlement-service contract.
-- [`docs/beta-scope.md`](./docs/beta-scope.md) — v1 scope.
-- [`docs/roadmap/roadmap.md`](./docs/roadmap/roadmap.md) — beta milestones M0–M4, dependencies, and what can run in parallel.
-- [`docs/roadmap/milestones/`](./docs/roadmap/milestones/) — per-milestone feature-spec briefs (`FS-x.y`).
-- [`docs/roadmap/specs/`](./docs/roadmap/specs/) — the full per-feature specs authored from those briefs.
+- [`docs/roadmap/roadmap.md`](./docs/roadmap/roadmap.md) — the order of work and the beta cut. Until it is filled in, the plan is the deliverables proposal (`docs/proposals/2026-09-25-sdk-deliverables.md`).
+- `docs/roadmap/specs/` — the per-feature specs, as they are authored.
 - [`docs/development-workflow.md`](./docs/development-workflow.md) — the full `mn-passport-skills` reference. **This file is the short orchestration guide; that is the detail.**
 
 ## Orchestrating the skills
 
-The unit of work is a **per-feature spec** (`FS-x.y`: brief in
-`docs/roadmap/milestones/`, full spec in `docs/roadmap/specs/`). Per spec:
+The unit of work is a **per-feature spec** in `docs/roadmap/specs/`, derived
+from the docs and one or more deliverables (`D…`). Per spec:
 
-1. **Author — `mn-passport-skills:spec-author`.** Expand the `FS-x.y` brief into a full
-   spec (scope, decisions, interfaces, acceptance, verify plan, proposed
-   tranches), derived from the source docs. It names the GitHub issue and
+1. **Author — `mn-passport-skills:spec-author`.** Write the full spec (scope,
+   decisions, interfaces, acceptance, verify plan, proposed tranches) from
+   the docs and the deliverables. It names the GitHub issue and
    **stops and asks if there is none**.
 2. **Plan — `mn-passport-skills:spec-driver` (plan phase).** Read the spec, confirm its
    issue, and break it into ordered PR-sized **gated tranches** (≤ 400 net lines
@@ -116,13 +114,12 @@ compatibility matrix) and `mn-passport-skills:devenv`.
 - Do not commit `.mn-passport-skills/` (nor `.planning/`, `.serena/`, `.midnight-expert/`).
 - Do not put a spec or code decision that is not derivable from `docs/` — raise
   a `doc-sync` instead.
-- Do not over-specify beyond `beta-scope.md` for v1 work.
+- Do not over-specify beyond the beta cut in the roadmap for v1 work.
 
 ## Start here
 
-New feature? Run `mn-passport-skills:spec-author` on an `FS-x.y` brief in
-[`docs/roadmap/milestones/`](./docs/roadmap/milestones/). See
-[`docs/roadmap/roadmap.md`](./docs/roadmap/roadmap.md) for
-what is in beta and what runs in parallel, and
+Development was reset on 2026/10/15: there is no code yet. New feature? Run
+`mn-passport-skills:spec-author` on a deliverable from
+[`docs/roadmap/roadmap.md`](./docs/roadmap/roadmap.md). See
 [`docs/development-workflow.md`](./docs/development-workflow.md) for the full
 skill reference.
