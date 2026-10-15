@@ -236,8 +236,9 @@ Three rules complete the invariant:
   grant key that is itself a passkey on the origin of the dApp. A request from
   a dApp on a different chain also gets its own tap (example 8).
 - **No device secret in a dApp or an agent.** The code of a dApp or an agent
-  holds only its grant key. The WaaS provider holds the embedded key, and a dApp
-  drives it only to onboard the user.
+  holds only its grant key. The WaaS provider holds the embedded key. A dApp
+  must drive it only to onboard the user, but the SDK cannot enforce this
+  (example 2).
 - **Encryption to an enclave** becomes mandatory when a trusted-hardware prover
   exists. Until then, the disclosure above applies.
 
@@ -324,7 +325,7 @@ const passport = await createPassport({
   metadata: waasMetadata(user), // ACC address and viewing key, on the user's key
   name: 'alice', prover, broadcast,
 });
-// Next: the usual grant ceremony (example 3). The dApp never uses this key again.
+// Next: the usual grant ceremony (example 3). The SDK does not use this key again.
 ```
 
 `connect/onboard` deploys the ACC, activates the embedded key of the provider as
@@ -332,8 +333,18 @@ the first device, claims the name, and writes the account metadata. It issues no
 grant. The user approves the grant of the dApp in the Passport app, where the
 user signs in with the same provider.
 
-**Known risk.** During activation, the page of the dApp drives the signatures of
-the provider. A hostile dApp can try to get more than the activation signed.
+**Known risk.** The page of the dApp drives the signatures of the provider, and
+this key is the full-authority first device. The SDK uses the key only for
+activation, but the SDK cannot stop the dApp. While the dApp holds a session
+with the provider, it can ask the key to sign more, for example `add_device`.
+Thus, the risk lasts for the whole session, not only for activation. The guard
+must cover the full session. The options are:
+
+- a signing policy at the provider that signs only the activation request for
+  the origin of the dApp;
+- an ACC rule that limits what a new first device can do;
+- a risk that the team accepts, records, and discloses to the user.
+
 Realignment open question 15 decides the guard.
 
 ### Example 3: connect, a joined call, and independent operation
@@ -345,14 +356,16 @@ import { joinIntents } from '@midnight-ntwrk/mn-passport-account';
 const passport = PassportConnect.create({ platform, prover, broadcast });
 
 // 1. Redirect to the Passport authorizer page (browser profile).
-await passport.requestGrant({ operations: ['withdraw_shielded'], color: NIGHT, perCall: 10n, total: 100n });
+await passport.requestGrant({ operations: ['withdraw_shielded_to_contract'], color: NIGHT, perCall: 10n, total: 100n });
 
 // 2. Back from the redirect: verify the grant on chain and take the handoff.
 const session = await passport.completeConnection(); // grant, private state, viewing key if read access
 
-// 3. Passport can close now. The dApp builds, signs, proves, and broadcasts.
-const accSpend = await session.grantSpend({ amount: 10n, to: dappContractAddress }); // intent 1
-const dappCall = await dappContract.callTx.claimAndRun(args); // intent 2, the dApp's own circuit
+// 3. Passport can close now. The dApp builds both parts first. It submits neither alone.
+const accSpend = await session.grantSpend({ amount: 10n, to: dappContractAddress }); // part 1: withdraw_shielded_to_contract
+const dappCall = await session.buildCall(dappContract, 'claimAndRun', args); // part 2: the dApp's own circuit, not submitted
+
+// 4. Join the two parts, then prove and submit the joined transaction once.
 await session.submit(joinIntents(accSpend, dappCall)); // write-back only after SucceedEntirely
 ```
 
@@ -361,8 +374,11 @@ and the key binding. The handoff gives the dApp a scoped key for its own WPP
 package, and `connect` wraps it as a private-state provider.
 
 A called contract cannot run a witness. Thus, a shielded spend from the ACC
-starts its own intent, and the transaction joiner adds the intent of the dApp
-(`addIntent`, never `merge`). The dApp composes the call; the SDK supplies the
+starts its own intent. The spend uses `withdraw_shielded_to_contract`, because
+the coin goes to the contract of the dApp. The dApp builds both parts before it
+submits anything. Then the transaction joiner adds the intent of the dApp
+(`addIntent`, never `merge`), and the dApp submits the joined transaction once.
+The dApp composes the call; the SDK supplies the
 ACC interface, the challenge, and the grant signature. The dApp writes its new
 state to WPP only after `SucceedEntirely`. If the write fails, the state stays
 local and the dApp tries again. [`dapp-connection.md`](./dapp-connection.md)
