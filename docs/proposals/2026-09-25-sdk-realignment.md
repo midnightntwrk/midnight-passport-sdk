@@ -381,7 +381,7 @@ flowchart TB
 |---|---|---|---|---|
 | Passkey | JubJub, from the PRF output of the passkey | Device | `core` (Passport app) | Signs in the tab, with no third party. This is the device model of the demo. |
 | Passkey on secp256r1 | p256 through profiled WebAuthn (`wa-json134`) | Device or grant | `core`, `connect` | The p256 arm exists (passport PR #175, Compact 0.35.0, runtime 0.20.0). It accepts exactly 134 bytes of `clientDataJSON` in a fixed field order, with a 21-byte origin. Other origin lengths, cross-origin iframes, and authenticator extensions are outside the profile. |
-| The embedded wallet of the provider | k256, envelope 0 | Device | `core` | Signs ACC challenges through the raw-signing call of the provider. The SDK enrolls it one time from a signature over a known digest. The reason is that the provider has no call to read the public key. |
+| The embedded wallet of the provider | k256, envelope 0 | Device: an optional backup owner key (§8.1) | `core` | Signs ACC challenges through the raw-signing call of the provider. The SDK enrolls it one time from a signature over a known digest. The reason is that the provider has no call to read the public key. |
 | Midnight connector wallet | k256 through the `signData` framing of the Midnight dApp connector (envelope 1, `midnight_signed_message:32:`) | Device, or a read-only grant | `core`, `connect` | Only a wallet whose `signData` uses the `ecdsa_secp256k1_sha256` scheme of the connector fits envelope 1. Other connector schemes do not make ECDSA over this digest, and they cannot enroll. The ACC accepts envelope-1 keys as devices. The scoped-grants MIP refuses them on the spend seam. Thus, as grants, they can only read. |
 | Ethereum-style wallet (for example MetaMask) | secp256k1 under EIP-191 (a keccak-256 digest) | — | — | **The ACC does not support it today.** The ACC accepts envelopes 0 and 1 only, and these wallets cannot sign a raw digest. Support needs a new envelope, which is a contract change with keccak-256 in the circuit. The other option is to sign through a provider wallet that can sign a raw digest (roadmap R10; open question 13). |
 | dApp per-origin key | JubJub or k256 (envelope 0), or p256 on the dApp origin | Grant | `connect` | One key for each account and each origin. The dApp never uses the same key again (MIP §3.2). |
@@ -460,7 +460,7 @@ key-provider model, and redefines two. It also adds two: the registry adapter an
 | `adapter-browser` | Browser runtime | **Keep** | No change. Load the two WASM runtimes in the correct order. The demo found that Safari fails if the order is wrong. | — |
 | `adapter-node` | Node runtime | **Keep, as `adapter-nodejs`** | The Node.js runtime for backends, which include `mn-passport-agent`. The new name tells which runtime it is. | `adapter-nodejs`. |
 | Registry adapter | — | **Add** | Agents need the circuit and the artifacts of a dApp at run time. | Behind the registry seam: a content-addressed fetch, verification, and a local cache. For a circuit, it gets the ZKIR and uses the SRS to make the verifier key again. Then it compares that key with the verifier key on chain (decision 6). |
-| `adapter-waas` | — | **Add** | The Passport app enrolls the embedded key of a WaaS provider as a second device, and it needs the metadata on that key. | It implements two seams: the key provider (k256, envelope 0) and the account metadata. It names no vendor. The first implementation is for the provider that the demo uses. Only `core` uses it, for owner operations. It enrolls the key only when the provider isolates it to the Passport app, and it never writes the viewing key in readable form (§8.1). |
+| `adapter-waas` | — | **Add** | The Passport app enrolls the embedded key of a WaaS provider as an optional backup owner key, and it needs the metadata on that key. | It implements two seams: the key provider (k256, envelope 0) and the account metadata. It names no vendor. The first implementation is for the provider that the demo uses. Only `core` uses it, for owner operations. It enrolls the key only when the provider isolates it to the Passport app, and it never writes the viewing key in readable form (§8.1). |
 
 ---
 
@@ -479,9 +479,10 @@ account with the p256 arm (52 circuits) takes ten waves (planning workspace
 `contract/README.md`, `GRANTS-CALLER.md`, `WEBAUTHN.md`). Then the first device
 becomes active, and the user claims the name.
 
-- **In the Passport app.** The passkey becomes the first device. If the user has
-  the embedded wallet of the provider, the app can enroll it as a second
-  device, under the isolation rule below. The app uses the signed request of
+- **In the Passport app.** At account creation, the passkey of the device
+  becomes the first owner key. Only the Passport app adds an owner key. Then
+  the user can opt in to a backup owner key: the embedded wallet of a WaaS
+  provider, under the isolation rule below. The app uses the signed request of
   FS-2.4 for this.
 - **From a dApp.** The dApp sends its usual grant request (§8.2). The
   authorizer page finds no account for the user, so the Passport app onboards
@@ -489,10 +490,12 @@ becomes active, and the user claims the name.
   per-origin key of the dApp. The redirect takes the user back to the dApp with
   the grant response. The dApp never drives a device key (decision 1).
 
-The embedded wallet of a WaaS provider is a device only in the Passport app.
-The second device keeps its full authority. A dApp can use the same key
-through the same provider. Thus, a second-device role alone does not stop an
-owner operation from a dApp, for example `add_device`.
+The embedded wallet of a WaaS provider is a backup owner key, and only the
+Passport app enrolls it. The user opts in. The key has the same authority as
+the passkey, and it works alone. Thus, it adds trust in the provider, and the
+app tells the user this. A dApp can reach the same key through the same
+provider. Thus, the backup role alone does not stop an owner operation from a
+dApp, for example `add_device`.
 
 The provider must do these things:
 
@@ -512,19 +515,25 @@ Each origin of the provider can read the metadata. Thus, the metadata splits
 in two parts:
 
 - **Public account metadata**, such as the ACC address. It finds the account.
-- **The viewing key.** It is never in readable form there. The provider keeps
-  it in a part that only the Passport app can read. Or, the app encrypts it
-  under a key that no other origin of the provider can get.
+- **The viewing key and the WPP account key.** They are never in readable
+  form there. The provider keeps them in a part that only the Passport app can
+  read. Or, the app encrypts them under a key that no other origin of the
+  provider can get.
 
 A dApp that signs in with the provider never gets the viewing key from the
 metadata. It gets the key only through a read grant, after consent (§8.5).
 The spec of `adapter-waas` has a second check. A dApp without read consent
 cannot recover the viewing key from the metadata.
 
-Later, the user can sign in with the same provider on a new device. The public
-metadata then finds the account. The Passport app recovers the viewing key, and
-it opens the payments that senders sealed to the account earlier. Then the key
-of the provider approves a new device.
+If the user loses the passkey, the user signs in to the Passport app with the
+same provider. The public metadata finds the account. Then the Passport app
+restores three things:
+
+- signing: the backup key approves a new passkey (`add_device`);
+- the viewing key, which opens the payments that senders sealed earlier;
+- the private state, through the WPP account key.
+
+The spec of `adapter-waas` checks all three.
 
 The provider itself holds a full-authority key for the user. Thus, the account
 is only as safe as the signing security of the provider. Passport tells the
@@ -871,9 +880,10 @@ New rules to add:
 - A dApp never onboards a user, and it never drives a device key. It sends a
   new user to the Passport app, which onboards the user and issues the grant of
   the dApp in the same visit (§8.1).
-- The Passport app enrolls the key of a WaaS provider only if the provider
-  isolates it to the Passport app. The provider metadata never holds the
-  viewing key in readable form (§8.1).
+- The Passport app enrolls a WaaS key only as an optional backup owner key,
+  and only if the provider isolates it to the Passport app.
+  The provider metadata never holds the viewing key or the WPP account key in
+  readable form (§8.1).
 - When the Passport app enrolls the key of a WaaS provider, it tells the user
   that the account is only as safe as the signing security of the provider.
 - Before Passport issues a read grant, and after it revokes one, it rotates
@@ -931,7 +941,7 @@ New rules to add:
 ## 11. Roadmap and beta
 
 - **M1 (managed onboarding)** becomes passkey-first, with the key of the
-  provider as a second device. The wave deploy and the check for partly
+  provider as an optional backup owner key. The wave deploy and the check for partly
   deployed accounts are in scope.
 - **M2 (connect)** becomes the grant ceremony. The MIP has no sign-in without a
   grant (§10: "There is no identity-only on-chain grant"). Thus, the

@@ -548,10 +548,13 @@ Two routes stay forbidden:
   such a key (errata 7 and 8).
 - The app drives the key of a WaaS provider as the first device (above).
 
-The Passport app can still enroll the embedded wallet of a WaaS provider as a
-device, but only if the provider isolates the key to the Passport app. The
-provider metadata never holds the viewing key in readable form (realignment
-§8.1). The reference demo already recovers an account on a new device from the
+The user can still add the embedded wallet of a WaaS provider as a backup
+owner key, in the Passport app. The key has the same authority as the passkey,
+so it adds trust in the provider. The app enrolls it only if the provider
+isolates the key to the Passport app. The provider metadata never holds the
+viewing key or the WPP account key in readable form (realignment §8.1). A
+recovery with this key restores signing, the viewing key, and the private
+state. The reference demo already recovers an account on a new device from the
 metadata on the user's key at its provider. The team can now define the scope
 of D16.
 
