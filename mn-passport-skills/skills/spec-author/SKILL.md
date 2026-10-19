@@ -5,7 +5,7 @@ description: Author a Midnight Passport SDK per-feature spec from the requiremen
 
 # spec-author — write the spec, then hand off
 
-The upstream of the mn-passport-skills spine (`docs/development-workflow.md` §2–3).
+The upstream of the mn-passport-skills spine (`docs/development-workflow.md`, "The skills").
 `spec-driver` *begins by reading* a spec (its plan phase, step 1); this skill
 *produces* that spec. It turns one or more deliverables into a full, derivable
 per-feature spec grounded in the source-of-truth docs.
@@ -29,10 +29,12 @@ per-feature spec grounded in the source-of-truth docs.
    [midnightntwrk/passport](https://github.com/midnightntwrk/passport/issues).
    If none is known, **STOP and ask** the user before finishing. This is the
    same gate `spec-driver` enforces, pulled forward so planning never stalls.
-3. **Respect the MUSTs.** Ceremony gate (requirements §2.2),
-   encrypt-preimage-to-enclave (§2.5), deposit-not-address (§3.12), `connect`
-   never links `core` (architecture §4.4), and the two version axes (§4.6). The
-   spec must not contradict these.
+3. **Respect the normative rules** in `docs/sdk-requirements.md` ("Normative
+   rules"): among them the ceremony gate (rule 1), the prover disclosure
+   (rule 2), deposit-not-address (rule 3), no `core` in `connect` or
+   `mn-passport-agent` (rule 4), the two version axes (rule 5), and owner keys
+   only in the Passport app (rules 11 and 12). The spec must not contradict
+   them.
 4. **Author only.** Do not decide the final **gated** tranche boundaries (that
    is `spec-driver`'s plan phase), do not write code, and never perform outward
    actions. Produce a *proposed* tranche outline for `spec-driver` to finalise
@@ -47,7 +49,7 @@ per-feature spec grounded in the source-of-truth docs.
    - **Surface & interfaces** — concrete types and signatures (finalise the
      brief's indicative sketches).
    - **Flow** — the sequence this feature performs; reference
-     `provider-integration.md` §3 where the provider or the proving & settlement
+     `provider-integration.md` where the provider or the proving & settlement
      service are involved.
    - **Dependencies** — internal feature specs and the external gate (the
      provider, the proving & settlement service, the contract team), noting what

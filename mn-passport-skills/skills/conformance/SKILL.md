@@ -6,87 +6,102 @@ description: Design-conformance review lens for Midnight Passport SDK changes �
 # conformance — the design guard
 
 Checks a change against the source of truth: `docs/sdk-requirements.md`
-(§ references below) and `docs/architecture.md` (arch §). Those SDK docs are
-themselves **derived from the Midnight Passport planning workspace**, so the
-change is also checked against that upstream — see §5. **The docs win over
-this checklist** — it is derived from them (as of 2026/07/28); if they have
-moved, re-derive from the docs and update this skill via `mn-passport-skills:doc-sync`.
+(cited as "requirements" with the section name, or "rule N" for its
+"Normative rules" table) and `docs/architecture.md` (cited as "architecture"
+with the section name). Those SDK docs are themselves **derived from the
+Midnight Passport planning workspace**, so the change is also checked against
+that upstream — see §5. **The docs win over this checklist** — it is derived
+from them (as of 2026/10/19); if they have moved, re-derive from the docs and
+update this skill via `mn-passport-skills:doc-sync`.
 
 Run over the tranche's diff, not the whole repo. Classify every finding as
 **blocking** (violates a rule below → fix before `pr-open`), **advisory**, or
 **divergence** (the code is right and the doc is wrong → route to
-`mn-passport-skills:doc-sync`; never bend correct code to a stale doc).
+`mn-passport-skills:doc-sync`; never bend correct code to a stale doc). Never
+flag what the docs do not require: a missing per-call ceremony, a missing
+enclave encryption before a trusted-hardware prover exists, or a signing arm
+other than JubJub are **not** findings.
 
-## 1. Package and dependency rules (arch §4.4)
+## 1. Package and dependency rules (architecture, "Dependency rules")
 
-- Dependencies point **inward** to `mn-passport-core`'s interfaces; nothing
-  points outward.
-- `mn-passport-connect` links **only** `mn-passport-protocol` and
-  `mn-passport-contract` — never `core` or any adapter. Deposits (§3.12) ride
-  `contract`, which is why `contract` is permitted there.
-- `mn-passport-core` holds **no platform code** (`fs`, `window`, `fetch`,
-  `WebSocket`) and **no concrete provider** — seam interfaces only.
-- `mn-passport-protocol` is types + constants only — **zero runtime logic**.
-- Adapters (`mn-passport-adapter-*`) depend only on the seam interface they
-  implement plus their own provider SDK. The provider-free default for each
-  seam always ships (§2.1, [P8]).
+- An entry library (`core`, `connect`, `mn-passport-agent`) depends on the
+  foundation; the foundation never depends on an entry library.
+- `mn-passport-account` depends only on `mn-passport-contract` and
+  `mn-passport-protocol`; those two depend on no other SDK package.
+- **`connect` and `mn-passport-agent` never link `core`** or a Passport-app
+  adapter, not even transitively. Shared code goes into `mn-passport-account`.
+- `mn-passport-ecosystems` depends only on `mn-passport-protocol`.
+- A shared adapter depends on the package that defines its seam and on its own
+  provider SDK — never on `core` or another adapter. A Passport-app adapter
+  (`adapter-storage-wpp`, `adapter-recovery`, `adapter-did`) implements a seam
+  from `core`, and only `core` uses it. `adapter-waas` is used only by `core`.
+- `core` and the foundation hold **no platform code** (`fs`, `window`,
+  `fetch`); the platform adapters supply it.
+- The SDK never compiles or owns the ACC; it consumes the published artifact.
+- `scripts/dependency-graph.mjs` is the graph; `scripts/lint-boundaries.mjs`
+  (imports) and `tests/dependency-rules.test.mjs` (manifests and project
+  references) enforce it. A new package enters the graph deliberately, in the
+  same PR.
 - Naming: packages under `@midnight-ntwrk/`, prefixed `mn-passport-`.
-- The SDK never owns or compiles the ACC contract — it consumes the
-  versioned published artefact via `mn-passport-contract` (arch §8.2), which
-  owns the connect-time version guard.
 
-## 2. Kernel secret boundary (arch §4.1, §5)
+## 2. Kernel secret boundary (architecture, "The core kernel invariant")
 
-- Only the kernel ever holds decrypted secrets. Secrets leave it **only** as:
-  (a) an in-circuit witness to a local prover, (b) an enclave-encrypted
-  preimage to a remote prover, or (c) ciphertext to storage/sync. Never
-  plaintext to an adapter, dApp, or agent.
-- Witness decryption happens only under the §2.2 ceremony; decrypted material
-  is ephemeral and **zeroised after proving** ([C7]).
-- Adapters receive scoped handles, never key material.
-- An agent holds a policy-gated **grant authoriser** — never the device or
-  account key (§3.8).
+- Only the kernel in `core` holds in plaintext: the PRF output and the JubJub
+  device key derived from it; the WPP account key and the package keys; the
+  viewing key. It derives the device key and the WPP account key for one
+  operation only.
+- Only the items in "What leaves the kernel" leave it: a signature over an ACC
+  challenge; the unproven transaction to the V1 prover (with the disclosure);
+  one WPP package key to its dApp at the handoff, after a tap and a separate
+  consent; ciphertext to WPP storage; the ACC address, with the viewing key and
+  the WPP account key only as ciphertext, in the metadata of an isolated WaaS
+  backup key.
+- The viewing key leaves whole only to the holder of a read grant, after a
+  separate consent, under the read-access lifecycle (rule 13).
+- On the p256 arm, the device key stays in the authenticator.
+- A dApp or an agent holds only its own grant key. It never holds or drives a
+  device key or an owner key (rules 9 to 11).
 
-## 3. Normative MUSTs (requirements doc)
+## 3. Normative rules (requirements, "Normative rules")
 
-- **§2.1** — the provider-free path stays viable at every release;
-  progressive decentralisation (managed → decentralised authoriser swap) is
-  an exposed, supported flow.
-- **§2.2** — every transaction confirmation requires a passkey/password
-  ceremony; per-dApp private state is encrypted at rest; the sole exception
-  to per-transaction ceremony is the agent path's policy-gated grants (§3.8).
-- **§2.3 / §3.7** — one signing primitive (Schnorr-on-Jubjub); external
-  identities (ECDSA, Ed25519, secp256k1) attach via the one-time signed
-  binding, committed as a typed ACC device entry; no second key hierarchy for
-  DIDs.
-- **§2.5** — the proving preimage is **encrypted to the prover's enclave key
-  before it leaves the device** (both remote variants); the SDK does **not**
-  perform enclave attestation (delegated upstream — an accepted, registered
-  risk); the in-tab → remote fallback is **consent-gated, never silent**,
-  with a standing reminder while remote proving is active; proof provenance
-  (where proved, who submitted) is surfaced truthfully as a first-class
-  event; the k-threshold is measured and configurable, not a constant.
-- **§3.6** — only non-reconstructable secrets sync; the blob is sealed under
-  the ceremony envelope before leaving the device; the vendor keystore is one
-  adapter behind the storage/sync seam, not the mechanism; sync is not
-  recovery.
-- **§3.9** — Passport-supplied witness provisioning is scoped, consented,
-  and ceremony-gated, per dApp — never blanket profile access.
-- **§3.12** — funding an account is a **deposit contract call**; UIs and
-  integrations never present the raw ACC address as a payment address.
-- **Arch §4.5** — the irreplaceable state tier requires a confirmed durable
-  backup before the user accrues such state; local stores hold ciphertext
-  only (`{version, nonce, ciphertext}`).
+Check each rule the change touches:
+
+1. **Ceremony gate** — a passkey tap at grant issuance and at the handoff; no
+   tap per call, except for a grant key that is a passkey on the dApp origin.
+   Each passkey signature in the Passport app needs a tap.
+2. **Prover disclosure** — the V1 prover sees the private inputs of each proof,
+   for the ACC and for each dApp circuit; the user is told. Enclave encryption
+   becomes mandatory once a trusted-hardware prover exists.
+3. **Deposit, not address** — a payment to an account is a deposit call; UIs
+   never present the raw ACC address as a payment address.
+4. **No `core` in `connect` or `mn-passport-agent`** (§1 above).
+5. **Two version axes** (§4 below).
+6. **A full shielded address**, both halves from one parsed address.
+7. **The recipient key at the time of the seal**, and again for each retry.
+8. **Write-back after `SucceedEntirely`** on each submit path.
+9. **Independent operation** — after the grant and the handoff, a dApp or an
+   agent signs with its own grant key, with Passport closed.
+10. **One grantee key** for each account and each origin.
+11. **No onboarding in a dApp** — only the Passport app adds an owner key.
+12. **The WaaS key only as an isolated backup owner key**, with protected,
+    authenticated, and current metadata (provider-integration, "The WaaS
+    provider").
+13. **The read-access lifecycle** — rotate before share, re-seal or mark after
+    each rotation, rotate on revocation.
+14. **No user-held DUST** on any SDK path.
+
+**Signing arms.** The ACC verifies four arms: k256 envelope 0, k256 envelope
+1, p256, and JubJub (requirements, "Signing digests"). A key on any arm is
+valid; check that the change builds the exact digest of its arm and builds
+each challenge from the arguments of the circuit.
 
 ## 4. Structure and state
 
-- Approach 2 with Approach-3-shaped seams (arch §3): imperative flows over a
-  real kernel boundary; seam interfaces already adapter-shaped.
-- **Two version axes, never conflated** (arch §4.6): wire
-  (`PROTOCOL_VERSION`, dApp ↔ wallet) vs binding (`mn-passport-contract` ↔
-  deployed ACC range, arch §8.2).
-- No module-global singletons; instance-scoped and disposable; observable
-  reads, imperative writes through the pipeline (arch §4.3, §7).
+- Approach 2 with seams that already have the approach 3 shape (architecture,
+  "Design approach"): observable reads, imperative writes.
+- **Two version axes, never conflated** (rule 5): wire (`PROTOCOL_VERSION` in
+  `mn-passport-protocol`) vs binding (`mn-passport-contract` ↔ the deployed
+  ACC). The matrix lives in `docs/compatibility.md`.
 
 ## 5. Planning-workspace conformance (the `passport` repo)
 
@@ -100,9 +115,8 @@ upstream too:
   `github.com/midnightntwrk/passport` — `docs/plans/components/` for the
   canvases, `docs/mps-mip/` for the MIPs.
 - Every `[C…]` / `[P…]` a change or spec cites must match the **current**
-  canvas: the component's chosen alternative and its decided status (e.g. C1
-  and C5 fix Schnorr-on-Jubjub verified in-circuit; C4 the custody model; C2
-  the name service). A change that contradicts a **decided** canvas is
+  canvas: the component's chosen alternative and its decided status (e.g. C4
+  the custody model; C2 the name service). A change that contradicts a **decided** canvas is
   **blocking**.
 - Where an SDK-doc reference and the upstream canvas disagree, the **upstream
   canvas wins**: treat it as a **divergence** → `mn-passport-skills:doc-sync` (fix the

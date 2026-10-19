@@ -70,13 +70,22 @@ compatibility matrix) and `mn-passport-skills:devenv`.
 
 ## Normative MUSTs (`conformance` checks these)
 
-- **Ceremony gate** before any witness use (requirements §2.2).
-- **Encrypt the proof preimage to the enclave** before remote proving (§2.5).
+`docs/sdk-requirements.md` ("Normative rules") owns the full list; these are
+the ones most often in play:
+
+- **Ceremony gate** — a passkey tap when Passport issues a grant and when the
+  private-data handoff completes; no tap per call (rule 1).
+- **Prover disclosure** — the V1 prover sees the private inputs of each proof,
+  and the user is told; enclave encryption becomes mandatory only once a
+  trusted-hardware prover exists (rule 2).
 - **Deposit, not address** — paying an account is a deposit contract call, never
-  a raw address transfer (§3.12).
-- **`connect` never links `core`** (architecture §4.4).
+  a raw address transfer (rule 3).
+- **`connect` and `mn-passport-agent` never link `core`** (rule 4; architecture
+  "Dependency rules").
 - **Two version axes** — wire (`mn-passport-protocol`) and binding
-  (`mn-passport-contract` ↔ deployed ACC) (§4.6).
+  (`mn-passport-contract` ↔ deployed ACC) (rule 5).
+- **Owner keys only in the Passport app** — a dApp never onboards a user; a
+  WaaS key is only an isolated backup owner key (rules 11 and 12).
 
 ## Conventions
 
