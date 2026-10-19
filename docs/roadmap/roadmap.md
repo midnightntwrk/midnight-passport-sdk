@@ -12,8 +12,9 @@
   ([`2026-09-25-sdk-deliverables.md`](../proposals/2026-09-25-sdk-deliverables.md))
   lists the work as deliverables (D1, D2, …), with lanes and waves. Until this
   roadmap is filled in, that proposal is the plan.
-- WaaS onboarding (D16) and the private-data handoff (D14) are in beta
-  (decision of 2026/10/14).
+- Onboarding from a dApp through the Passport app (D16) and the private-data
+  handoff (D14) are in beta (decision of 2026/10/14). A dApp never onboards a
+  user; it sends the user to the Passport app (amended 2026/10/19).
 
 ## Milestones
 
