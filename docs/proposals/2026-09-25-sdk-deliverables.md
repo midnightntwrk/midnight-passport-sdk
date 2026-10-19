@@ -1,6 +1,7 @@
 # SDK deliverables — working draft
 
-> **Status:** working draft · 2026/09/25
+> **Status:** working draft · 2026/09/25 · amended 2026/10/19 (§6: a new user
+> creates their Passport in the Passport app)
 > **Purpose:** this file lists the SDK's deliverables as functional groups, in the
 > order of their dependencies. It maps them to the Passport product roadmap. It is
 > input to the SDK statement of work.
@@ -423,22 +424,9 @@ D16 gives an app ready parts, so that the app can add Passport in a few lines:
 - sponsored first fees;
 - a starter project as an AI-agent skill.
 
-D16 also lets an app onboard a new user inside the app, through a WaaS provider
-that supports metadata attached to the user's key (§6). The entry point
-`mn-passport-connect/onboard` does these steps:
-
-- it deploys the ACC and activates the key of the provider as the first device;
-- it claims the name;
-- it writes the account metadata to the key of the user at the provider.
-
-`adapter-waas` supplies the key of the provider and the metadata. The app does
-not issue its own grant. It then gets its grant through the usual grant
-ceremony (D13), and the user approves it in the Passport app. After onboarding,
-the app never uses the key of the provider again.
-
-During activation, the page of the app drives the signatures of the provider.
-Open question 1 asks which guard makes sure that the provider
-signs only the activation (§6).
+An app never onboards a user itself (§6). The Passport app onboards a new user
+and issues the grant of the app (D13) in the same visit. Then it goes directly
+back to the app.
 
 **D17 — Onboarding measurements** (R14)
 
@@ -534,34 +522,36 @@ shows the capabilities that need work outside the SDK.
 ## 6. Decided: where a new user creates their Passport
 
 The product review of 2026/09/25 identified a risk: apps will not integrate
-Passport if a new user must leave the app to create a Passport. The decision is:
-a new user can create a Passport inside the app. The condition is that the app
-onboards the user through a wallet-as-a-service (WaaS) provider. That provider
-must support metadata attached to the user's key.
+Passport if a new user must leave the app to create a Passport. That review
+first let an app create a Passport inside the app, through a
+wallet-as-a-service (WaaS) provider.
 
-The app uses the key of the provider only to create the account. It does not
-issue its own grant. The app then gets its grant through the usual grant
-ceremony, as each other app does. The user approves it in the Passport app,
-where the user signs in with the same provider. After onboarding, the app never
-uses the key of the provider again.
+_Amended 2026/10/19._ The architecture review (SDK PR #29) reversed this. On
+that route, the page of the app drives the key of the provider. That key is the
+full-authority first device. Thus, a malicious app can make the key sign more
+than the activation, for example a new device. No guard closes this risk for
+the whole session.
 
-**Known risk.** During activation, the page of the app drives the signatures of
-the provider. Thus, a hostile app can try to get more than the activation
-signed, for example a new device. Open question 1 asks which guard closes this
-risk: a signing policy at the provider, an ACC rule for a new first device, or a
-risk that the team accepts and records.
+The decision now is: a new user creates their Passport only in the Passport
+app. The app sends the user there with its grant request. The Passport app
+creates the account and issues the grant of the app in the same visit. Then it
+goes directly back to the app.
 
 | Route | Experience of a new user | What it costs |
 |---|---|---|
-| **In the app, through a WaaS provider** | The user signs in with the provider inside the app. The app creates the Passport there, with no hand-off | The key of the provider for the user is the first device of the account. The provider holds it for the user, and the code of the app does not hold it. The provider attaches the metadata of the account (its address and viewing key) to that key. Thus the user finds and recovers the account anywhere they sign in with the same provider, also in the Passport app. The provider can read that metadata, so it can see the payments to the account. The metadata alone gives no authority to spend. But the provider holds a full-authority key for the user, so the account is only as safe as the signing security of the provider. |
-| **In the Passport app, then return** | The user taps "Continue with Passport". The Passport app opens, creates the account, and goes directly back to the grant request of the app | One hand-off. This is the route for an app without a WaaS provider. |
+| **In the Passport app, then return** | The user taps "Continue with Passport". The Passport app opens, creates the account, approves the grant request of the app, and goes directly back | One hand-off. This is the only route. D16 keeps it short. |
 
-One route stays forbidden: the app creates the Passport with a device secret in
-its own code (the superseded partner-origin facade). Device revocation cannot
-reliably remove such a key (errata 7 and 8). Also, the app must then configure
-backup and metadata itself. The reference demo already recovers an account on a
-new device from the metadata on the user's key at its provider. The team can now
-define the scope of D16.
+Two routes stay forbidden:
+
+- The app creates the Passport with a device secret in its own code (the
+  superseded partner-origin facade). Device revocation cannot reliably remove
+  such a key (errata 7 and 8).
+- The app drives the key of a WaaS provider as the first device (above).
+
+The Passport app can still enroll the embedded wallet of a WaaS provider as a
+device. The reference demo already recovers an account on a new device from the
+metadata on the user's key at its provider. The team can now define the scope
+of D16.
 
 ---
 
@@ -589,10 +579,9 @@ define the scope of D16.
 
 ## 8. Open questions
 
-1. When an app creates a Passport, which guard makes sure that the provider
-   signs only the activation (§6; realignment open question 15)? The options
-   are a signing policy at the WaaS provider, an ACC rule for a new first
-   device, or a risk that the team accepts and records.
+1. _Closed 2026/10/19._ The guard during activation: an app never creates a
+   Passport, so its page never drives a full-authority key (§6; realignment
+   open question 15).
 2. Who builds the registry of dApp code, and in which form (§5, D19)?
 3. Can an agent receive the private data of a dApp (D19)?
 4. Ethereum-style wallets: do they need a new envelope, or do they join through a
