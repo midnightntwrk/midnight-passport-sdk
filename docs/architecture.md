@@ -149,7 +149,7 @@ foundation, never from `core`.
 | `adapter-fee-capacity-exchange` | Fees | The other fee route: a swap through the Capacity Exchange. Planned for later. |
 | `adapter-browser` | Platform | The browser runtime: passkeys with PRF and the two WASM runtimes in the correct order. |
 | `adapter-nodejs` | Platform | The Node.js runtime for backends, `mn-passport-agent` included. |
-| `adapter-waas` | Key provider, account metadata | The embedded key of a WaaS provider (k256, envelope 0) and the metadata on it. It names no vendor. Only `core` uses it, because this key is a full-authority device (example 2). |
+| `adapter-waas` | Key provider, account metadata | The embedded key of a WaaS provider (k256, envelope 0) and the metadata on it. It names no vendor. Only `core` uses it, because this key is a full-authority device. It enrolls the key only when the provider isolates it to the Passport app. It never writes the viewing key in readable form (the kernel invariant). |
 | Registry adapter (name open) | Registry | Content-addressed fetch, verification, and a local cache. It makes the verifier key again from the ZKIR and the SRS, and compares it with the key on chain. |
 | `adapter-multi-chain` | Multi-chain | **After V1.** It connects to a multi-chain signature network. The network signs for the ACC on other chains, after the ACC authorizes the intent. |
 | `adapter-prover-wasm` | Prover | **After V1.** ACC proving keys are 112–224 MB, and the zkir WASM package has no key generation. |
@@ -211,7 +211,8 @@ output and the key. It never stores or sends them. The p256 arm gives a
 stronger boundary, because no secret enters the page.
 
 A device from a WaaS provider is outside the kernel. The provider holds that
-key, and the kernel gets only its signatures.
+key, and the kernel gets only its signatures. Passport enrolls such a key only
+if the provider isolates it to the Passport app (the rules below).
 
 ### What leaves the kernel
 
@@ -224,21 +225,45 @@ it:
 | The unproven transaction | The V1 prover | The prover sees the coin and the amount. The user is told. |
 | A key for one WPP package | One dApp | At the handoff, after a passkey tap and a separate consent. It opens only the package of that dApp. |
 | Ciphertext | WPP storage | Always |
+| The ACC address, and the viewing key only as ciphertext | The metadata of an isolated WaaS device | Each origin of the provider can read it. Only the Passport app can get the key of that ciphertext. |
 
 The viewing key is the one exception: it leaves the kernel whole. It goes to a
-holder of a read grant, after a separate consent. A revocation cannot take it
-back, so after Passport revokes a read grant, it rotates the encryption key of
-the account (`rotate_enc_key`).
+holder of a read grant, after a separate consent. Its lifecycle follows
+scoped-grants MIP §8:
 
-Three rules complete the invariant:
+- **Rotate before share.** Before Passport issues a grant with read access, it
+  calls `rotate_enc_key` and re-encrypts the live holdings into new inbox
+  entries. Thus, the holder reads current and future holdings, not spent
+  history.
+- **Re-seal after each rotation.** A rotation blinds each other holder of a
+  read grant. Passport re-seals the new key to each of these grants, or it
+  marks them as needing reconnection and shows this to the user.
+- **Revoke.** When Passport revokes a read grant, it rotates, re-encrypts the
+  live holdings, and re-seals to the remaining holders. The revoked holder
+  keeps what it already read. The consent screen says this in advance.
+
+The spec of the read-grant lifecycle owns partial completion and cost.
+
+The metadata of a WaaS device never holds the viewing key in readable form.
+Each origin of the provider can read that metadata. Thus, Passport keeps the
+viewing key out of it, or encrypts it under a key that only the Passport app
+can get. A dApp gets the viewing key only through a read grant.
+
+These rules complete the invariant:
 
 - **The ceremony gate.** A passkey tap occurs when Passport issues a grant and
   when the handoff completes. There is no tap for each call. The exception is a
   grant key that is itself a passkey on the origin of the dApp. A request from
   a dApp on a different chain also gets its own tap (example 8).
 - **No device key in a dApp or an agent.** The code of a dApp or an agent
-  holds only its grant key, and it never drives a device key. Only the
-  Passport app drives the embedded key of a WaaS provider (example 2).
+  holds only its grant key, and it never drives a device key (example 2).
+- **A WaaS key becomes a device only when the provider isolates it.** The
+  provider gives Passport a key or session that no other origin can use. As
+  an alternative, the provider enforces a signing policy. That policy refuses
+  each ACC owner operation from another origin. Without one of these, Passport
+  does not enroll the key. The `adapter-waas` spec has a negative acceptance
+  check. After enrollment, a dApp session with the same provider cannot get a
+  signature for an owner operation, for example `add_device`.
 - **Encryption to an enclave** becomes mandatory when a trusted-hardware prover
   exists. Until then, the disclosure above applies.
 
@@ -256,7 +281,7 @@ flowchart TB
   subgraph EXT["External services"]
     PROVER["Prover<br/>sees coin and amount"]
     SPONSOR["Sponsor<br/>pays fees, broadcasts"]
-    WAAS["WaaS provider<br/>full-authority key, reads metadata,<br/>driven only by the Passport app"]
+    WAAS["WaaS provider<br/>full-authority key, isolated to the Passport app,<br/>no readable viewing key"]
     WPP["WPP storage<br/>ciphertext only"]
     IDX["Indexer<br/>sees what the viewing key opens"]
   end
@@ -272,7 +297,7 @@ flowchart TB
   AGENT --> PROVER
   PROVER --> SPONSOR
   SPONSOR --> ACC
-  WAAS -->|"signs as the first device"| ACC
+  WAAS -->|"signs as a device"| ACC
 ```
 
 Each external service carries the one trust assumption in its label. The WaaS
@@ -310,7 +335,7 @@ the 15,000-byte verifier budget, so the wave count comes from the artifacts.
 Then `core` activates the passkey as the first device and claims the name. The
 prover proves each wave, and `adapter-broadcast` gives it to the sponsor. If the
 user has the embedded wallet of a WaaS provider, the app can enroll it as a
-second device.
+second device, but only if the provider isolates the key to the Passport app.
 
 ### Example 2: a new user who arrives from a dApp
 

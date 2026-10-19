@@ -549,7 +549,9 @@ Two routes stay forbidden:
 - The app drives the key of a WaaS provider as the first device (above).
 
 The Passport app can still enroll the embedded wallet of a WaaS provider as a
-device. The reference demo already recovers an account on a new device from the
+device, but only if the provider isolates the key to the Passport app. The
+provider metadata never holds the viewing key in readable form (realignment
+§8.1). The reference demo already recovers an account on a new device from the
 metadata on the user's key at its provider. The team can now define the scope
 of D16.
 

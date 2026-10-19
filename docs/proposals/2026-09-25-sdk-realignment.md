@@ -460,7 +460,7 @@ key-provider model, and redefines two. It also adds two: the registry adapter an
 | `adapter-browser` | Browser runtime | **Keep** | No change. Load the two WASM runtimes in the correct order. The demo found that Safari fails if the order is wrong. | — |
 | `adapter-node` | Node runtime | **Keep, as `adapter-nodejs`** | The Node.js runtime for backends, which include `mn-passport-agent`. The new name tells which runtime it is. | `adapter-nodejs`. |
 | Registry adapter | — | **Add** | Agents need the circuit and the artifacts of a dApp at run time. | Behind the registry seam: a content-addressed fetch, verification, and a local cache. For a circuit, it gets the ZKIR and uses the SRS to make the verifier key again. Then it compares that key with the verifier key on chain (decision 6). |
-| `adapter-waas` | — | **Add** | The Passport app enrolls the embedded key of a WaaS provider as a second device, and it needs the metadata on that key. | It implements two seams: the key provider (k256, envelope 0) and the account metadata. It names no vendor. The first implementation is for the provider that the demo uses. Only `core` uses it, for owner operations. A dApp never drives this full-authority key (decision 1). |
+| `adapter-waas` | — | **Add** | The Passport app enrolls the embedded key of a WaaS provider as a second device, and it needs the metadata on that key. | It implements two seams: the key provider (k256, envelope 0) and the account metadata. It names no vendor. The first implementation is for the provider that the demo uses. Only `core` uses it, for owner operations. It enrolls the key only when the provider isolates it to the Passport app, and it never writes the viewing key in readable form (§8.1). |
 
 ---
 
@@ -480,8 +480,9 @@ account with the p256 arm (52 circuits) takes ten waves (planning workspace
 becomes active, and the user claims the name.
 
 - **In the Passport app.** The passkey becomes the first device. If the user has
-  the embedded wallet of the provider, the app enrolls it as a second device.
-  The app uses the signed request of FS-2.4 for this.
+  the embedded wallet of the provider, the app can enroll it as a second
+  device, under the isolation rule below. The app uses the signed request of
+  FS-2.4 for this.
 - **From a dApp.** The dApp sends its usual grant request (§8.2). The
   authorizer page finds no account for the user, so the Passport app onboards
   the user first, as above. Then, in the same visit, it issues the grant to the
@@ -489,23 +490,45 @@ becomes active, and the user claims the name.
   the grant response. The dApp never drives a device key (decision 1).
 
 The embedded wallet of a WaaS provider is a device only in the Passport app.
-The app writes the ACC address and the viewing key to the metadata that the
-provider keeps on the key of the user. The provider must do these things:
+The second device keeps its full authority. A dApp can use the same key
+through the same provider. Thus, a second-device role alone does not stop an
+owner operation from a dApp, for example `add_device`.
+
+The provider must do these things:
 
 - hold the key for the user, and sign raw ACC challenges with it;
+- **isolate the key to the Passport app.** It gives Passport a key or session
+  that no other origin can use. Or, it enforces a signing policy that refuses
+  each ACC owner operation from another origin;
 - keep metadata on the key of the user, which the sign-in of the user can read
   and write from each origin that the provider serves;
 - let the Passport app sign in as the user.
 
-Later, the user can sign in with the same provider on a new device. That
-metadata then finds the account and opens the payments that senders sealed to
-it earlier. Then the key of the provider approves a new device.
+Without isolation, the Passport app does not enroll the key. The spec of
+`adapter-waas` has a negative acceptance check. After enrollment, a dApp
+session with the same provider cannot get a signature for an owner operation.
 
-The provider can read that metadata. With a viewing key there, the provider can
-see what the account receives. The viewing key alone gives no authority to
-spend. But the provider also holds a full-authority key for the user. Thus, the
-account is only as safe as the signing security of the provider. Passport tells
-the user this (§9).
+Each origin of the provider can read the metadata. Thus, the metadata splits
+in two parts:
+
+- **Public account metadata**, such as the ACC address. It finds the account.
+- **The viewing key.** It is never in readable form there. The provider keeps
+  it in a part that only the Passport app can read. Or, the app encrypts it
+  under a key that no other origin of the provider can get.
+
+A dApp that signs in with the provider never gets the viewing key from the
+metadata. It gets the key only through a read grant, after consent (§8.5).
+The spec of `adapter-waas` has a second check. A dApp without read consent
+cannot recover the viewing key from the metadata.
+
+Later, the user can sign in with the same provider on a new device. The public
+metadata then finds the account. The Passport app recovers the viewing key, and
+it opens the payments that senders sealed to the account earlier. Then the key
+of the provider approves a new device.
+
+The provider itself holds a full-authority key for the user. Thus, the account
+is only as safe as the signing security of the provider. Passport tells the
+user this (§9).
 
 The metadata is small (as little as 2 KB with some providers). Thus, it holds
 only keys and references, never private state.
@@ -717,18 +740,26 @@ code of the dApp does not change.
 - **Revocation of private-state access.** A revocation does not take back data
   that the dApp already read. Thus, Passport rotates the key of that package and
   seals the package again to the new key. Passport tells the user this.
-- **Revocation of read access.** A grant with read access gives the dApp the
-  viewing key. A revocation does not take that key back. Thus, after Passport
-  revokes a read grant, it must rotate the encryption key (`rotate_enc_key`).
-  Senders then seal new deliveries to the new key. Notes sealed before the
-  rotation stay readable to the revoked party. Passport tells the user this.
+- **The read-access lifecycle (scoped-grants MIP §8).** A grant with read
+  access gives the dApp the viewing key. A revocation does not take that key
+  back. Passport has three duties:
+  - **Rotate before share.** Before it issues a read grant, Passport calls
+    `rotate_enc_key` and re-encrypts the live holdings into new inbox entries.
+    Thus, the new holder cannot read spent history.
+  - **Re-seal after each rotation.** A rotation blinds each other holder of a
+    read grant. Passport re-seals the new key to each of these grants, or it
+    marks them as needing reconnection and shows this to the user.
+  - **Revoke.** After Passport revokes a read grant, it rotates, re-encrypts
+    the live holdings, and re-seals to the remaining holders. Senders then
+    seal new deliveries to the new key. Notes sealed before the rotation stay
+    readable to the revoked party. The consent screen says this in advance.
 - **Where each type of data goes.**
 
 | Data | Tier | Where |
 |---|---|---|
 | The private state of a dApp | Irreplaceable | WPP |
 | The coin store of the ACC (the data of `held_coin`, queued coins, positions) | Passport can make it again from the on-chain inbox with the viewing key | Local cache only |
-| Viewing key, ACC address, grant references | Small, they change rarely, and each client needs them | WPP metadata, or the `largeBlob` of the passkey (open question 4). For accounts with a WaaS device: the metadata of the provider on the key of the user (§8.1). |
+| Viewing key, ACC address, grant references | Small, they change rarely, and each client needs them | WPP metadata, or the `largeBlob` of the passkey (open question 4). For accounts with a WaaS device: the provider metadata on the key of the user, never with a readable viewing key (§8.1). |
 | Device keys | Passport can make them again from the passkey | Passport does not store them |
 
 The storage doc also needs three WPP rules, which it does not have now:
@@ -840,11 +871,14 @@ New rules to add:
 - A dApp never onboards a user, and it never drives a device key. It sends a
   new user to the Passport app, which onboards the user and issues the grant of
   the dApp in the same visit (§8.1).
+- The Passport app enrolls the key of a WaaS provider only if the provider
+  isolates it to the Passport app. The provider metadata never holds the
+  viewing key in readable form (§8.1).
 - When the Passport app enrolls the key of a WaaS provider, it tells the user
-  that the provider can read the account metadata. It also tells the user that
-  the account is only as safe as the signing security of the provider.
-- After Passport revokes a grant with read access, it rotates the encryption
-  key of the account and tells the user (§8.5).
+  that the account is only as safe as the signing security of the provider.
+- Before Passport issues a read grant, and after it revokes one, it rotates
+  the encryption key of the account and re-encrypts the live holdings. It re-seals the new key to the remaining read grants, or marks them
+  as needing reconnection (§8.5).
 - After Passport revokes private-state access, it rotates the key of that
   package and tells the user (§8.5).
 
@@ -953,7 +987,8 @@ New rules to add:
 4. **The viewing key.** How does it get to OWS and to dApps with read grants?
    The options are WPP metadata, the `largeBlob` of the passkey (which needs PRF
    support), or a different route. For accounts with a WaaS device, the
-   metadata of the provider on the key of the user is also an option. Passkey sync carries the signing key but not the viewing key.
+   metadata of the provider on the key of the user is also an option, with
+   the viewing key never in readable form (§8.1). Passkey sync carries the signing key but not the viewing key.
 5. **The registry.** Where do dApps publish their artifacts? For circuits, the
    on-chain verifier key is an anchor now (§8.3). How do agents verify the client
    code of a dApp before an on-chain reference exists?
