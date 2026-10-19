@@ -16,7 +16,8 @@
   Passport app, and a dApp never drives it.
 - **The prover** takes an unproven transaction and returns the proven
   transaction. It holds or makes again the proving keys. In V1, it sees the
-  coin and the amount, and the user is told.
+  private inputs of each proof, for example the coin and the amount. The user
+  is told.
 - **The sponsor** pays the fees and broadcasts. A user never holds DUST. The
   **Capacity Exchange** is the second fee route, and it comes later.
 - If the user enables the backup key, the WaaS provider needs the most trust.
@@ -29,14 +30,14 @@ Each service sits behind a seam, and each one is replaceable.
 | Service | What it does | What it can see or do | Called through |
 |---|---|---|---|
 | WaaS provider (optional) | Holds the backup owner key of the user, signs ACC challenges, and keeps account metadata | It holds a full-authority key, isolated to the Passport app. It reads the public metadata. | `adapter-waas` |
-| Prover | Turns an unproven transaction into a proven transaction | The coin and the amount of each transaction | `adapter-prover-remote` |
+| Prover | Turns an unproven transaction into a proven transaction | The private inputs of each proof, for example the coin and the amount | `adapter-prover-remote` |
 | Sponsor | Pays the fees and broadcasts the proven transaction | The proven transaction | `adapter-broadcast` |
 | Capacity Exchange | Sells DUST capacity for a token that the user holds | The amount class and the payment token of a quote | `adapter-fee-capacity-exchange` |
 
 ```mermaid
 flowchart LR
   W["WaaS provider"] -->|"signature over H(c)"| C["Client"]
-  C -->|"unproven transaction"| P["Prover<br/>sees coin and amount"]
+  C -->|"unproven transaction"| P["Prover<br/>sees the private inputs"]
   P -->|"proven transaction"| C
   C -->|"proven transaction"| S["Sponsor<br/>pays fees, broadcasts"]
   S --> N[("Midnight network")]
@@ -61,11 +62,14 @@ supplies all of these functions:
    session that no other origin can use. Or, it enforces a signing policy that
    refuses each ACC owner operation from another origin.
 4. It keeps metadata on the key of the user. The sign-in of the user can read
-   and write it from each origin that the provider serves.
-5. It lets the Passport app sign in as the same user.
+   it from each origin that the provider serves.
+5. **It protects the writes.** Only the Passport app can write or delete the
+   entries of Passport. Another origin of the provider cannot replace them.
+6. It lets the Passport app sign in as the same user.
 
 A provider that cannot sign a raw digest cannot enroll on the ACC. A provider
-that cannot isolate the key does not become a backup owner key.
+that cannot isolate the key or protect the writes does not become a backup
+owner key.
 
 ### Signing ACC challenges
 
@@ -92,6 +96,9 @@ Each origin of the provider can read the metadata. Thus, it has two parts.
 | Size | Small. Some providers keep only about 2 KB. |
 | Namespace and version | Each entry has a namespace and a version. |
 | Write | Read, merge, write, and then read back. A write that does not read back is a failure. |
+| Protected write | Only the Passport app writes or deletes the entries of Passport. Encryption hides the keys, but it does not stop a replacement or a replay. |
+| Binding | Passport authenticates each entry. The authentication binds the ACC address, the version of each key, and the version of the entry. |
+| Freshness | At recovery, Passport rejects an entry that fails authentication, names another account, or holds an older key. The viewing key must match `enc_key` on the ACC. The WPP account key must open the newest WPP package. |
 
 A dApp that signs in with the same provider never gets the viewing key from the
 metadata. It gets the key only through a read grant, after consent.
@@ -108,6 +115,20 @@ restores three things:
 - signing: the backup key approves a new passkey (`add_device`);
 - the viewing key, which opens the payments that senders sealed earlier;
 - the private state, through the WPP account key.
+
+Recovery works on a fresh device, without the original passkey or a local
+cache. The metadata and the chain are its only sources.
+
+### Keeping the backup current
+
+A rotation of the viewing key (`rotate_enc_key`) or of the WPP account key
+makes the backup stale. Thus, Passport writes the new keys to the metadata in
+the same flow. If the write fails, Passport marks the backup as stale. It shows
+this to the user, and it tries again until a write succeeds.
+
+A recovery from a stale backup still restores signing. The old viewing key
+opens only the payments from before the rotation. The app tells the user which
+keys it did not restore.
 
 ### Who uses the key
 
@@ -136,10 +157,15 @@ The `adapter-waas` spec has these checks:
 
 1. After enrollment, a dApp session with the same provider cannot get a
    signature for an owner operation, for example `add_device`.
-2. A dApp without read consent cannot recover the viewing key from the
-   metadata.
+2. A dApp without read consent cannot recover the viewing key or the WPP
+   account key from the metadata.
 3. A recovery with the backup key restores signing, the viewing key, and the
-   private state.
+   private state. It runs on a fresh device, without the original passkey or a
+   local cache. It passes again after a rotation of the viewing key and of the
+   WPP account key.
+4. Another origin of the provider cannot write or delete the entries of
+   Passport. Recovery rejects a replaced entry, an entry for another account,
+   and a replayed entry with an older key.
 
 ### Custody disclosure
 
@@ -188,8 +214,13 @@ must use the crate revisions that the version registry records.
 
 ### What the prover sees
 
-The prover gets the unproven transaction. Thus, it sees the coin and the
-amount of each transaction. The SDK must tell the user this. Encryption of the proving input to an enclave becomes mandatory when a
+The prover gets the unproven transaction. Thus, it sees the private inputs
+supplied for proving, for example the coin and the amount. The same prover also
+proves the circuits of dApps. Their witnesses can hold other sensitive data of
+the user. The SDK must tell the user that the prover sees these inputs, for the
+ACC and for each dApp circuit.
+
+Encryption of the proving input to an enclave becomes mandatory when a
 trusted-hardware prover exists. Until then, the disclosure applies.
 
 ## Fees and broadcast
@@ -236,7 +267,8 @@ DUST, so this route matters for funds in the ACC.
 4. **The metadata schema.** The namespace names, the version format, and the
    merge rule for each field are not fixed. The provider can keep a part that
    only Passport can read, or Passport encrypts the secret part. Which route,
-   and which key, depends on the provider.
+   and which key, depends on the provider. The key that authenticates each
+   entry is also open: recovery must check it without the passkey.
 5. **A proof server that makes keys from ZKIR.** No proof server has this mode.
    Nobody tested if a proof server accepts keys made from ZKIR only.
 6. **The resubmission path.** Does the client resubmit through the sponsor, or

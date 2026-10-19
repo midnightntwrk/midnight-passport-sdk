@@ -22,7 +22,8 @@
 - **A passkey tap** occurs when Passport issues a grant and when the handoff
   completes. There is no tap for each call.
 - **Transaction in, proof out.** The prover holds the proving keys. In V1, it
-  sees the coin and the amount, and the user is told.
+  sees the private inputs of each proof, for example the coin and the amount.
+  The user is told.
 - **A user never holds or pays with DUST.** A sponsor pays the fees, or the user
   swaps for them through the Capacity Exchange.
 - **A payment to an account is a deposit**, never a transfer to a raw address.
@@ -154,9 +155,12 @@ transaction: `prove(unprovenTx, circuitIds) → provenTx`. These rules apply:
   version registry records these revisions.
 
 **What the V1 prover sees.** The prover gets the unproven transaction. Thus, it
-sees the coin and the amount, and the SDK must tell the user this. Encryption of
-the proving input to an enclave becomes mandatory when a trusted-hardware prover
-exists. The SDK does not do remote attestation.
+sees the private inputs supplied for proving, for example the coin and the
+amount. The same prover proves the circuits of dApps, and their witnesses can
+hold other sensitive data. The SDK must tell the user this, for the ACC and for
+each dApp circuit. Encryption of the proving input to an enclave becomes
+mandatory when a trusted-hardware prover exists. The SDK does not do remote
+attestation.
 
 **No proofs in the tab in V1.** The ACC circuits are at k=15 to 17, with
 proving keys of 112 to 224 MB. The zkir WASM package has no key generation.
@@ -189,7 +193,7 @@ Each service is replaceable behind a seam.
 
 | Process | Service | What it can see or do |
 |---|---|---|
-| Proving | The prover | The coin and the amount of each transaction |
+| Proving | The prover | The private inputs of each proof, for example the coin and the amount |
 | Fees and broadcast | The sponsor | The proven transaction |
 | Fee swaps | The Capacity Exchange | The amount class and the payment token of a quote |
 | Backup owner key (optional) | The WaaS provider | It holds a full-authority key, isolated to the Passport app. It reads the public account metadata. |
@@ -252,12 +256,13 @@ The WaaS provider must do these things:
   origin can use, or a signing policy that refuses each ACC owner operation
   from another origin;
 - keep metadata on that key, readable from each origin that it serves;
+- let only the Passport app write or delete the entries of Passport;
 - let the Passport app sign in as the user.
 
 These rules apply:
 
-- **No isolation, no enrollment.** Without isolation, the Passport app does not
-  enroll the key.
+- **No isolation, no enrollment.** Without isolation and protected writes, the
+  Passport app does not enroll the key.
 - **Two parts of metadata.** Public account metadata, such as the ACC address,
   finds the account. The viewing key and the WPP account key are never in
   readable form there. The provider keeps them in a part that only the Passport
@@ -265,17 +270,27 @@ These rules apply:
   the provider can get.
 - **Small, versioned metadata.** Each entry has a namespace and a version. Each
   write reads, merges, writes, and reads back. Some providers keep only 2 KB.
+- **Bound and fresh metadata.** Encryption does not stop a replacement or a
+  replay. Thus, Passport authenticates each entry, bound to the ACC address and
+  to the version of each key. At recovery, it rejects an entry for another
+  account or with an older key.
+- **A current backup.** After a rotation of the viewing key or of the WPP
+  account key, Passport writes the new keys to the metadata. If the write
+  fails, Passport marks the backup as stale and tells the user.
 - **The user is told** that the provider holds a full-authority key. Thus, the
   account is only as safe as the signing security of the provider.
 
-The `adapter-waas` spec has three acceptance checks:
+The `adapter-waas` spec has four acceptance checks:
 
 1. After enrollment, a dApp session with the same provider cannot get a
    signature for an owner operation, for example `add_device`.
-2. A dApp without read consent cannot recover the viewing key from the
-   metadata.
+2. A dApp without read consent cannot recover the viewing key or the WPP
+   account key from the metadata.
 3. A recovery with the backup key restores signing, the viewing key, and the
-   private state (section "Recovery").
+   private state (section "Recovery"). It runs on a fresh device, without the
+   original passkey or a local cache, and again after each key rotation.
+4. Another origin of the provider cannot write or delete the entries of
+   Passport. Recovery rejects a replaced or a replayed entry.
 
 ## dApps
 
@@ -519,7 +534,7 @@ The `conformance` lens checks these rules. The sections above give the detail.
 | # | Rule |
 |---|---|
 | 1 | **Ceremony gate:** a passkey tap at grant issuance and at the handoff. No tap for each call, except for a passkey grant key on the dApp origin. |
-| 2 | **Prover disclosure:** the V1 prover sees the coin and the amount, and the user is told. Enclave encryption is mandatory once a trusted-hardware prover exists. |
+| 2 | **Prover disclosure:** the V1 prover sees the private inputs of each proof, for the ACC and for each dApp circuit, and the user is told. Enclave encryption is mandatory once a trusted-hardware prover exists. |
 | 3 | **Deposit, not address:** a payment to an account is a deposit call, with an inbox entry for a payment from a Passport. |
 | 4 | **`connect` and `mn-passport-agent` never link `core`.** Shared code goes into `mn-passport-account`. |
 | 5 | **Two version axes:** the wire axis (the MIP §9 messages) and the binding axis (`mn-passport-contract` and the deployed ACC). |
@@ -529,7 +544,7 @@ The `conformance` lens checks these rules. The sections above give the detail.
 | 9 | **Independent operation:** after the grant and the handoff, a dApp or an agent signs with its own grant key, with Passport closed. |
 | 10 | **One grantee key** for each account and each origin. |
 | 11 | **No onboarding in a dApp:** a dApp never onboards a user, and it never drives an owner key. Only the Passport app adds an owner key. |
-| 12 | **The WaaS key only as an isolated backup owner key:** Passport enrolls it only when the provider isolates it. The metadata never holds the viewing key or the WPP account key in readable form. The user is told. |
+| 12 | **The WaaS key only as an isolated backup owner key:** Passport enrolls it only when the provider isolates it. The metadata never holds the viewing key or the WPP account key in readable form. Only Passport writes it, bound to the account and the key versions, and refreshed after each rotation. The user is told. |
 | 13 | **The read-access lifecycle:** rotate before share, re-seal or mark for reconnection after each rotation, and rotate on revocation. The package key rotates after private-state revocation. The user is told. |
 | 14 | **No user-held DUST** on any SDK path. |
 
