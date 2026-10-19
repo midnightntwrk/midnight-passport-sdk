@@ -4,8 +4,8 @@
 > **Owns:** the packages, the seams, the adapters, and the dependency rules of
 > the SDK.
 > **Companions:** [`sdk-requirements.md`](./sdk-requirements.md) (what the SDK
-> must do), [`compatibility.md`](./compatibility.md) (the version axes), and
-> [`beta-scope.md`](./beta-scope.md) (what beta contains).
+> must do, and the version axes in rule 5) and
+> [`roadmap.md`](./roadmap/roadmap.md) (what beta contains).
 
 ## Summary
 
@@ -416,8 +416,8 @@ submits anything. Then the transaction joiner adds the intent of the dApp
 The dApp composes the call; the SDK supplies the
 ACC interface, the challenge, and the grant signature. The dApp writes its new
 state to WPP only after `SucceedEntirely`. If the write fails, the state stays
-local and the dApp tries again. [`dapp-connection.md`](./dapp-connection.md)
-owns the full flow.
+local and the dApp tries again. [`sdk-requirements.md`](./sdk-requirements.md)
+(section "dApps") and realignment §8.2 own the full flow.
 
 ### Example 4: an agent call
 
@@ -505,8 +505,8 @@ export interface GrantResponse {
 
 `connect` and `mn-passport-agent` build a `GrantRequest`, and `core` validates
 it on the authorizer page. Neither side imports the other. The wire axis
-(`PROTOCOL_VERSION`) is separate from the binding axis;
-[`compatibility.md`](./compatibility.md) owns both.
+(`PROTOCOL_VERSION`) is separate from the binding axis.
+[`sdk-requirements.md`](./sdk-requirements.md) rule 5 owns both.
 
 ### Example 8: Passport in the wallet picker of a different chain (after V1)
 

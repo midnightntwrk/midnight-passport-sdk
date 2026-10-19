@@ -6,8 +6,9 @@ description: Upstream-dependency watcher for the Midnight Passport SDK — 7-day
 # deps — upstream drift and supply-chain hygiene
 
 Midnight breaks often, and the SDK pins midnight-js / ledger / zkir /
-compact **and** the ACC artefact (arch §8.2). This skill keeps those pins
-honest and the adoption path safe (`docs/development-workflow.md` §2).
+compact **and** the ACC artefact (architecture, "Dependency rules", rule 8).
+This skill keeps those pins honest and the adoption path safe
+(`docs/development-workflow.md`, "Watchers").
 
 ## The 7-day cooldown (non-negotiable default)
 
@@ -38,8 +39,9 @@ fails the gate).
 
 `@midnight-ntwrk/*` (midnight-js packages, ledger, zkir-v2,
 dapp-connector-api, compact runtime/toolchain, midnight-did packages), the
-**ACC artefact** (arch §8.2 — versioned, externally owned), WingRiders
-`ows-core` (§3.8), and the Capacity Exchange SDK (§3.11).
+**ACC artefact** (versioned, externally owned), WingRiders `ows-core`
+(requirements, "Agents"), and the Capacity Exchange SDK (requirements, "Fees
+and broadcast").
 
 For drift checks: `compact check` / `compact self check`, the
 `midnight-tooling:release-notes` skill for component release notes, and the
@@ -49,13 +51,15 @@ an unrelated tranche.
 
 ## The compatibility matrix (two axes — never conflate them)
 
-Maintained at `docs/compatibility.md` (create on first entry):
+Maintained at [`docs/compatibility.md`](../../../docs/compatibility.md):
 
 | Axis | Between | Owned by |
 |---|---|---|
-| **Wire** | dApp connector ↔ wallet (C23 messages) | `mn-passport-protocol` (`PROTOCOL_VERSION`) |
-| **Binding** | SDK contract bindings ↔ deployed ACC | `mn-passport-contract` (arch §8.2 compatibility contract) |
+| **Wire** | dApp or agent ↔ Passport (the MIP §9 messages) | `mn-passport-protocol` (`PROTOCOL_VERSION`) |
+| **Binding** | SDK contract bindings ↔ deployed ACC | `mn-passport-contract` |
 
-Any upstream bump that shifts either axis updates the matrix **in the same
-PR**. A wire change never implies a binding change, and vice versa
-(arch §4.6).
+It also records the **toolchain pins** — midnight-js, and the exact zkir and
+midnight-zk crate revisions, because proving keys change with the crate
+revision. Any upstream bump that shifts an axis or a pin updates the matrix
+**in the same PR**. A wire change never implies a binding change, and vice
+versa (requirements, rule 5).

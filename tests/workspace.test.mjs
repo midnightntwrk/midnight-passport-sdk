@@ -1,6 +1,6 @@
-// Guards the FS-0.1 T1 acceptance shape: pnpm workspaces (spec D-9), the
-// Node 22 baseline (spec D-1; the CI gate), and exact-pinned dependencies
-// with a committed lockfile (docs/development-workflow.md §2, deps).
+// Guards the workspace shape: pnpm workspaces, the Node 22 baseline (the CI
+// gate), and exact-pinned dependencies with a committed lockfile
+// (docs/development-workflow.md, deps).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';

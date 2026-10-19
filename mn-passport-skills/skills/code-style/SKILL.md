@@ -1,6 +1,6 @@
 ---
 name: code-style
-description: Project coding-preference review lens for Midnight Passport SDK changes — British English with Oxford comma, YYYY/MM/DD dates, TypeScript conventions, error-taxonomy consistency, and Midnight (not IOG) branding. Run per tranche, or on any change touching prose, UI copy, or public API shape.
+description: Project coding-preference review lens for Midnight Passport SDK changes — American English with Oxford comma, YYYY/MM/DD dates, TypeScript conventions, error-taxonomy consistency, and Midnight (not IOG) branding. Run per tranche, or on any change touching prose, UI copy, or public API shape.
 ---
 
 # code-style — project preferences
@@ -12,7 +12,8 @@ and never nitpick what a tool enforces.
 
 ## Prose (comments, docs, error messages, UI copy)
 
-- **British English**, with the **Oxford comma**.
+- **American English**, with the **Oxford comma**. Leave code identifiers,
+  file names, and quoted external titles in their original spelling.
 - Dates as **YYYY/MM/DD**.
 - Complete sentences in doc comments and user-facing text; comments state
   constraints the code can't show, not narration of the next line.

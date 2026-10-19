@@ -1,96 +1,97 @@
-// Manifest- and tsconfig-level assertion of the architecture §4.4 dependency
-// graph (FS-0.1 D-2/D-3): every @midnight-ntwrk/mn-passport-* edge in a
-// workspace manifest or a project reference must be permitted, and `connect`
-// must have no path to `core` or any adapter — not even transitively. The
-// import-level twin is scripts/lint-boundaries.mjs; both consume
-// scripts/dependency-graph.mjs.
-import { test } from 'node:test';
+// Guards the dependency rules (docs/architecture.md, "Dependency rules") at
+// the manifest and project-reference level. The workspace is empty after the
+// reset, so the fixtures prove that the check still rejects forbidden edges
+// once packages are added.
+import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, readdir } from 'node:fs/promises';
-import { ALLOWED, SCOPE } from '../scripts/dependency-graph.mjs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { ALLOWED, NEVER_REACHES, SCOPE } from '../scripts/dependency-graph.mjs';
+import { checkWorkspace, reachable } from '../scripts/dependency-rules.mjs';
 
-/** @param {string} path */
-const readJson = async (path) => JSON.parse(await readFile(new URL(path, import.meta.url), 'utf8'));
+/** @type {string[]} */
+const fixtures = [];
+after(() => {
+  for (const dir of fixtures) rmSync(dir, { recursive: true, force: true });
+});
 
-const dirs = (await readdir(new URL('../packages', import.meta.url))).sort();
-/** @type {Map<string, string[]>} */
-const edges = new Map();
-/** @type {Map<string, string[]>} */
-const references = new Map();
-for (const dir of dirs) {
-  const manifest = await readJson(`../packages/${dir}/package.json`);
-  const deps = Object.keys({
-    ...manifest.dependencies,
-    ...manifest.devDependencies,
-    ...manifest.peerDependencies,
-  })
-    .filter((name) => name.startsWith(SCOPE))
-    .map((name) => name.slice(SCOPE.length));
-  edges.set(dir, deps);
-
-  const tsconfig = await readJson(`../packages/${dir}/tsconfig.json`);
-  references.set(
-    dir,
-    (tsconfig.references ?? []).map((/** @type {{path: string}} */ ref) =>
-      ref.path.replace(/^\.\.\//, ''),
-    ),
-  );
+/**
+ * Writes a fixture workspace: each package lists its SDK dependencies, and
+ * its project references (by default the same packages).
+ * @param {Record<string, { deps?: string[], refs?: string[], name?: string }>} packages
+ * @returns {string}
+ */
+function workspace(packages) {
+  const root = mkdtempSync(join(tmpdir(), 'mn-passport-deps-'));
+  fixtures.push(root);
+  for (const [dir, { deps = [], refs = deps, name = SCOPE + dir }] of Object.entries(packages)) {
+    mkdirSync(join(root, 'packages', dir), { recursive: true });
+    const dependencies = Object.fromEntries(deps.map((dep) => [SCOPE + dep, 'workspace:*']));
+    writeFileSync(
+      join(root, 'packages', dir, 'package.json'),
+      JSON.stringify({ name, dependencies }),
+    );
+    const references = refs.map((ref) => ({ path: `../${ref}` }));
+    writeFileSync(join(root, 'packages', dir, 'tsconfig.json'), JSON.stringify({ references }));
+  }
+  return root;
 }
 
-test('all expected packages are scaffolded', () => {
-  assert.deepEqual(dirs, Object.keys(ALLOWED).sort());
+test('the repository workspace respects the dependency rules', () => {
+  assert.deepEqual(checkWorkspace(fileURLToPath(new URL('..', import.meta.url))), []);
 });
 
-test('every workspace dependency edge is in the architecture §4.4 graph', () => {
-  for (const [pkg, deps] of edges) {
-    const allowed = ALLOWED[pkg];
-    assert.ok(allowed, `unexpected package "${pkg}" — add it to the graph deliberately`);
-    for (const dep of deps) {
-      assert.ok(allowed.includes(dep), `"${pkg}" must not depend on "${dep}" (architecture §4.4)`);
-    }
+test('the graph itself keeps connect, agent, and ecosystems away from forbidden packages', () => {
+  const edges = new Map(Object.entries(ALLOWED).map(([pkg, deps]) => [pkg, new Set(deps)]));
+  for (const [pkg, forbidden] of Object.entries(NEVER_REACHES)) {
+    const reached = [...reachable(edges, pkg)].filter((target) => forbidden.includes(target));
+    assert.deepEqual(reached, [], `"${pkg}" reaches ${reached.join(', ')} in the graph`);
   }
 });
 
-test('every tsconfig project reference mirrors a permitted edge', () => {
-  for (const [pkg, refs] of references) {
-    const allowed = ALLOWED[pkg] ?? [];
-    assert.deepEqual(
-      [...refs].sort(),
-      [...allowed].sort(),
-      `"${pkg}" tsconfig references must mirror its permitted dependencies (architecture §4.4)`,
-    );
-  }
+test('a workspace with permitted edges passes', () => {
+  const root = workspace({
+    protocol: {},
+    contract: {},
+    account: { deps: ['contract', 'protocol'] },
+    core: { deps: ['account', 'contract', 'protocol'] },
+    connect: { deps: ['account', 'protocol'] },
+    'adapter-recovery': { deps: ['core'] },
+  });
+  assert.deepEqual(checkWorkspace(root), []);
 });
 
-test('connect has no path to core or any adapter, even transitively', () => {
-  const reachable = new Set();
-  const walk = (/** @type {string} */ pkg) => {
-    for (const dep of edges.get(pkg) ?? []) {
-      if (!reachable.has(dep)) {
-        reachable.add(dep);
-        walk(dep);
-      }
-    }
-  };
-  walk('connect');
-  for (const target of reachable) {
-    assert.ok(
-      target !== 'core' && !target.startsWith('adapter-'),
-      `connect reaches "${target}" — the kernel must never enter a dApp bundle (architecture §4.4)`,
-    );
-  }
+test('connect depending on core is rejected, in the manifest and the reference', () => {
+  const root = workspace({ core: {}, connect: { deps: ['core'] } });
+  const violations = checkWorkspace(root);
+  assert.ok(violations.some((v) => v.startsWith('"connect" must not depend on "core"')));
+  assert.ok(violations.some((v) => v.startsWith('"connect" must not reference "core"')));
+  assert.ok(violations.some((v) => v.startsWith('"connect" reaches "core"')));
 });
 
-test('every package skeleton is private, pre-release, and ESM', async () => {
-  for (const dir of dirs) {
-    const manifest = await readJson(`../packages/${dir}/package.json`);
-    assert.equal(manifest.name, SCOPE + dir);
-    assert.equal(
-      manifest.private,
-      true,
-      `"${dir}" must stay private until the release skill exists`,
-    );
-    assert.equal(manifest.version, '0.0.0');
-    assert.equal(manifest.type, 'module');
-  }
+test('a transitive path from agent to core is rejected', () => {
+  const root = workspace({ core: {}, account: { deps: ['core'] }, agent: { deps: ['account'] } });
+  const violations = checkWorkspace(root);
+  assert.ok(violations.some((v) => v.startsWith('"account" must not depend on "core"')));
+  assert.ok(violations.some((v) => v.startsWith('"agent" reaches "core"')));
+});
+
+test('a project reference must mirror a dependency', () => {
+  const root = workspace({
+    protocol: {},
+    contract: {},
+    account: { deps: ['contract'], refs: ['contract', 'protocol'] },
+  });
+  assert.deepEqual(checkWorkspace(root), [
+    '"account" references "protocol" without depending on it (architecture, Dependency rules).',
+  ]);
+});
+
+test('an unknown or misnamed package is rejected', () => {
+  const root = workspace({ onboard: {}, protocol: { name: '@other/protocol' } });
+  const violations = checkWorkspace(root);
+  assert.ok(violations.some((v) => v.startsWith('"onboard" is not in the graph')));
+  assert.ok(violations.some((v) => v.startsWith('"protocol" must be named')));
 });

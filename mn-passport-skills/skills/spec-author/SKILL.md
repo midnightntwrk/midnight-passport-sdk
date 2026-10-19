@@ -1,23 +1,22 @@
 ---
 name: spec-author
-description: Author a Midnight Passport SDK per-feature spec from the architecture, roadmap, and the milestone brief in docs/roadmap/milestones/. Use before spec-driver — turn an FS-x.y brief into a full spec (scope, decisions, interfaces, acceptance, verify plan, proposed tranches, GitHub issue) that spec-driver can then plan and loop. Does not finalise gated tranches, write code, or perform outward actions.
+description: Author a Midnight Passport SDK per-feature spec from the requirements, the architecture, the roadmap, and the deliverables (D-IDs). Use before spec-driver — turn one or more deliverables into a full spec (scope, decisions, interfaces, acceptance, verify plan, proposed tranches, GitHub issue) that spec-driver can then plan and loop. Does not finalise gated tranches, write code, or perform outward actions.
 ---
 
 # spec-author — write the spec, then hand off
 
-The upstream of the mn-passport-skills spine (`docs/development-workflow.md` §2–3).
+The upstream of the mn-passport-skills spine (`docs/development-workflow.md`, "The skills").
 `spec-driver` *begins by reading* a spec (its plan phase, step 1); this skill
-*produces* that spec. It expands a feature-spec brief in
-`docs/roadmap/milestones/` into a full, derivable per-feature spec grounded in
-the source-of-truth docs.
+*produces* that spec. It turns one or more deliverables into a full, derivable
+per-feature spec grounded in the source-of-truth docs.
 
 ## Inputs
 
-- The target **`FS-x.y` brief** from `docs/roadmap/milestones/M*.md` (index:
-  `docs/roadmap/milestones/README.md`).
+- The target **deliverables** (`D…`) from
+  `docs/proposals/2026-09-25-sdk-deliverables.md`.
 - Source of truth: `docs/sdk-requirements.md` (what/why), `docs/architecture.md`
-  (how), `docs/beta-scope.md` (v1 scope).
-- Sequencing and dependencies: `docs/roadmap/roadmap.md`.
+  (how).
+- Sequencing, dependencies, and the beta cut: `docs/roadmap/roadmap.md`.
 - Provider / proving-service detail: `docs/provider-integration.md`.
 
 ## Hard rules
@@ -30,10 +29,12 @@ the source-of-truth docs.
    [midnightntwrk/passport](https://github.com/midnightntwrk/passport/issues).
    If none is known, **STOP and ask** the user before finishing. This is the
    same gate `spec-driver` enforces, pulled forward so planning never stalls.
-3. **Respect the MUSTs.** Ceremony gate (requirements §2.2),
-   encrypt-preimage-to-enclave (§2.5), deposit-not-address (§3.12), `connect`
-   never links `core` (architecture §4.4), and the two version axes (§4.6). The
-   spec must not contradict these.
+3. **Respect the normative rules** in `docs/sdk-requirements.md` ("Normative
+   rules"): among them the ceremony gate (rule 1), the prover disclosure
+   (rule 2), deposit-not-address (rule 3), no `core` in `connect` or
+   `mn-passport-agent` (rule 4), the two version axes (rule 5), and owner keys
+   only in the Passport app (rules 11 and 12). The spec must not contradict
+   them.
 4. **Author only.** Do not decide the final **gated** tranche boundaries (that
    is `spec-driver`'s plan phase), do not write code, and never perform outward
    actions. Produce a *proposed* tranche outline for `spec-driver` to finalise
@@ -41,14 +42,14 @@ the source-of-truth docs.
 
 ## Steps
 
-1. Read the `FS-x.y` brief and every backing doc section it names.
+1. Read the target deliverables and every backing doc section they name.
 2. Expand it into a full spec with these parts:
    - **Objective** and **scope** (in / out).
    - **Decisions** — each with a one-line rationale and a doc citation.
    - **Surface & interfaces** — concrete types and signatures (finalise the
      brief's indicative sketches).
    - **Flow** — the sequence this feature performs; reference
-     `provider-integration.md` §3 where the provider or the proving & settlement
+     `provider-integration.md` where the provider or the proving & settlement
      service are involved.
    - **Dependencies** — internal feature specs and the external gate (the
      provider, the proving & settlement service, the contract team), noting what
@@ -63,10 +64,8 @@ the source-of-truth docs.
 3. Where the source docs cannot answer a normative question, add it to open
    questions and hand to `mn-passport-skills:doc-sync` rather than guessing.
 4. Write the spec as **one file per feature spec** under
-   `docs/roadmap/specs/<milestone>/` — one subfolder per milestone (e.g.
-   `docs/roadmap/specs/M1-managed-onboarding/FS-1.4-prover-remote.md`) —
-   leaving the milestone files in `docs/roadmap/milestones/` as the index of
-   briefs. Present it to the human.
+   `docs/roadmap/specs/`, named after its deliverables (e.g.
+   `docs/roadmap/specs/D2-account-client.md`). Present it to the human.
 5. On approval, hand off to `mn-passport-skills:spec-driver` (plan phase), which confirms
    the issue, finalises the gated tranches, and loops.
 

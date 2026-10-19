@@ -1,6 +1,13 @@
 # 0005 — Partner-origin onboarding via Related Origin Requests; the `onboard` facade
 
-Date: 2026/08/18 · Status: accepted
+Date: 2026/08/18 · Status: **superseded (2026/10/19) by Decision 1 of the
+[SDK realignment proposal](../proposals/2026-09-25-sdk-realignment.md)**
+(§3.1, amended 2026/10/19) — a dApp never onboards a user. It sends a new
+user to the Passport app, which onboards the user with the passkey and issues
+the grant of the dApp in the same visit. The `mn-passport-onboard` facade is
+dropped ([`sdk-requirements.md`](../sdk-requirements.md), rule 11). The
+experiment results below stay valid: Related Origin Requests work, the PRF
+output is the same across origins, and the largeBlob is a cache only.
 Refs: [midnightntwrk/passport#77](https://github.com/midnightntwrk/passport/issues/77)
 (C27 · Passport Facade)
 
@@ -43,7 +50,7 @@ Three shapes were considered for the packaging:
 ## Decision
 
 - **Adopt partner-origin onboarding** as requirements **§3.13**, designed in
-  [`onboarding-and-key-authorisation.md`](../onboarding-and-key-authorisation.md) and specced as
+  [`onboarding-and-key-authorisation.md`](https://github.com/midnightntwrk/midnight-passport-sdk/blob/41de3ffb6aa7f8ea9f97cda1a4e234f785dbe4e4/docs/onboarding-and-key-authorisation.md) and specced as
   **FS-2.3**.
 - **Package it as the `mn-passport-onboard` facade over `core` + adapters**
   (option 3): one kernel implementation, no duplicated functionality;
