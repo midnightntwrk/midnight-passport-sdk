@@ -1,444 +1,293 @@
-# Provider integration — contract execution, authorisation, and third-party proving & DUST sponsorship
+# Provider integration
 
-> **Status:** draft · 2026/08/17
-> **Audience:** the wallet-infrastructure provider ("the provider") backing
-> Passport's managed custody path, the **third-party proving & DUST
-> sponsorship service** it integrates, and the Passport SDK team.
-> **Assumes:** the provider holds a signing key in its own secure signer and
-> **routes proof creation (in a TEE) and DUST sponsorship to a third-party
-> service**, which proves, balances, sponsors, and binds **in one process**;
-> the sealed, balanced transaction returns through the provider and the **SDK
-> broadcasts it**.
-> **Companion to:** [`sdk-requirements.md`](./sdk-requirements.md) §2.5–§2.6,
-> [`architecture.md`](./architecture.md) §4.2.1, and
-> [`beta-scope.md`](./beta-scope.md). Canonical interfaces: the public **DApp
-> Connector API** (`@midnight-ntwrk/dapp-connector-api`, `SPECIFICATION.md`) and
-> the account-authorisation MIP (canvases **C1**, **C5**).
+> **Status:** draft · 2026/10/19
+> **Owns:** the contract between the SDK and its external services: the WaaS
+> provider, the prover, the sponsor, and the Capacity Exchange.
+> **Companions:** [`sdk-requirements.md`](./sdk-requirements.md) (what the SDK
+> must do) and [`architecture.md`](./architecture.md) (the seams and the
+> adapters that call these services).
 
-## 1. What this document is
+## Summary
 
-This brief tells the parties behind Passport exactly what they must implement to
-let a user **execute a Midnight contract call** — including deploying and using
-their Account Custody Contract (ACC).
+- **The WaaS provider** holds an optional backup owner key of the user. It signs
+  raw ACC challenges (k256, envelope 0), and it keeps small account metadata on
+  that key.
+- **Only the Passport app uses the WaaS key.** The provider isolates it to the
+  Passport app, and a dApp never drives it.
+- **The prover** takes an unproven transaction and returns the proven
+  transaction. It holds or makes again the proving keys. In V1, it sees the
+  private inputs of each proof, for example the coin and the amount. The user
+  is told.
+- **The sponsor** pays the fees and broadcasts. A user never holds DUST. The
+  **Capacity Exchange** is the second fee route, and it comes later.
+- If the user enables the backup key, the WaaS provider needs the most trust.
+  The account is only as safe as the signing security of the provider.
 
-The single most important thing to internalise:
+## The services
 
-> **A Midnight contract call is a zero-knowledge proof, not a bare signature.**
-> Authorisation *is* a signature, but one the ACC verifies **inside that proof**
-> (C5), not at the ledger layer. The proven call is then balanced, fee-paid,
-> cryptographically bound, and relayed.
+Each service sits behind a seam, and each one is replaceable.
 
-### The three off-device actors
-
-There are two external systems behind Passport, and it matters which one sees
-what:
-
-- **The provider — identity, authorisation, and routing.** Holds the account
-  authoriser key in its secure signer, signs operation challenges, and runs
-  passkey login and recovery policy. Once the circuit is executed on the
-  device, it **routes the sealed proving payload to the third-party service,
-  and the sealed, balanced transaction back to the device**. Mind the two
-  senses of "sealed": the outbound proving payload is **encrypted** to the
-  service's enclave (opaque ciphertext to the provider), while the returned
-  transaction is sealed in the ledger sense — **cryptographically bound, not
-  encrypted**. The provider therefore sees operation *metadata* (what it is
-  asked to authorise) and **every complete transaction pre-broadcast** (the
-  same bytes the network will see, linkable to the account it authorised); it
-  **never sees the witness**.
-- **The third-party proving & DUST sponsorship service — a third party the
-  provider integrates.** Runs the TEE proof server and, **in the same
-  process**, does DUST balancing, fee sponsorship, and binding, returning the
-  sealed, balanced transaction. The sealed witness reaches **its enclave**; it
-  **never holds the account key** — and it never broadcasts: **the SDK does**.
-
-This separation is a feature: the party that authorises never sees the witness,
-and the party that proves and settles never holds the authoriser key. Routing
-does not weaken the witness guarantee — the outbound payload the provider
-forwards is opaque ciphertext, sealed to the service's enclave. It does give
-the provider **pre-broadcast visibility**: the returned transaction is bound,
-not encrypted, so the provider observes the full public content of every
-transaction it routes (public once broadcast anyway, but earlier, and tied to
-an authenticated account). If that visibility is ever unwanted, the service
-would have to seal the returned transaction to a device key — recorded under
-the open wire-encoding item (§9).
-
-### The organising principle: two secrets, two holders
-
-| Secret | What it is | Who holds it | How it is used |
+| Service | What it does | What it can see or do | Called through |
 |---|---|---|---|
-| **Witness** | the proof's private inputs — per-dApp private state, shielded-coin data | **Passport (device)**, encrypted at rest, decrypted per transaction via the ceremony | consumed inside the proof; leaves the device only **sealed to the service's enclave**, for one proof |
-| **Authoriser private key** | the key whose signature authorises ACC operations | **the provider** (secure signer); the **device** for a self-custody authoriser | signs a per-operation challenge; the **signature is public** and verified in-circuit; the **private key never leaves the holder and never enters the proof** |
-
-## 2. Division of responsibilities
+| WaaS provider (optional) | Holds the backup owner key of the user, signs ACC challenges, and keeps account metadata | It holds a full-authority key, isolated to the Passport app. It reads the public metadata. | `adapter-waas` |
+| Prover | Turns an unproven transaction into a proven transaction | The private inputs of each proof, for example the coin and the amount | `adapter-prover-remote` |
+| Sponsor | Pays the fees and broadcasts the proven transaction | The proven transaction | `adapter-broadcast` |
+| Capacity Exchange | Sells DUST capacity for a token that the user holds | The amount class and the payment token of a quote | `adapter-fee-capacity-exchange` |
 
 ```mermaid
 flowchart LR
-  subgraph DEVICE["User device — Passport PWA + SDK"]
-    direction TB
-    D1["Ceremony → decrypt witness"]
-    DA["Build intent<br/>(operation + args + auth_nonce)"]
-    D2["Execute circuit → preimage<br/>(signature as public input)"]
-    D3["Seal preimage to enclave key"]
-    D4["Broadcast sealed, balanced tx"]
-    D5["Await finalisation"]
-    D1 --> DA --> D2 --> D3
-  end
-
-  subgraph PROVIDER["Provider — identity, authorisation & routing"]
-    direction TB
-    AUTH["ACC authoriser (secure signer):<br/>sign operation challenge<br/>(JubJub Schnorr / ECDSA secp256k1 / secp256r1)<br/>· passkey login · recovery policy"]
-    ROUTE["Route:<br/>sealed payload → service (opaque ciphertext)<br/>sealed, balanced tx → device (bound, readable)"]
-  end
-
-  subgraph SERVICE["Third-party proving & DUST sponsorship — one process"]
-    direction TB
-    subgraph ENCLAVE["TEE / enclave"]
-      P1["Decrypt preimage"]
-      P2["Generate ZK proof"]
-      P1 --> P2
-    end
-    PK["Prover-key cache<br/>(by keyLocation)"]
-    CU["DUST balance + fee sponsorship + bind"]
-    PK -.-> P2
-    P2 -->|"proof (in-process)"| CU
-  end
-
-  subgraph NETWORK["Midnight network"]
-    direction TB
-    AH["Public ZK-artefact host"]
-    IX["Indexer"]
-    ND["Node"]
-  end
-
-  DA -->|"op + args + auth_nonce"| AUTH
-  AUTH -->|"signature (public)"| D2
-  D3 -->|"sealed preimage + keyLocation"| ROUTE
-  ROUTE -->|"sealed payload"| P1
-  CU -->|"sealed, balanced tx"| ROUTE
-  ROUTE -->|"sealed, balanced tx"| D4
-  AH -.->|"prover key (public)"| PK
-  D4 --> ND
-  IX -.->|"ledger state"| D2
-  D5 -.-> IX
+  W["WaaS provider"] -->|"signature over H(c)"| C["Client"]
+  C -->|"unproven transaction"| P["Prover<br/>sees the private inputs"]
+  P -->|"proven transaction"| C
+  C -->|"proven transaction"| S["Sponsor<br/>pays fees, broadcasts"]
+  S --> N[("Midnight network")]
+  N -.->|"status from the indexer"| C
 ```
 
-**The device does, and neither external party reimplements:** the ceremony,
-witness storage and decryption, intent and circuit execution, preimage
-construction, sealing to the enclave, **broadcasting the sealed, balanced
-transaction**, and awaiting finalisation. Proving, balancing, sponsorship, and
-binding all happen on the service, in one process, once the provider routes
-the sealed payload; the finished transaction comes back through the provider
-for the device to broadcast.
+## The WaaS provider
 
-## 3. End-to-end sequence
+The WaaS key is an optional backup owner key. The user adds it in the Passport
+app, after the passkey becomes the first owner key. The key has the same
+authority as the passkey, and it works alone. Thus, it adds trust in the
+provider. A dApp never drives it.
+
+### What the provider must supply
+
+The Passport app enrolls the key of a WaaS provider only if the provider
+supplies all of these functions:
+
+1. It holds a key for the user. The code of a dApp never holds that key.
+2. It signs a raw 32-byte digest with that key (ECDSA over secp256k1).
+3. **It isolates the key to the Passport app.** It gives Passport a key or
+   session that no other origin can use. Or, it enforces a signing policy that
+   refuses each ACC owner operation from another origin.
+4. It keeps metadata on the key of the user. The sign-in of the user can read
+   it from each origin that the provider serves.
+5. **It protects the writes.** Only the Passport app can write or delete the
+   entries of Passport. Another origin of the provider cannot replace them.
+6. It lets the Passport app sign in as the same user.
+
+A provider that cannot sign a raw digest cannot enroll on the ACC. A provider
+that cannot isolate the key or protect the writes does not become a backup
+owner key.
+
+### Signing ACC challenges
+
+The key of the provider is a device on the k256 arm, with envelope 0. For each
+operation, the SDK builds the 32-byte challenge `c` from the arguments of the
+circuit. The provider signs the digest `H(c)`, where `H` is SHA-256. It needs
+no contract runtime, prover, or node. The ACC verifies the signature in the
+circuit. [`sdk-requirements.md`](./sdk-requirements.md) owns the exact digests.
+
+**Enrollment from a signature.** The provider has no call that returns the
+public key. Thus, the SDK asks for a signature over a known digest, and it gets
+the public key from that signature. The passkey then approves `add_device` for
+that key. The envelope stays 0 for the life of the key.
+
+### Account metadata
+
+Each origin of the provider can read the metadata. Thus, it has two parts.
+
+| Rule | Detail |
+|---|---|
+| Public part | The ACC address. It finds the account. |
+| Secret part | The viewing key and the WPP account key, never in readable form. The provider keeps them in a part that only the Passport app can read. Or, the app encrypts them under a key that no other origin of the provider can get. |
+| Never | Private state |
+| Size | Small. Some providers keep only about 2 KB. |
+| Namespace and version | Each entry has a namespace and a version. |
+| Write | Read, merge, write, and then read back. A write that does not read back is a failure. |
+| Protected write | Only the Passport app writes or deletes the entries of Passport. Encryption hides the keys, but it does not stop a replacement or a replay. |
+| Binding | Passport authenticates each entry. The authentication binds the ACC address, the version of each key, and the version of the entry. |
+| Freshness | At recovery, Passport rejects an entry that fails authentication, names another account, or holds an older key. The viewing key must match `enc_key` on the ACC. The WPP account key must open the newest WPP package. |
+
+A dApp that signs in with the same provider never gets the viewing key from the
+metadata. It gets the key only through a read grant, after consent.
+
+The account-metadata seam in `mn-passport-account` defines these operations.
+`adapter-waas` implements them for one provider. The adapter names no vendor.
+
+### Recovery with the backup key
+
+If the user loses the passkey, the user signs in to the Passport app with the
+same provider. The public metadata finds the account. Then the Passport app
+restores three things:
+
+- signing: the backup key approves a new passkey (`add_device`);
+- the viewing key, which opens the payments that senders sealed earlier;
+- the private state, through the WPP account key.
+
+Recovery works on a fresh device, without the original passkey or a local
+cache. The metadata and the chain are its only sources.
+
+### Keeping the backup current
+
+A rotation of the viewing key (`rotate_enc_key`) or of the WPP account key
+makes the backup stale. Thus, Passport writes the new keys to the metadata in
+the same flow. If the write fails, Passport marks the backup as stale. It shows
+this to the user, and it tries again until a write succeeds.
+
+A recovery from a stale backup still restores signing. The old viewing key
+opens only the payments from before the rotation. The app tells the user which
+keys it did not restore.
+
+### Who uses the key
+
+| Who | When | Operations |
+|---|---|---|
+| The Passport app | Owner operations and recovery | Issue and revoke grants, add and remove devices, and approve a new passkey |
+| A dApp | Never | The dApp acts only through its grant key |
+| An agent | Never | The agent acts only through its grant key |
 
 ```mermaid
 sequenceDiagram
-  autonumber
-  participant SDK as Passport SDK (device)
-  participant PRV as Provider authoriser (secure signer)
-  participant SVC as Third-party proving & DUST sponsorship (TEE)
-  participant NET as Midnight node / indexer
-
-  Note over SDK: ceremony decrypts witness,<br/>build intent (op + args + auth_nonce)
-  SDK->>PRV: request authorisation signature (the bundle)
-  Note over PRV: apply policy, then sign the challenge<br/>(JubJub Schnorr, or ECDSA secp256k1 / secp256r1 as they land)
-  PRV-->>SDK: signature (public)
-  Note over SDK: execute circuit → preimage<br/>(signature as public input), seal to enclave
-  SDK->>PRV: sealed preimage + keyLocation<br/>(opaque ciphertext to the provider)
-  PRV->>SVC: route proving + DUST sponsorship (sealed payload)
-  Note over SVC: one process — decrypt in enclave, resolve key, prove,<br/>DUST-balance + sponsor fees + bind
-  SVC-->>PRV: sealed, balanced tx
-  PRV-->>SDK: sealed, balanced tx
-  SDK->>NET: broadcast
-  SDK->>NET: await finalisation (indexer)
+  participant P as Passport app
+  participant W as WaaS provider
+  participant A as ACC
+  P->>W: sign a known digest (gives the public key)
+  P->>A: add_device for the WaaS key, approved with the passkey
+  P->>W: write the metadata (ACC address, keys never readable)
+  Note over P,A: Later, after the user loses the passkey
+  P->>W: sign in, read the metadata, find the account
+  P->>A: add_device for a new passkey, signed with the WaaS key
 ```
 
-The provider is touched twice — **sign**, then **route** (out with the sealed
-payload, back with the finished transaction). The service does **prove and
-settle in one process** and returns the sealed, balanced transaction; the
-device does the circuit work in between and **broadcasts** — there is no proof
-returned on its own, no device-side unsealed-tx assembly, and no separate
-balance call.
+### Acceptance checks
 
-## 4. The provider — identity & authorisation
+The `adapter-waas` spec has these checks:
 
-### 4.1 ACC authorisation — the in-circuit co-signer
+1. After enrollment, a dApp session with the same provider cannot get a
+   signature for an owner operation, for example `add_device`.
+2. A dApp without read consent cannot recover the viewing key or the WPP
+   account key from the metadata.
+3. A recovery with the backup key restores signing, the viewing key, and the
+   private state. It runs on a fresh device, without the original passkey or a
+   local cache. It passes again after a rotation of the viewing key and of the
+   WPP account key.
+4. Another origin of the provider cannot write or delete the entries of
+   Passport. Recovery rejects a replaced entry, an entry for another account,
+   and a replayed entry with an older key.
 
-The ACC does **not** authorise operations with a ledger-level signature. Per the
-account-authorisation MIP (C1, C5), authorisation is a **signature verified
-inside the ZK circuit**: the ACC stores authoriser public keys, and each gated
-circuit verifies a signature over a per-operation challenge. The provider is
-**one registered authoriser**.
+### Custody disclosure
 
-**What the provider holds.** At onboarding the provider generates its **own**
-keypair; the ACC logs the **public** key as a registered authoriser. The private
-key stays in the provider's secure signer and never leaves. This authoriser is also the
-account's recovery backstop (below). Keys are **per-account and independent** —
-the MIP forbids an HD tree, and per-account keys cap a compromise to one account.
+When the user enables the backup key, the Passport app tells the user two
+facts:
 
-**Signature scheme — one of:**
+- The provider holds a full-authority key for the user. Thus, the account is
+  only as safe as the signing security of the provider.
+- If the provider keeps the viewing key in a part that only Passport can read,
+  the provider itself can read it. Then it can see what the account receives.
+  The viewing key alone gives no authority to spend.
 
-- **JubJub Schnorr** (RedDSA over JubJub) — verified in-circuit **today**
-  (`s·G == R + c·pk`, native Compact built-ins); the specified,
-  experiment-validated path (C5; `experiments/redjubjub-wallet`).
-- **ECDSA over secp256k1** — the scheme most secure signers support, usable as
-  native secp256k1 support lands in Compact and the ledger.
-- **ECDSA over secp256r1 (P-256)** — the curve **native to WebAuthn passkeys**.
-  Compact is going to verify secp256r1 in-circuit; once that lands, a secure
-  signer holding a P-256 key becomes a first-class authoriser (it signs the
-  raw challenge, exactly like the two schemes above). A **passkey**-held
-  credential can also authorise ACC operations, with one structural addition:
-  a WebAuthn authenticator never signs the challenge itself — it signs
-  `authenticatorData || SHA-256(clientDataJSON)`, with the challenge embedded
-  base64url-encoded inside `clientDataJSON` — so the verifying circuit must
-  additionally check that envelope (challenge embedding, ceremony type,
-  rpIdHash, flags). Measured viable end-to-end in the passport workspace's
-  [p256-in-circuit experiment](https://github.com/midnightntwrk/passport/pull/117):
-  signature-only k = 15 (about 0.5 s), whole envelope in-circuit k = 16 (about
-  1.2 s), real platform-passkey assertions verified through both. Two spec
-  notes from that experiment: Apple authenticators emit **high-S** signatures
-  (the challenge spec must accept both S forms or mandate client-side
-  normalisation), and envelope verification makes passkey authorisations
-  **relying-party-scoped** (the rpIdHash the ACC accepts must be pinned).
+## The prover
 
-Until the ECDSA curves ship, **JubJub Schnorr is the only in-circuit-verified
-scheme** — choose with that timing in mind (§9).
+### Transaction in, proof out
 
-**What the provider signs, and when.** A signature authorises exactly one call on
-one account. The challenge binds the account, the circuit, the argument list, and
-the account's `auth_nonce`, hashed with **SHA-256** — a fixed public definition,
-so the provider computes it with no contract runtime. Flow: the SDK builds the
-intent and reads `auth_nonce`; the provider **applies its policy** and returns a
-signature (needing **only signing primitives — no compact-runtime, prover, or
-node**); the SDK embeds the signature as **public** call data and builds the
-preimage.
+The prover seam is `prove(unprovenTx, circuitIds) → provenTx`. It lives in
+`mn-passport-account`, and `adapter-prover-remote` implements it. The Passport
+app, dApps, and agents use the same seam.
 
-**Recovery — why the provider's key is on the ACC.** As a registered authoriser,
-if the user loses their device the provider can sign a recovery operation that
-registers the user's **new** device key and bumps the epoch (invalidating the
-lost device). The provider's policy check is its recovery gate.
+The client never uploads a proving key. It loads only the compiled module, the ledger decoder, and the manifest,
+about 1 MB for each contract.
 
-**Custodial vs bounded — an explicit decision.** In the current ACC any
-registered authoriser is a full 1-of-n admin, so an authoriser that can "fully
-back up" the account can also unilaterally **take it over** — custodial by
-definition, and a single signing key is a single point of compromise.
+### Proving keys
 
-- **Beta stance (recommended):** custodial — full authoriser, single per-account
-  key in a secure signer. Stated plainly; matches the managed tier and the timeline.
-- **Post-beta hardening:** bound the power — scope it and constrain recovery
-  (time-lock + user notification/veto, or a guardian quorum via the ACC's BUSS
-  mechanism), because a key that can rotate the user's device can otherwise
-  rotate it to itself; and add FROST to remove the single-key risk. FROST
-  needs **no ACC change**: the threshold ceremony produces a standard JubJub
-  Schnorr signature that verifies against the registered **group public key**
-  with the same in-circuit check (C5), so adopting it is a key registration or
-  rotation on the provider side, not a contract upgrade.
+The prover holds the proving keys. It can also make each key again from the
+ZKIR and the on-chain verifier key. The result is byte-identical to the key
+that the compiler makes. The step needs no SRS.
 
-### 4.2 `signData` and account data
+Measured on a 30-circuit build of the reference account (2026/09/23):
 
-Connector-surface methods the provider exposes:
+| k | Proving key | Make the key again from the on-chain verifier key |
+|---|---|---|
+| 13 | 11 MB | 0.04 s |
+| 16 | 112 MB | 0.33 to 0.47 s |
+| 17 | 224 MB | 0.72 to 1.35 s |
 
-- `signData(data, …)` — arbitrary-data signing for **Sign-In-with-Passport**
-  (not ACC authorisation, which is §4.1). Prefix with
-  `midnight_signed_message:<size>:`; return scheme (`schnorr_bip340` or
-  `ecdsa_secp256k1_sha256`), the 64-byte signature, and the verifying key.
-- `getShieldedAddresses`, `getUnshieldedAddress`, `getDustAddress`, the
-  `get*Balances` methods, `getConnectionStatus`, and `hintUsage`.
-- `getConfiguration` → indexer URI, indexer WS URI, node URI, and `networkId`.
-  The proving endpoint it points to is the **service's** (§5).
+All proving keys of that account total 3.5 GB, against 928 KB of ZKIR. The
+prover still needs the SRS to prove: 25 MB at k=17.
 
-## 5. Third-party proving & DUST sponsorship — one process
+**Key identity.** A proving key depends on the exact zkir and midnight-zk crate
+revisions, not on the version string. A different revision can make a different
+key from the same ZKIR. The on-chain verifier key shows the mismatch, because
+the node rejects the proof. It does not repair the mismatch. Thus, the prover
+must use the crate revisions that the version registry records.
 
-This is the third-party service the provider integrates and routes to. Per
-transaction it does two things, **in the same process**: **create the proof in
-a TEE**, then **DUST-balance, sponsor, and bind** the transaction, returning
-the sealed, balanced result for the device to broadcast. The sealed witness
-lives here (only in the enclave); the account key never does.
+### What the prover sees
 
-### 5.1 TEE proof server
+The prover gets the unproven transaction. Thus, it sees the private inputs
+supplied for proving, for example the coin and the amount. The same prover also
+proves the circuits of dApps. Their witnesses can hold other sensitive data of
+the user. The SDK must tell the user that the prover sees these inputs, for the
+ACC and for each dApp circuit.
 
-Turns a **proof preimage** (which may encode a witness) into a **ZK proof**.
+Encryption of the proving input to an enclave becomes mandatory when a
+trusted-hardware prover exists. Until then, the disclosure applies.
 
-The device reaches it **via the provider**: the connector's delegated-proving
-interface (`getProvingProvider` → `ProvingProvider`) is the device-side entry
-point, and the provider routes each call to the service, whose surface is,
-concretely, HTTP POSTs:
+## Fees and broadcast
 
-| Property | Value |
-|---|---|
-| Endpoints | `POST /check`, `POST /prove` |
-| Request `Content-Type` | `application/octet-stream` |
-| Request body | a single binary blob (`Uint8Array`) — **not JSON** |
-| Response | `/check` → the check result (raw binary); `/prove` → the **sealed, balanced transaction** produced by the full in-process prove → balance → sponsor → bind run (encoding: §9) — the proof is never returned on its own |
-| Timeout / retries | proving is slow; SDK default 5 min, retries on `500`/`503` |
+### The sponsor
 
-**Two hardening changes vs. the stock proof server:**
+A user never holds or pays with DUST. The broadcast seam in `mn-passport-account` takes the proven transaction.
+`adapter-broadcast` gives it to the sponsor. The sponsor adds the fee payment
+and broadcasts the transaction. The sponsor also pays the fees of account
+creation and the opening balance.
 
-1. **Sealed preimage.** The body carries the preimage **sealed to the enclave's
-   public key**, not cleartext. Only the enclave can open it.
-2. **Key by reference.** The body carries a **`keyLocation`** string, and the
-   enclave **resolves and caches the prover key itself** from the public artefact
-   host. Do **not** require the device to upload the 10–80 MB prover key per
-   proof — that is the main mobile cost, and the keys are public (§6).
+### Monitoring until final
 
-**The enclave privacy contract:**
+The client monitors each transaction until it is final. A chain subscription
+can stop without an error, for example after a network change. Thus, these
+rules apply:
 
-```mermaid
-flowchart TB
-  subgraph OUT["Outside the enclave — service infra & network"]
-    A["Sealed preimage (opaque ciphertext)"]
-    B["Prover key · ZKIR · verifier key (public)"]
-    C["Proof (public output)"]
-  end
-  subgraph IN["Inside the enclave — TEE"]
-    E["Cleartext preimage (may contain a witness)"]
-    F["Proving"]
-  end
-  A -->|"decrypt with enclave key"| E
-  E --> F
-  B -.-> F
-  F --> C
-```
+- **Bounded waits.** Each wait on the chain has a limit. At the limit, the
+  client asks the indexer, and it stops waiting for an event.
+- **Resubmission.** When a transaction does not arrive, the client submits the
+  same transaction again. A node answer that it already holds the
+  transaction is not a failure.
+- **The indexer decides.** The client knows the transaction identifier before
+  it submits. It reads the result from the indexer.
 
-The enclave MUST decrypt the preimage **only inside** the TEE; **never** log,
-persist, or emit the cleartext preimage or any witness-revealing intermediate;
-treat keys, ZKIR, and the proof as public; and be the only holder of the enclave
-key. (For an operation whose only auth is the §4.1 signature and which has no
-private witness, the preimage carries no secret — those proofs leak nothing.)
+### The Capacity Exchange
 
-**Attestation is the service's responsibility.** The SDK **seals to a published
-enclave key and does not verify a fresh attestation quote per call**. The service
-MUST provision the enclave with a stable key pair, publish the public key over a
-channel Passport can pin, back it with a remote-attestation quote, and document
-rotation/re-attestation.
+The Capacity Exchange is the second fee route, and it comes later. The SDK
+gets quotes off chain from liquidity providers, and the user selects one. The
+liquidity provider returns a partial transaction, and the SDK adds the intent
+of the user. `adapter-fee-capacity-exchange` must handle quote expiry, replay, and abandoned
+quotes. It must ask only trusted providers, because a quote request shows the
+amount class and the payment token. NIGHT that a contract holds cannot make
+DUST, so this route matters for funds in the ACC.
 
-> **Accepted residual risk:** enclave-key provenance — the SDK trusts the
-> published key rather than verifying attestation itself. A compromised or
-> substituted enclave key would expose witnesses. Recorded as an accepted beta
-> risk; SDK-side attestation (RA-TLS) is the mitigation path. Message-layer
-> sealing (HPKE to the enclave key) or transport-layer (RA-TLS) are both fine;
-> the service owns attestation either way.
+## Open questions
 
-**`/check` vs `/prove`:** `check` returns the public transcript values for
-pre-validation; `prove` produces the proof and carries straight on into
-settlement in the same process (§5.2), returning the sealed, balanced
-transaction. Both take the sealed preimage + `keyLocation`. **Artefact integrity:** pin keys by a content hash tied to the
-verifier key so a stale or swapped key fails loudly rather than producing an
-invalid proof (`ZkArtifactIntegrityError` on the SDK side).
+1. **The activation guard.** _Closed 2026/10/19._ A dApp never onboards a user,
+   so no dApp drives the WaaS key (realignment open question 15).
+2. **The WaaS key scheme.** Does the provider enroll on k256 with envelope 0,
+   or on p256 within the `wa-json134` profile (realignment open question 11)?
+3. **The viewing key.** Is the WaaS metadata its route, or is a different
+   route better (realignment open question 4)?
+4. **The metadata schema.** The namespace names, the version format, and the
+   merge rule for each field are not fixed. The provider can keep a part that
+   only Passport can read, or Passport encrypts the secret part. Which route,
+   and which key, depends on the provider. The key that authenticates each
+   entry is also open: recovery must check it without the passkey.
+5. **A proof server that makes keys from ZKIR.** No proof server has this mode.
+   Nobody tested if a proof server accepts keys made from ZKIR only.
+6. **The resubmission path.** Does the client resubmit through the sponsor, or
+   directly to a node?
+7. **Sponsor policy.** Which calls does the sponsor pay for, and which limits
+   stop abuse?
+8. **The trusted-hardware prover.** Which encryption scheme does the client
+   use, and how does it pin the key of the enclave?
 
-### 5.2 DUST balancing & sponsorship — in-process, after proving
+## Sources
 
-*After* proving — **inside the same process, on the service** — the transaction
-is unsealed (proof present, no settlement signatures, not yet bound). Distinct
-from §4.1 authorisation — this is ledger-level fee/coin settlement. There is
-no device-side `balanceUnsealedTransaction` call: the device never holds the
-unsealed transaction. The service MUST:
-
-- add coin inputs/outputs to remove imbalances **in the same intent** as the call;
-- **pay/sponsor the DUST fees** (the service is the fee sponsor — §7);
-- **cryptographically bind** the transaction, signing for its own coin inputs;
-- return the **sealed, balanced tx** to the routed call, ready to broadcast (§5.3).
-
-### 5.3 Broadcast — the device's job
-
-The sealed, balanced tx flows back through the provider to the device, and the
-**SDK broadcasts it** to the network, then awaits finalisation on the indexer
-(§3). The service never submits; its process ends when it returns the finished
-transaction.
-
-## 6. Where the ZK artefacts live (and don't)
-
-ZKIR, prover key, and verifier key are **deterministic, public outputs of
-compiling the contract** — not secret, not user-specific. The **device** resolves
-them to build the preimage; the **service's enclave** fetches the prover key by
-`keyLocation` from the public artefact host and caches it (§5.1) rather than
-receiving it from the phone. The **witness** is the only secret, on the device,
-encrypted at rest, reaching the service **only sealed, only for the enclave, only
-for one proof** — and only for operations that have a witness at all.
-
-## 7. Beta scope (what must be ready first)
-
-Per [`beta-scope.md`](./beta-scope.md), beta is the managed path only and needs:
-
-1. **Provider — ACC authoriser** (§4.1): a single per-account key in a secure signer, registered
-   on the ACC, signing challenges with **JubJub Schnorr** (or ECDSA —
-   secp256k1, or passkey-native secp256r1 — once in-circuit support lands).
-   Custodial (full authoriser); FROST and bounded
-   recovery are post-beta.
-2. **Provider — routing** (§3): forward the device's sealed proving payload to
-   the service, and the sealed, balanced transaction back to the device.
-3. **Service — TEE proof server** (§5.1), reached via the provider's routing,
-   for **every** proof (no local WASM path, no size-based routing).
-4. **Service — in-process DUST balancing & fee sponsorship** (§5.2), including
-   ACC-deploy and name-claim, so a zero-DUST user can onboard.
-5. **Provider — passkey confirmation** on every managed action (passkey login is
-   the presence gate).
-6. account data (§4.2); the device broadcasts (§5.3).
-
-Out of beta: FROST, bounded recovery, local/WASM proving, size-based routing,
-external wallet connections, agents, and the Capacity-Exchange fee path.
-
-## 8. Implementation checklist
-
-**Provider — authorisation**
-- [ ] Per-account keypair; register the **public** key on the ACC; private key in a secure signer.
-- [ ] Sign the challenge — SHA-256 over `{account, circuit, args, auth_nonce}` — with **JubJub Schnorr** (today) or **ECDSA** (secp256k1 or secp256r1, as in-circuit support lands). A passkey cannot sign this challenge directly — WebAuthn signs its own envelope with the challenge embedded — so a passkey authoriser goes through the envelope-verifying circuit (§4.1), not this raw-challenge path.
-- [ ] No compact-runtime / prover / node needed for signing.
-- [ ] Apply authorisation policy **before** signing (the enforcement point, especially for recovery).
-- [ ] Route the sealed proving payload (sealed preimage + `keyLocation`) to the service, and the sealed, balanced transaction back to the device; the proving payload is opaque ciphertext to the provider.
-- [ ] `signData`, addresses/balances, `getConfiguration` (pointing at the service's prover), `getConnectionStatus`, `hintUsage`.
-- [ ] _(Future)_ FROST; bounded-recovery constraints.
-
-**Service — proving**
-- [ ] `POST /check` and `POST /prove`, `application/octet-stream`, binary in/out.
-- [ ] Accept a **sealed** preimage; decrypt **only** inside the enclave.
-- [ ] Accept a **`keyLocation`**; resolve + cache the prover key server-side.
-- [ ] Never emit the cleartext preimage outside the enclave.
-- [ ] Publish an attestation-backed enclave public key; document rotation.
-- [ ] Pin keys by content hash; handle large payloads, multi-minute proofs, and SDK retries idempotently.
-
-**Service — settlement (same process as proving)**
-- [ ] After proving, in the same process: balance in-intent, pay/sponsor DUST, bind.
-- [ ] Return the sealed, balanced tx to the routed call; the device broadcasts.
-
-## 9. Open items to confirm
-
-- **Provider ↔ service integration topology — decided: the provider routes.**
-  The device hands the sealed proving payload to the provider, which routes it
-  to the service; the preimage is sealed to the **service's** enclave, so the
-  provider cannot read what it forwards. Still open: the trust chain for
-  obtaining/pinning the service's enclave key, and the **wire encoding of the
-  returned sealed, balanced transaction** the device broadcasts — including
-  whether it should additionally be sealed to a device key to remove the
-  provider's pre-broadcast visibility (today it is bound but readable).
-- **Authoriser signature scheme + timing** — JubJub Schnorr is the only
-  in-circuit-verified scheme today; confirm the Compact/ledger timelines for
-  **secp256k1** and for **secp256r1 (P-256, passkey-native)** — in-circuit
-  gadget vs ledger-native authorisation, or both — before committing to an
-  ECDSA curve. Upstream status: the secp256r1 operations are already frozen
-  into ZKIR 3.0 (merged 2026/07/31) and the Compact toolchain's ledger
-  dependency carries them; the remaining leg is the Compact language surface
-  (LFDT-Minokawa/compact#674, on the current quarter's roadmap).
-- **Custodial stance** — beta is custodial (full authoriser, single per-account
-  key). Confirm and record; schedule bounded-recovery + FROST hardening.
-- **DUST sponsorship mechanics** — the service's fee-payer account, its funding,
-  and whether the provider tops it up per account; whether sponsorship is
-  unconditional in beta.
-- **Sealing scheme** — message-layer (HPKE to the service's enclave key) vs
-  transport-layer (RA-TLS). Fixes what the SDK's `adapter-prover-remote` builds.
-- **Artefact host** — the shared public location the enclave resolves prover keys
-  from, and its integrity/versioning scheme.
-
-## 10. References
-
-- Account-authorisation model: `C1-account-custody-contract.md`,
-  `C5-signing-primitive.md`, ACC prototype `experiments/account-custody-prototype`.
-- Schnorr-in-circuit validation: `experiments/redjubjub-wallet` (TS) and
-  `experiments/redjubjub-wallet-rs` (Rust).
-- Public DApp Connector API — `@midnight-ntwrk/dapp-connector-api`,
-  `SPECIFICATION.md`.
-- [`sdk-requirements.md`](./sdk-requirements.md) §2.5–§2.6,
-  [`architecture.md`](./architecture.md) §4.2.1,
-  [`beta-scope.md`](./beta-scope.md).
-- Reference dApp flow: `example-bboard` (`BrowserDeployedBoardManager.ts`).
+- [Realignment proposal](./proposals/2026-09-25-sdk-realignment.md) §4, §6 to
+  §9, §12, and §13; [deliverables](./proposals/2026-09-25-sdk-deliverables.md)
+  D3, D16, and §6.
+- ADR [0004](./adr/0004-artefact-hashes-committed-compiler-deterministic.md)
+  (committed artifact hashes).
+- Planning workspace (`midnightntwrk/passport`): PR #170
+  (`experiments/proving-key-regeneration/`), PR #180 (signing digests), and
+  `contract/contracts/account.compact` (`envelope_digest`).
+- midnight-ledger PR #770 (keys from disk); servicedesk issue #203 (key sizes).
+- Bounded waits and resubmission: the reference demo (`chainWait.ts`).
+- Capacity Exchange: the upstream sponsor design (pre-launch).

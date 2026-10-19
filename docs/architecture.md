@@ -24,8 +24,8 @@
   share one prover, one broadcast client, and one key-provider interface.
   Storage, recovery, and DID stay behind `core`.
 - **Transaction in, proof out.** The prover gets the unproven transaction and
-  holds the proving keys. In V1, the prover sees the coin and the amount, and
-  the user is told.
+  holds the proving keys. In V1, the prover sees the private inputs of each
+  proof, for example the coin and the amount. The user is told.
 - After the grant and the handoff, a dApp or an agent operates with the
   Passport app closed. It signs with its own grant key, never through Passport.
 - **A dApp never onboards a user.** It sends a new user to the Passport app.
@@ -226,7 +226,7 @@ it:
 | Item | To | Condition |
 |---|---|---|
 | A signature over an ACC challenge | The prover, inside the transaction | A device operation in the Passport app |
-| The unproven transaction | The V1 prover | The prover sees the coin and the amount. The user is told. |
+| The unproven transaction | The V1 prover | The prover sees the private inputs of each proof, for the ACC and for each dApp circuit. The user is told. |
 | A key for one WPP package | One dApp | At the handoff, after a passkey tap and a separate consent. It opens only the package of that dApp. |
 | Ciphertext | WPP storage | Always |
 | The ACC address, and the viewing key and the WPP account key only as ciphertext | The metadata of an isolated WaaS backup key | Each origin of the provider can read it. Only the Passport app can get the key of that ciphertext. |
@@ -252,7 +252,10 @@ The metadata of a WaaS backup key never holds the viewing key or the WPP
 account key in readable form. Each origin of the provider can read that
 metadata. Thus, Passport keeps these keys out of it, or encrypts them under a
 key that only the Passport app can get. A dApp gets the viewing key only
-through a read grant.
+through a read grant. Only the Passport app writes that metadata. Passport
+binds each entry to the ACC address and the key versions, and it refreshes the
+entry after each rotation
+([`provider-integration.md`](./provider-integration.md)).
 
 These rules complete the invariant:
 
@@ -285,7 +288,7 @@ flowchart TB
     AGENT["agent + mn-passport-agent<br/>OWS grant key only"]
   end
   subgraph EXT["External services"]
-    PROVER["Prover<br/>sees coin and amount"]
+    PROVER["Prover<br/>sees the private inputs"]
     SPONSOR["Sponsor<br/>pays fees, broadcasts"]
     WAAS["WaaS provider (optional)<br/>backup owner key, isolated to the Passport app,<br/>no readable viewing key"]
     WPP["WPP storage<br/>ciphertext only"]
