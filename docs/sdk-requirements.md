@@ -1,6 +1,6 @@
 # Midnight Passport SDK requirements
 
-> **Status:** draft · 2026/10/14
+> **Status:** draft · 2026/10/19
 > **Owns:** what the SDK must do, and the normative rules (the MUSTs) that the
 > `conformance` lens checks.
 > **Companions:** [`architecture.md`](./architecture.md) (packages, seams, and
@@ -67,7 +67,7 @@ registers the key on one of two paths:
 
 | Path | Circuits | Authority | Where |
 |---|---|---|---|
-| Device | `activate_initial_device_with_*`, `add_device_with_*` | Full | The Passport app, or a dApp through a WaaS provider (first device only) |
+| Device | `activate_initial_device_with_*`, `add_device_with_*` | Full | The Passport app only: the passkey at account creation, then an optional WaaS backup key |
 | Grant | `issue_grant_with_*` | Scoped | The Passport app, through the grant ceremony |
 
 The SDK must supply these key providers:
@@ -76,7 +76,7 @@ The SDK must supply these key providers:
 |---|---|---|
 | Passkey | JubJub, from the PRF output of the passkey | Device |
 | Passkey on secp256r1 | p256, `wa-json134` WebAuthn profile only | Device or grant |
-| Embedded wallet of a WaaS provider | k256, envelope 0 | Device |
+| Embedded wallet of a WaaS provider | k256, envelope 0 | Device: an optional backup owner key |
 | Midnight connector wallet | k256, envelope 1 (`signData` with `ecdsa_secp256k1_sha256`) | Device, or a read-only grant |
 | dApp per-origin key | JubJub, k256 (envelope 0), or p256 | Grant |
 | Agent key in OWS | JubJub or k256 (envelope 0) | Grant |
@@ -192,19 +192,21 @@ Each service is replaceable behind a seam.
 | Proving | The prover | The coin and the amount of each transaction |
 | Fees and broadcast | The sponsor | The proven transaction |
 | Fee swaps | The Capacity Exchange | The amount class and the payment token of a quote |
-| dApp onboarding | The WaaS provider | It holds a full-authority key, and it reads the account metadata |
+| Backup owner key (optional) | The WaaS provider | It holds a full-authority key, isolated to the Passport app. It reads the public account metadata. |
 | Private-data storage | WPP storage | Ciphertext only |
 | Chain reads | The indexer | What the viewing key opens, if the client gives it |
 | Total-loss recovery | Guardians | Their own shares only |
 
-The WaaS provider needs the most trust.
+If the user enables the backup owner key, the WaaS provider needs the most
+trust.
 [`provider-integration.md`](./provider-integration.md) owns the contract with
 the WaaS provider and the prover.
 
 ## Onboarding
 
-Onboarding has two routes. On each route, the SDK deploys the ACC, activates
-the first device, and claims the name.
+Onboarding occurs only in the Passport app. The user starts there, or comes
+from a dApp. The SDK deploys the ACC, activates the first owner key, and claims
+the name. Only the Passport app adds an owner key.
 
 **Waves.** The deploy planner packs the circuits into waves within a
 15,000-byte verifier budget. It uses the actual artifacts, so the wave count is
@@ -214,50 +216,66 @@ partly deployed account, and a client checks only the circuits that it calls.
 
 ### In the Passport app
 
-1. The user makes a passkey. It becomes the first device.
+1. The user makes a passkey on the device. It becomes the first owner key.
 2. The app deploys the ACC in waves, and the sponsor pays.
 3. The app claims a free, first-come, first-served name under `passport.night`.
 4. The app creates the DID of the account.
-5. The app can enroll the embedded wallet of a WaaS provider as a second device.
+5. The user can opt in to a backup owner key: the embedded wallet of a WaaS
+   provider (below).
 
 **Recognition.** `core` recognizes an account from the passkey and its
 largeBlob. The largeBlob is a cache, never the source of truth: a hit is checked
 against the chain. The RP ID, the PRF salt, and the largeBlob schema come from
 `mn-passport-protocol`.
 
-### In a dApp, through a WaaS provider
+### From a dApp
 
-A dApp onboards a new user only through a WaaS provider that supports metadata
-on the key of the user. The entry point `mn-passport-connect/onboard` deploys
-the ACC, activates the provider key as the first device, and claims the name.
-Then it writes the ACC address and the viewing key to the metadata.
+A dApp never onboards a user, and it never drives an owner key. The dApp sends
+its usual grant request. The authorizer page finds no account, so the Passport
+app onboards the user first, as above. Then, in the same visit, it issues the
+grant to the per-origin key of the dApp. The redirect takes the user back to
+the dApp.
 
-It does not issue a grant. The dApp gets its grant through the usual grant
-ceremony. The user approves it in the Passport app, signed in with the same
-provider. The metadata finds the account, and the provider key signs
-`issue_grant`.
+A dApp must never create a Passport with a device secret in its own code.
 
-The WaaS provider must sign raw ACC challenges with the key of the user. It
-must keep metadata on that key, readable from each origin that it serves. It
-must let the Passport app sign in as the same user. These rules apply:
+### The WaaS backup owner key
 
-- **No device secret in the dApp.** No dApp or agent gets a device key.
-- **The provider key only for onboarding.** After that, the dApp acts only
-  through its grant key. Owner use of the provider key occurs only from the
-  Passport app.
+The user can add the embedded wallet of a WaaS provider as a backup owner key.
+It has the same authority as the passkey, and it works alone. Thus, it adds
+trust in the provider. A dApp can reach the same key through the same provider.
+Thus, the backup role alone does not stop an owner operation from a dApp.
+
+The WaaS provider must do these things:
+
+- sign raw ACC challenges with the key of the user;
+- **isolate the key to the Passport app:** a key or session that no other
+  origin can use, or a signing policy that refuses each ACC owner operation
+  from another origin;
+- keep metadata on that key, readable from each origin that it serves;
+- let the Passport app sign in as the user.
+
+These rules apply:
+
+- **No isolation, no enrollment.** Without isolation, the Passport app does not
+  enroll the key.
+- **Two parts of metadata.** Public account metadata, such as the ACC address,
+  finds the account. The viewing key and the WPP account key are never in
+  readable form there. The provider keeps them in a part that only the Passport
+  app can read. Or, the app encrypts them under a key that no other origin of
+  the provider can get.
 - **Small, versioned metadata.** Each entry has a namespace and a version. Each
   write reads, merges, writes, and reads back. Some providers keep only 2 KB.
-- **The user is told** that the provider can read the metadata and see what the
-  account receives. The account is only as safe as the signing security of the
-  provider, because it holds a full-authority key.
+- **The user is told** that the provider holds a full-authority key. Thus, the
+  account is only as safe as the signing security of the provider.
 
-**Known risk.** During activation, the page of the dApp drives the signatures of
-the provider. A hostile dApp can try to get more than the activation signed.
-Open question 2 asks which guard closes this risk.
+The `adapter-waas` spec has three acceptance checks:
 
-**The redirect fallback.** A dApp without a WaaS provider sends a new user to
-the Passport app, and the user returns through the grant ceremony. A dApp must
-never create a Passport with a device secret in its own code.
+1. After enrollment, a dApp session with the same provider cannot get a
+   signature for an owner operation, for example `add_device`.
+2. A dApp without read consent cannot recover the viewing key from the
+   metadata.
+3. A recovery with the backup key restores signing, the viewing key, and the
+   private state (section "Recovery").
 
 ## dApps
 
@@ -269,7 +287,8 @@ the browser profile:
 1. `mn-passport-connect` makes a key for the origin of the dApp.
 2. It sends the user to the Passport authorizer page with a `GrantRequest` and
    a possession proof. Both bind the web origin of the dApp.
-3. If the user has no account, the authorizer page helps the user make one.
+3. If the user has no account, the Passport app onboards the user first
+   (section "Onboarding").
 4. The user approves the grant with a passkey tap, and Passport submits
    `issue_grant`.
 5. The user gives separate consents for private-state access and, with read
@@ -358,15 +377,24 @@ without Passport, and its witness code does not change.
 - **Private-state revocation.** A revocation does not take back data that the
   dApp already read. Thus, Passport rotates the key of that package and tells
   the user.
-- **Read revocation.** A revocation does not take back the viewing key. Thus,
-  Passport rotates the encryption key (`rotate_enc_key_with_*`) and tells the
-  user. Notes sealed before the rotation stay readable to the revoked party.
+- **The read-access lifecycle (scoped-grants MIP §8).** A revocation does not
+  take back the viewing key. Thus, Passport has three duties:
+  - **Rotate before share.** Before it issues a read grant, Passport rotates the
+    encryption key (`rotate_enc_key_with_*`) and re-encrypts the live holdings.
+    The new holder cannot read spent history.
+  - **Re-seal after each rotation.** A rotation blinds each other holder of a
+    read grant. Passport re-seals the new key to them, or it marks them as
+    needing reconnection and tells the user.
+  - **Revoke.** After a revocation, Passport rotates, re-encrypts the live
+    holdings, and re-seals to the remaining holders. Notes sealed before the
+    rotation stay readable to the revoked party. The consent screen says this.
+  The spec of the read-grant lifecycle owns partial completion and cost.
 
 | Data | Tier | Where |
 |---|---|---|
 | The private state of a dApp | Irreplaceable | WPP |
 | The coin store of the ACC | Passport can make it again with the viewing key | Local cache only |
-| Viewing key, ACC address, grant references | Small, rarely changed | WPP metadata, the passkey largeBlob, or the WaaS metadata |
+| Viewing key, ACC address, grant references | Small, rarely changed | WPP metadata, the passkey largeBlob, or the WaaS metadata (keys never in readable form) |
 | Device keys | Passport can make them again from the passkey | Not stored |
 
 WPP storage uses a folder that the user can see (the `drive.file` scope). A
@@ -382,7 +410,7 @@ Recovery has two parts: control of the account, and the private state.
 |---|---|
 | A lost device | A current device removes it. The limits of errata 7 and 8 apply. |
 | Total loss | Guardians or paper keys recover a secret, and the ACC enrolls a new device |
-| A WaaS account | The user signs in with the same provider, and the provider key approves a new device |
+| A lost passkey, with the WaaS backup key | The user signs in to the Passport app with the provider. The backup key approves a new passkey. The app restores the viewing key and the WPP account key from the metadata. |
 
 **Total loss.** Guardians keep no state for each account. The ACC stores a
 recovery artifact and a commitment that gates the recovery. A veto window lets
@@ -481,8 +509,8 @@ These are expectations on the SDK, not SDK deliverables:
 
 1. **The Passport app** of the Midnight Foundation, built on `core`.
 2. **A reference Midnight dApp.** It holds a grant and passes the acceptance
-   test of deliverable D13. It can create Passports
-   through a WaaS provider.
+   test of deliverable D13. It sends a new user to the Passport app to
+   onboard.
 
 ## Normative rules
 
@@ -500,17 +528,17 @@ The `conformance` lens checks these rules. The sections above give the detail.
 | 8 | **Write-back after `SucceedEntirely`**, on each submit path. After a failed write, the dApp keeps the state locally and tries again. |
 | 9 | **Independent operation:** after the grant and the handoff, a dApp or an agent signs with its own grant key, with Passport closed. |
 | 10 | **One grantee key** for each account and each origin. |
-| 11 | **WaaS onboarding only:** a dApp never holds a device secret. The user is told what the provider can read and hold. |
-| 12 | **The WaaS key only for onboarding.** Owner use of that key occurs only from the Passport app. |
-| 13 | **Rotation on revocation:** the encryption key after a read grant, the package key after private-state access. The user is told. |
+| 11 | **No onboarding in a dApp:** a dApp never onboards a user, and it never drives an owner key. Only the Passport app adds an owner key. |
+| 12 | **The WaaS key only as an isolated backup owner key:** Passport enrolls it only when the provider isolates it. The metadata never holds the viewing key or the WPP account key in readable form. The user is told. |
+| 13 | **The read-access lifecycle:** rotate before share, re-seal or mark for reconnection after each rotation, and rotate on revocation. The package key rotates after private-state revocation. The user is told. |
 | 14 | **No user-held DUST** on any SDK path. |
 
 ## Open questions
 
 1. **Password fallback (decision D).** On a device without PRF, does the
    ceremony use a password with a key-derivation function? This is open.
-2. **The activation guard.** Which guard makes sure that the WaaS provider signs
-   only the activation (realignment open question 15)?
+2. **The activation guard.** _Closed 2026/10/19._ A dApp never onboards a user,
+   so no dApp drives an owner key (realignment open question 15).
 3. **Agents and private data.** Can an agent backend get the private data of a
    dApp (realignment open question 3)?
 4. **DID keys in V1.** Is the DID controller key derived from the PRF output, or

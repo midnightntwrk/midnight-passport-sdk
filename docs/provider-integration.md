@@ -1,6 +1,6 @@
 # Provider integration
 
-> **Status:** draft · 2026/10/15
+> **Status:** draft · 2026/10/19
 > **Owns:** the contract between the SDK and its external services: the WaaS
 > provider, the prover, the sponsor, and the Capacity Exchange.
 > **Companions:** [`sdk-requirements.md`](./sdk-requirements.md) (what the SDK
@@ -9,17 +9,18 @@
 
 ## Summary
 
-- **The WaaS provider** holds the key of the user. It signs raw ACC challenges
-  (k256, envelope 0), and it keeps small account metadata on that key.
-- A dApp drives the WaaS key **only to onboard** the user. After that, owner use
-  of the key occurs only from the Passport app.
+- **The WaaS provider** holds an optional backup owner key of the user. It signs
+  raw ACC challenges (k256, envelope 0), and it keeps small account metadata on
+  that key.
+- **Only the Passport app uses the WaaS key.** The provider isolates it to the
+  Passport app, and a dApp never drives it.
 - **The prover** takes an unproven transaction and returns the proven
   transaction. It holds or makes again the proving keys. In V1, it sees the
   coin and the amount, and the user is told.
 - **The sponsor** pays the fees and broadcasts. A user never holds DUST. The
   **Capacity Exchange** is the second fee route, and it comes later.
-- The WaaS provider needs the most trust. The account is only as safe as the
-  signing security of the provider.
+- If the user enables the backup key, the WaaS provider needs the most trust.
+  The account is only as safe as the signing security of the provider.
 
 ## The services
 
@@ -27,7 +28,7 @@ Each service sits behind a seam, and each one is replaceable.
 
 | Service | What it does | What it can see or do | Called through |
 |---|---|---|---|
-| WaaS provider | Holds the key of the user, signs ACC challenges, and keeps account metadata | It holds a full-authority key. It reads the metadata. | `adapter-waas` |
+| WaaS provider (optional) | Holds the backup owner key of the user, signs ACC challenges, and keeps account metadata | It holds a full-authority key, isolated to the Passport app. It reads the public metadata. | `adapter-waas` |
 | Prover | Turns an unproven transaction into a proven transaction | The coin and the amount of each transaction | `adapter-prover-remote` |
 | Sponsor | Pays the fees and broadcasts the proven transaction | The proven transaction | `adapter-broadcast` |
 | Capacity Exchange | Sells DUST capacity for a token that the user holds | The amount class and the payment token of a quote | `adapter-fee-capacity-exchange` |
@@ -44,19 +45,27 @@ flowchart LR
 
 ## The WaaS provider
 
+The WaaS key is an optional backup owner key. The user adds it in the Passport
+app, after the passkey becomes the first owner key. The key has the same
+authority as the passkey, and it works alone. Thus, it adds trust in the
+provider. A dApp never drives it.
+
 ### What the provider must supply
 
-A dApp can onboard a new user only through a WaaS provider that supplies all of
-these functions:
+The Passport app enrolls the key of a WaaS provider only if the provider
+supplies all of these functions:
 
-1. It holds a key for the user. The code of the dApp never holds that key.
+1. It holds a key for the user. The code of a dApp never holds that key.
 2. It signs a raw 32-byte digest with that key (ECDSA over secp256k1).
-3. It keeps metadata on the key of the user. The sign-in of the user can read
+3. **It isolates the key to the Passport app.** It gives Passport a key or
+   session that no other origin can use. Or, it enforces a signing policy that
+   refuses each ACC owner operation from another origin.
+4. It keeps metadata on the key of the user. The sign-in of the user can read
    and write it from each origin that the provider serves.
-4. It lets the Passport app sign in as the same user.
+5. It lets the Passport app sign in as the same user.
 
-A provider that cannot sign a raw digest cannot enroll on the ACC. A dApp
-without such a provider sends a new user to the Passport app.
+A provider that cannot sign a raw digest cannot enroll on the ACC. A provider
+that cannot isolate the key does not become a backup owner key.
 
 ### Signing ACC challenges
 
@@ -68,84 +77,80 @@ circuit. [`sdk-requirements.md`](./sdk-requirements.md) owns the exact digests.
 
 **Enrollment from a signature.** The provider has no call that returns the
 public key. Thus, the SDK asks for a signature over a known digest, and it gets
-the public key from that signature. The ACC then registers that key. The
-envelope stays 0 for the life of the key.
+the public key from that signature. The passkey then approves `add_device` for
+that key. The envelope stays 0 for the life of the key.
 
 ### Account metadata
 
-The metadata lets the user find and recover the account at each place where
-the user signs in with the same provider.
+Each origin of the provider can read the metadata. Thus, it has two parts.
 
 | Rule | Detail |
 |---|---|
-| Content | Keys and references only: the ACC address and the viewing key. Never private state. |
+| Public part | The ACC address. It finds the account. |
+| Secret part | The viewing key and the WPP account key, never in readable form. The provider keeps them in a part that only the Passport app can read. Or, the app encrypts them under a key that no other origin of the provider can get. |
+| Never | Private state |
 | Size | Small. Some providers keep only about 2 KB. |
 | Namespace and version | Each entry has a namespace and a version. |
 | Write | Read, merge, write, and then read back. A write that does not read back is a failure. |
 
+A dApp that signs in with the same provider never gets the viewing key from the
+metadata. It gets the key only through a read grant, after consent.
+
 The account-metadata seam in `mn-passport-account` defines these operations.
 `adapter-waas` implements them for one provider. The adapter names no vendor.
 
-### Sign-in from the Passport app
+### Recovery with the backup key
 
-The user can sign in with the same provider in the Passport app, or on a new
-device. Then the SDK reads the metadata and finds the account. With the
-viewing key, the app opens the payments that senders sealed to the account.
-The Passport app can then use the key of the provider as a device. It signs
-`issue_grant` for a dApp, or it approves a new device for recovery.
+If the user loses the passkey, the user signs in to the Passport app with the
+same provider. The public metadata finds the account. Then the Passport app
+restores three things:
+
+- signing: the backup key approves a new passkey (`add_device`);
+- the viewing key, which opens the payments that senders sealed earlier;
+- the private state, through the WPP account key.
 
 ### Who uses the key
 
 | Who | When | Operations |
 |---|---|---|
-| A dApp, through `mn-passport-connect/onboard` | Once, to onboard the user | Deploy the ACC, activate the key as the first device, claim the name, and write the metadata |
-| The Passport app | Each owner operation | Issue and revoke grants, add and remove devices, and recovery |
-| A dApp after onboarding | Never | The dApp acts only through its grant key |
+| The Passport app | Owner operations and recovery | Issue and revoke grants, add and remove devices, and approve a new passkey |
+| A dApp | Never | The dApp acts only through its grant key |
 | An agent | Never | The agent acts only through its grant key |
-
-The dApp issues no grant during onboarding. It gets its grant through the usual
-grant ceremony, which the user approves in the Passport app.
 
 ```mermaid
 sequenceDiagram
-  participant D as dApp (connect/onboard)
-  participant W as WaaS provider
-  participant S as Prover and sponsor
-  participant A as ACC
   participant P as Passport app
-  D->>S: deploy the ACC in waves
-  D->>W: sign the activation challenge
-  D->>S: activate the first device, claim the name
-  S->>A: proven, sponsored transactions
-  D->>W: write the metadata (ACC address, viewing key)
-  Note over D: The dApp never uses the WaaS key again
-  D->>P: grant request (the usual ceremony)
-  P->>W: sign in, find the account, sign issue_grant
-  P->>A: issue_grant
+  participant W as WaaS provider
+  participant A as ACC
+  P->>W: sign a known digest (gives the public key)
+  P->>A: add_device for the WaaS key, approved with the passkey
+  P->>W: write the metadata (ACC address, keys never readable)
+  Note over P,A: Later, after the user loses the passkey
+  P->>W: sign in, read the metadata, find the account
+  P->>A: add_device for a new passkey, signed with the WaaS key
 ```
 
-### The activation risk
+### Acceptance checks
 
-During activation, the page of the dApp drives the signatures of the provider.
-A hostile dApp can try to get more than the activation signed, for example
-`add_device`. The code of the dApp holds no device secret, but this alone does
-not limit what the key signs.
+The `adapter-waas` spec has these checks:
 
-Open question 1 asks which of these guards applies:
-
-- a signing policy at the provider, which signs only the activation request;
-- an ACC rule that limits what a new first device can do in its first
-  transaction;
-- a risk that the team accepts and records.
+1. After enrollment, a dApp session with the same provider cannot get a
+   signature for an owner operation, for example `add_device`.
+2. A dApp without read consent cannot recover the viewing key from the
+   metadata.
+3. A recovery with the backup key restores signing, the viewing key, and the
+   private state.
 
 ### Custody disclosure
 
-The Passport app and the onboarding flow must tell the user two facts:
+When the user enables the backup key, the Passport app tells the user two
+facts:
 
-- The provider can read the metadata. With the viewing key there, it can see
-  what the account receives. The viewing key alone gives no authority to spend.
 - The provider holds a full-authority key for the user. Thus, the account is
   only as safe as the signing security of the provider.
+- If the provider keeps the viewing key in a part that only Passport can read,
+  the provider itself can read it. Then it can see what the account receives.
+  The viewing key alone gives no authority to spend.
 
 ## The prover
 
@@ -222,15 +227,16 @@ DUST, so this route matters for funds in the ACC.
 
 ## Open questions
 
-1. **The activation guard.** Which guard makes sure that the WaaS provider
-   signs only the activation: a provider policy, an ACC rule, or a recorded
-   risk (realignment open question 15)?
+1. **The activation guard.** _Closed 2026/10/19._ A dApp never onboards a user,
+   so no dApp drives the WaaS key (realignment open question 15).
 2. **The WaaS key scheme.** Does the provider enroll on k256 with envelope 0,
    or on p256 within the `wa-json134` profile (realignment open question 11)?
 3. **The viewing key.** Is the WaaS metadata its route, or is a different
    route better (realignment open question 4)?
 4. **The metadata schema.** The namespace names, the version format, and the
-   merge rule for each field are not fixed.
+   merge rule for each field are not fixed. The provider can keep a part that
+   only Passport can read, or Passport encrypts the secret part. Which route,
+   and which key, depends on the provider.
 5. **A proof server that makes keys from ZKIR.** No proof server has this mode.
    Nobody tested if a proof server accepts keys made from ZKIR only.
 6. **The resubmission path.** Does the client resubmit through the sponsor, or
