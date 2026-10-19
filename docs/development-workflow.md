@@ -120,7 +120,7 @@ the kernel invariant, the naming, and these normative rules:
 | Rule | What conformance checks |
 |---|---|
 | Ceremony gate | A passkey tap occurs when Passport issues a grant and when the handoff completes. There is no tap for each call, unless the grant key is a passkey on the origin of the dApp. |
-| Prover disclosure | In V1, the prover gets the unproven transaction and sees the coin and the amount. The user is told this. Encryption to an enclave becomes mandatory when a trusted-hardware prover exists. |
+| Prover disclosure | In V1, the prover gets the unproven transaction and sees the private inputs of each proof, for the ACC and for each dApp circuit. The user is told this. Encryption to an enclave becomes mandatory when a trusted-hardware prover exists. |
 | Deposit, not address | A payment to an account is a deposit contract call, never a transfer to a raw ACC address. Unshielded value goes in through `deposit_unshielded`. |
 | No `core` in clients | `connect` and `mn-passport-agent` never link `core` or a Passport-app adapter. Shared code goes into `mn-passport-account`. |
 | Two version axes | The wire axis (`mn-passport-protocol`, the grant messages) and the binding axis (`mn-passport-contract` and the deployed ACC) stay separate. |
@@ -180,8 +180,9 @@ pre-filled compare URL and a copy of the description.
 - **Toolchain pins.** The build pins one midnight-js version and states which
   behavior it uses. It also pins the exact zkir and midnight-zk crate
   revisions, because proving keys change with the crate revision.
-- **Compatibility matrix.** It keeps the two version axes current. A bump that
-  moves an axis updates the matrix in the same PR.
+- **Compatibility matrix.** It keeps the two version axes current in
+  [`compatibility.md`](./compatibility.md). A bump that moves an axis updates
+  the matrix in the same PR.
 
 It turns drift into backlog items through `spec-driver`. It never bumps a
 dependency silently inside an unrelated tranche.
