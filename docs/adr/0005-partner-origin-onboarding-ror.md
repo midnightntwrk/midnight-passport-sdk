@@ -43,7 +43,7 @@ Three shapes were considered for the packaging:
 ## Decision
 
 - **Adopt partner-origin onboarding** as requirements **§3.13**, designed in
-  [`onboarding-and-key-authorisation.md`](../onboarding-and-key-authorisation.md) and specced as
+  [`onboarding-and-key-authorisation.md`](https://github.com/midnightntwrk/midnight-passport-sdk/blob/41de3ffb6aa7f8ea9f97cda1a4e234f785dbe4e4/docs/onboarding-and-key-authorisation.md) and specced as
   **FS-2.3**.
 - **Package it as the `mn-passport-onboard` facade over `core` + adapters**
   (option 3): one kernel implementation, no duplicated functionality;
