@@ -399,7 +399,8 @@ recovery code. The BUSS arithmetic comes from the Pleiades library through
 ### What the SDK must enforce
 
 The contract checks only what it can see. These rules are client
-obligations in MIP-0022, so the kernel enforces them:
+obligations in MIP-0022, so the kernel enforces them (requirements, rules 15
+to 18):
 
 1. **Fresh `s` and fresh session id for each session** (REC-4). A reused id
    lets a quorum open two sessions. With `2t+2` guardians, two correlated
