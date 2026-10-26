@@ -251,6 +251,8 @@ scoped-grants MIP §8:
 - **Revoke.** When Passport revokes a read grant, it rotates, re-encrypts the
   live holdings, and re-seals to the remaining holders. The revoked holder
   keeps what it already read. The consent screen says this in advance.
+- **Renew the recovery wrap.** Each rotation leaves the recovery wrap with the
+  old key. Passport then runs a new recovery session (section "Recovery").
 
 The spec of the read-grant lifecycle owns partial completion and cost.
 
@@ -347,7 +349,8 @@ from a secret that it already holds:
 
 One roster can mix the three profiles.
 
-**Session** (set-up, and each change to the roster or the threshold):
+**Session** (set-up, each change to the roster or the threshold, and each
+rotation of the viewing key):
 
 1. The kernel samples a fresh recovery secret `s` and a fresh session id.
 2. `adapter-recovery` sends a `ShareRequest` to every guardian in the roster.
@@ -377,7 +380,8 @@ One roster can mix the three profiles.
    a new session at once.
 
 Assets never move. Recovery changes who can authorize, not where the assets
-are. The viewing key comes back from the wrap, and with it the coin store.
+are. The viewing key of the last session comes back from the wrap, and with it
+the coin store.
 The private data of dApps comes back only through WPP key recovery
 (requirements, section "Recovery").
 
@@ -418,10 +422,20 @@ to 18):
    same as a roster that is too small.
 6. **A for-cause session rotates the viewing key** and re-encrypts the live
    inbox entries, because a past quorum can still open the old wrap.
+7. **Each rotation of the viewing key needs a new session.** The wrap holds
+   the key of its session. After a `rotate_enc_key` for a read grant, a
+   revocation, or a for-cause removal, the wrap is stale: a recovery would
+   restore a key that does not open new holdings. MIP-0022 §5 has no rewrap
+   and no partial update, so the only fix is a new session with a share from
+   every guardian. Until it completes, `core` marks the recovery backup as
+   stale and warns the user (MIP-0022 makes the warning a MUST). If a
+   guardian cannot answer, the backup stays stale until the user changes the
+   roster.
 
 ### Security model
 
-MIP-0022 protects `s` from parties outside the client:
+MIP-0022 aims to protect `s` from parties outside the client. These
+properties rest on the open CRYPTO-MEMO answers:
 
 - Fewer than `t+1` guardians learn nothing about `s`.
 - The chain shows the artifact set and the session timing only: no guardian
@@ -450,22 +464,25 @@ Recovery adds three risks that the device path does not have:
 
 The veto window helps only while a device survives. In total loss it is a
 delay and an alarm, and the guardian quorum is the root of trust (MIP-0022,
-Security Considerations). Thus, the SDK adds these controls:
+Security Considerations). The SDK adds the controls below. They reduce some
+risks and make some attacks easier to see. None of them removes a risk.
 
-| Control | Against |
+| Control | Helps against |
 |---|---|
-| **Roster diversity.** By default, `core` refuses a roster in which profile A guardians alone can reach `t+1`. Each quorum must include a profile B or C share, which a software compromise cannot reach. An override exists. It needs a passkey tap, states the risk, and goes into the roster record. | Risk 2 |
+| **Roster diversity.** By default, `core` refuses a roster in which profile A guardians alone can reach `t+1`. Each quorum must include a profile B or C share. These shares are not a PRF output that one build can harvest during an unrelated tap. They still pass through software: a compromised client can ask a cold signer to sign for its own session, and a paper key is typed into a device at recovery. An override exists. It needs a passkey tap, states the risk, and goes into the roster record. | Widespread harvesting of passkey guardian secrets (risk 2) |
 | **People, not credentials.** `core` warns when guardian credentials share a person, a provider, or a place (MIP-0022 people-counting rule). | Risk 2 |
 | **The roster record names the SDK version** that ran the session. Each release carries a signed list of revoked versions. A session made by a revoked version forces a new session. | Risk 1 |
 | **A deliberate guard flow.** Each share response needs a passkey tap. It shows the account and how the request arrived. The guardian secret is derived for that response only, and never cached. The PRF call for the guardian salt happens only in this flow. | Risks 2 and 3 |
 | **Sealed, authenticated transport.** A share goes only to an authenticated owner, sealed to the request (MIP-0022 §7). | Interception, risk 3 |
-| **Alarms.** Each enrolled device watches for a pending recovery. The guard flow watches the accounts that its user guards, and alerts the guardian to a submission. Repeated submissions show that `s` is known, so `core` proposes a new session. | All three, and denial of service against the window |
-| **Clear signing for profile B.** The signer shows the account and the session before it signs. | A malicious client that asks for a share for a different session |
+| **Alarms.** Each enrolled device watches for a pending recovery. The guard flow watches the accounts that its user guards, and alerts the guardian to a submission. Repeated submissions suggest that `s` is known, so `core` proposes a new session. | Makes a submission visible, while a device or a guardian is watching |
+| **Clear signing for profile B,** where the signer supports it. The signer shows the account and the session before it signs. | A client that asks for a share for a different session, if the guardian checks the screen |
 | **Signed, reproducible builds** of `core` and `buss-wasm`, with exact pins and the 7-day cooldown. Pleiades is audited and published before release. | The supply chain |
 
-The client stays trusted after these controls. They make a client-side
-attack detectable, and they keep one compromised build from reaching a
-quorum.
+The client stays trusted after these controls. A compromised build that runs
+a session or a recovery can still misuse `s`, and nothing here detects a
+backdoored session (risk 1) until its version is revoked or the next session
+runs. Roster diversity limits how far one build can harvest passkey guardian
+secrets. It does not stop a compromised client from reaching a quorum.
 
 ### Open questions
 
@@ -477,6 +494,11 @@ quorum.
 - **The successor key scheme.** The reference gate is JubJub only. A p256
   passkey cannot be the successor device yet.
 - **Who calls `recover_finalise`.** The successor device, or the sponsor.
+- **Rotations and full-roster sessions.** The read-grant lifecycle rotates
+  the viewing key on each read grant and each revocation, and each rotation
+  needs every guardian to answer. A cheaper rewrap needs MIP-0022 to allow it
+  (CRYPTO-MEMO Q3). The order of a for-cause session, the rotation, and the
+  churn must leave the wrap with the current key (MIP-0022 §5).
 - **Pending upstream work.** The proof and node validation of the device-set
   reset (#183), and the CRYPTO-MEMO answers (Q1–Q7).
 

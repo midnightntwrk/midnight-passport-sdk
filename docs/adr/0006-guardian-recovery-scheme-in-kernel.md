@@ -48,10 +48,15 @@ Two facts force decisions in the SDK:
    and session id for each session, a full roster for each session, `s`
    never at rest, a local check before submit, rejection of an unknown
    artifact-set version, and viewing-key rotation for a for-cause session.
+   Each rotation of the viewing key, for any cause, starts a new full-roster
+   session, because MIP-0022 has no rewrap. Until it completes, `core`
+   marks the recovery backup as stale and warns the user.
 6. **Roster diversity by default.** `core` refuses a roster in which
    profile A guardians alone can reach the threshold. Each quorum needs a
    cold-signer or paper share. An override needs a passkey tap and is
-   recorded.
+   recorded. This limits the widespread harvesting of passkey guardian
+   secrets. Cold-signer and paper shares still pass through software, so it
+   does not stop a compromised client.
 7. **The roster record names the SDK version** that ran the session. A
    signed list of revoked versions in each release forces a new session.
 8. **A deliberate guard flow and alarms.** A tap per share response, the
@@ -64,8 +69,12 @@ The full design is [`architecture.md`](../architecture.md), section
 
 ## Consequences
 
-- The client stays trusted. The controls make a client-side attack
-  detectable, and they keep one compromised build from reaching a quorum.
+- The client stays trusted. The controls reduce some risks and make some
+  attacks easier to see. They do not keep a compromised build from reaching
+  a quorum, and they do not detect a backdoored session.
+- Each read grant and each revocation rotates the viewing key, so each one
+  costs a full-roster session. If a guardian cannot answer, the recovery
+  backup stays stale.
 - A user with no cold signer and no paper key meets friction at set-up (the
   override), by design.
 - The roster record must survive total loss, so it cannot live only in WPP.

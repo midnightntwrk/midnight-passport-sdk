@@ -456,10 +456,16 @@ roster, so these are obligations of the client (rules 15 to 18):
   adapter. The prover sees signatures only, never the secret.
 - The SDK checks the reconstructed secret against the commitment before it
   submits.
+- Each rotation of the viewing key, including the rotations of the read-access
+  lifecycle (rule 13), needs a new session with a share from every guardian.
+  There is no rewrap. Until the session completes, a recovery would restore
+  the old viewing key, so the SDK marks the recovery backup as stale and warns
+  the user.
 - A passkey guardian's secret is the same for each session. Thus, one
   compromised Passport build could take the shares of many passkey guardians
   at once. A roster where passkey guardians alone reach the threshold is
-  refused by default.
+  refused by default. This limits that harvesting. It does not protect the
+  account from a compromised client.
 - After `recover_finalise`, the account has no recovery backup. The SDK warns
   the user until a new session completes.
 
@@ -581,7 +587,7 @@ The `conformance` lens checks these rules. The sections above give the detail.
 | 12 | **The WaaS key only as an isolated backup owner key:** Passport enrolls it only when the provider isolates it. The metadata never holds the viewing key or the WPP account key in readable form. Only Passport writes it, bound to the account and the key versions, and refreshed after each rotation. The user is told. |
 | 13 | **The read-access lifecycle:** rotate before share, re-seal or mark for reconnection after each rotation, and rotate on revocation. The package key rotates after private-state revocation. The user is told. |
 | 14 | **No user-held DUST** on any SDK path. |
-| 15 | **A fresh recovery session:** a fresh recovery secret and a fresh session id for each session, and a share from every guardian of the new roster. The secret is never at rest, never leaves the kernel, and is checked against the commitment before a submit. The SDK rejects an artifact set with a version that it does not implement. |
+| 15 | **A fresh recovery session:** a fresh recovery secret and a fresh session id for each session, and a share from every guardian of the new roster. The secret is never at rest, never leaves the kernel, and is checked against the commitment before a submit. The SDK rejects an artifact set with a version that it does not implement. Each rotation of the viewing key starts a new session; until it completes, the recovery backup is marked stale and the user is told. |
 | 16 | **Roster diversity:** passkey guardians alone never reach the threshold, unless the user overrides with a tap. The override is recorded with the roster. The SDK warns when guardian credentials share a person, a provider, or a place. |
 | 17 | **A guarded share:** a guardian gives a share only after a tap and a confirmation of the account, and only to an authenticated owner, sealed to that owner. The guardian secret is derived only for that share, and never cached. |
 | 18 | **Recovery alarms:** each enrolled device watches for a pending recovery and alerts the user. After repeated submissions, the SDK proposes a new session. After finalization, it warns until a new session completes. The roster record names the SDK version that ran the session, and a session from a revoked version forces a new one. |
@@ -616,6 +622,10 @@ The `conformance` lens checks these rules. The sections above give the detail.
     is not secret, and it must survive total loss. It cannot live only in WPP,
     because the WPP keys are lost too. Is it printed with the paper keys, kept
     in the WaaS metadata, or exported as a file?
+14. **Rotations and recovery sessions.** Each rotation of the viewing key needs
+    a full-roster recovery session. Read grants and revocations rotate often.
+    Is that cost acceptable, or does the SDK wait for MIP-0022 to allow a
+    rewrap (CRYPTO-MEMO Q3)?
 
 ## Sources
 
