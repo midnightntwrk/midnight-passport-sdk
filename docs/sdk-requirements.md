@@ -135,6 +135,10 @@ make a device signature without the user. On the JubJub arm, the kernel of
 one operation only. On the p256 arm, the key stays in the authenticator.
 [`architecture.md`](./architecture.md) owns the kernel invariant.
 
+**Recovery taps.** Recovery operations are not calls, so each one gets its own
+tap: a recovery session, each share that a guardian gives, a cancel, and the
+display of a paper key (section "Recovery").
+
 **A device without PRF.** The JubJub arm and the WPP keys need the PRF
 extension. The p256 arm gives a device without PRF, but WPP still needs a
 secret. Open question 1 asks if a password fallback stays.
@@ -427,10 +431,46 @@ Recovery has two parts: control of the account, and the private state.
 | Total loss | Guardians or paper keys recover a secret, and the ACC enrolls a new device |
 | A lost passkey, with the WaaS backup key | The user signs in to the Passport app with the provider. The backup key approves a new passkey. The app restores the viewing key and the WPP account key from the metadata. |
 
-**Total loss.** Guardians keep no state for each account. The ACC stores a
-recovery artifact and a commitment that gates the recovery. A veto window lets
-a current device cancel a recovery. A finished recovery retires the old
-devices.
+**Total loss.** MIP-0022 owns the protocol. Guardians keep no state for each
+account: each guardian computes its share again on request, from a secret that
+it already holds. A guardian is a passkey (profile A), a cold signer with
+deterministic signatures (profile B), or a paper key (profile C). One roster
+can mix them. The ACC stores the public shares, a commitment that gates the
+recovery, a wrap of the viewing key, and a session id. Nothing on chain names
+a guardian.
+
+Recovery has two phases. `recover_submit` records a pending recovery. After a
+veto window of some days, `recover_finalise` retires every old device and
+enrolls the new one. During the window, any enrolled device can cancel. In
+total loss no device remains, so the window is a delay and an alarm. Then the
+guardian quorum is the root of trust.
+
+**What the SDK must enforce.** The contract cannot check freshness or the
+roster, so these are obligations of the client (rules 15 to 18):
+
+- Each session uses a fresh recovery secret and a fresh session id, and every
+  guardian of the new roster answers. A reused session id can give the secret
+  to anyone who reads the chain.
+- The recovery secret is never at rest. It exists only while a session or a
+  recovery runs, in the kernel, and it never reaches a screen, a log, or an
+  adapter. The prover sees signatures only, never the secret.
+- The SDK checks the reconstructed secret against the commitment before it
+  submits.
+- Each rotation of the viewing key, including the rotations of the read-access
+  lifecycle (rule 13), needs a new session with a share from every guardian.
+  There is no rewrap. Until the session completes, a recovery would restore
+  the old viewing key, so the SDK marks the recovery backup as stale and warns
+  the user.
+- A passkey guardian's secret is the same for each session. Thus, one
+  compromised Passport build could take the shares of many passkey guardians
+  at once. A roster where passkey guardians alone reach the threshold is
+  refused by default. This limits that harvesting. It does not protect the
+  account from a compromised client.
+- After `recover_finalise`, the account has no recovery backup. The SDK warns
+  the user until a new session completes.
+
+[`architecture.md`](./architecture.md) (section "Recovery") gives the design and
+the security model.
 
 **Private state.** The recovery secret also decrypts the viewing key, which the
 ACC stores in encrypted form. With it, Passport makes the coin store again. WPP
@@ -547,6 +587,10 @@ The `conformance` lens checks these rules. The sections above give the detail.
 | 12 | **The WaaS key only as an isolated backup owner key:** Passport enrolls it only when the provider isolates it. The metadata never holds the viewing key or the WPP account key in readable form. Only Passport writes it, bound to the account and the key versions, and refreshed after each rotation. The user is told. |
 | 13 | **The read-access lifecycle:** rotate before share, re-seal or mark for reconnection after each rotation, and rotate on revocation. The package key rotates after private-state revocation. The user is told. |
 | 14 | **No user-held DUST** on any SDK path. |
+| 15 | **A fresh recovery session:** a fresh recovery secret and a fresh session id for each session, and a share from every guardian of the new roster. The secret is never at rest, never leaves the kernel, and is checked against the commitment before a submit. The SDK rejects an artifact set with a version that it does not implement. Each rotation of the viewing key starts a new session; until it completes, the recovery backup is marked stale and the user is told. |
+| 16 | **Roster diversity:** passkey guardians alone never reach the threshold, unless the user overrides with a tap. The override is recorded with the roster. The SDK warns when guardian credentials share a person, a provider, or a place. |
+| 17 | **A guarded share:** a guardian gives a share only after a tap and a confirmation of the account, and only to an authenticated owner, sealed to that owner. The guardian secret is derived only for that share, and never cached. |
+| 18 | **Recovery alarms:** each enrolled device watches for a pending recovery and alerts the user. After repeated submissions, the SDK proposes a new session. After finalization, it warns until a new session completes. The roster record names the SDK version that ran the session, and a session from a revoked version forces a new one. |
 
 ## Open questions
 
@@ -574,6 +618,14 @@ The `conformance` lens checks these rules. The sections above give the detail.
     signing key (realignment open question 10)?
 12. **The registry.** Where do dApps publish their artifacts (realignment open
     question 5)?
+13. **The roster record.** The record of guardians, indexes, and the threshold
+    is not secret, and it must survive total loss. It cannot live only in WPP,
+    because the WPP keys are lost too. Is it printed with the paper keys, kept
+    in the WaaS metadata, or exported as a file?
+14. **Rotations and recovery sessions.** Each rotation of the viewing key needs
+    a full-roster recovery session. Read grants and revocations rotate often.
+    Is that cost acceptable, or does the SDK wait for MIP-0022 to allow a
+    rewrap (CRYPTO-MEMO Q3)?
 
 ## Sources
 
@@ -584,7 +636,8 @@ The `conformance` lens checks these rules. The sections above give the detail.
   [`2026-09-25-sdk-deliverables.md`](./proposals/2026-09-25-sdk-deliverables.md),
   §4 and §6.
 - Planning workspace (`midnightntwrk/passport`): the scoped-grants MIP (§3.2,
-  §9, §10), the signature-schemes MIP (§2), the account-recovery MIP,
+  §9, §10), the signature-schemes MIP (§2), the account-recovery MIP
+  (MIP-0022, Proposed, upstream #339 and #385), components C14 and C15,
   `contract/contracts/account.compact` (`spec_version = 3`),
   `contract/README.md` (waves), `contract/GRANTS-CALLER.md`, and
   `contract/WEBAUTHN.md`; PRs #170, #175, #176, and #180.

@@ -79,7 +79,7 @@ All packages publish under the `@midnight-ntwrk/` scope.
 |---|---|
 | `mn-passport-account` | The ACC client that the three entry libraries share. It builds and signs ACC challenges for each arm, and it reads grants on chain. It has the grant-ceremony client, the coin store, the inbox codec, payments, the transaction joiner, and the grant-scope helpers. It defines the shared seams. |
 | `mn-passport-contract` | Typed bindings over the published ACC artifact, the version registry, and the integrity checks. It loads the compiled module, the ledger decoder, and the manifest. It loads the ZKIR only for a client that verifies circuits. It accepts a partly deployed account. It publishes the interface of the ACC for dApp circuits, and it defines the registry seam. |
-| `mn-passport-protocol` | The MIP §9 messages: the grant request, the possession proof, the redirect response, and the sign-in message (MIP §10). It also carries the shared constants: the RP ID, the PRF salt, and the largeBlob schema. Types and constants only, with no logic. |
+| `mn-passport-protocol` | The MIP §9 messages: the grant request, the possession proof, the redirect response, and the sign-in message (MIP §10). It also carries the shared constants: the RP ID, the PRF salt, and the largeBlob schema. It carries the guardian messages of MIP-0022 §7 and the recovery tags too (section "Recovery"). Types and constants only, with no logic. |
 
 ## Seams
 
@@ -98,7 +98,7 @@ entry library uses lives in the foundation.
 | Registry | Get dApp artifacts by content hash, and verify them | `contract` | `mn-passport-agent` | The registry adapter |
 | Multi-chain | Submit an authorized intent for a different chain, then report its settlement or its failure | `account` | All three | `adapter-multi-chain` |
 | Storage | Ciphertext only: WPP packages, catalogs, conflict retention, backup states | `core` | `core` | `adapter-storage-wpp` |
-| Recovery | Guardians and paper keys | `core` | `core` | `adapter-recovery` |
+| Recovery | Send share requests, collect share responses and liveness attestations, over a confidential and authenticated channel | `core` | `core` | `adapter-recovery` |
 | DID | Create, link, sign, and resolve `did:midnight` | `core` | `core` | `adapter-did` |
 
 ### Key providers
@@ -164,7 +164,7 @@ Only `core` uses these adapters.
 | Adapter | Seam | Note |
 |---|---|---|
 | `adapter-storage-wpp` | Storage | The storage adapters of WPP, with Google Drive first. |
-| `adapter-recovery` | Recovery | Total-loss recovery through guardians and paper keys. |
+| `adapter-recovery` | Recovery | The guardian transport of MIP-0022 §7. It carries sealed messages only. The recovery secret and the shares in plaintext stay in the kernel (section "Recovery"). |
 | `adapter-did` | DID | A wrapper over `midnight-did-api`. It makes the DID with the account and links it to the ACC. |
 
 ## Dependency rules
@@ -194,7 +194,11 @@ The kernel in `core` is the only code that holds these secrets in plaintext:
 - the PRF output of the passkey, and the JubJub device key derived from it;
 - the WPP keys of the account: the account key, and the package keys derived
   from it;
-- the viewing key.
+- the viewing key;
+- the recovery secret `s`, only during a session or a recovery (section
+  "Recovery");
+- the guardian secret, when this user acts as a guardian, only during one
+  share response.
 
 ### Passkey devices: two arms
 
@@ -229,6 +233,8 @@ it:
 | The unproven transaction | The V1 prover | The prover sees the private inputs of each proof, for the ACC and for each dApp circuit. The user is told. |
 | A key for one WPP package | One dApp | At the handoff, after a passkey tap and a separate consent. It opens only the package of that dApp. |
 | Ciphertext | WPP storage | Always |
+| A guardian share, sealed to the requesting owner | The owner, through `adapter-recovery` | After a passkey tap and an explicit confirmation of the account |
+| Two signatures: one under `s`, one under the successor device key | The prover, inside `recover_submit` | A recovery. The prover learns no scalar (MIP-0022 REC-11). |
 | The ACC address, and the viewing key and the WPP account key only as ciphertext | The metadata of an isolated WaaS backup key | Each origin of the provider can read it. Only the Passport app can get the key of that ciphertext. |
 
 The viewing key is the one exception: it leaves the kernel whole. It goes to a
@@ -245,6 +251,8 @@ scoped-grants MIP §8:
 - **Revoke.** When Passport revokes a read grant, it rotates, re-encrypts the
   live holdings, and re-seals to the remaining holders. The revoked holder
   keeps what it already read. The consent screen says this in advance.
+- **Renew the recovery wrap.** Each rotation leaves the recovery wrap with the
+  old key. Passport then runs a new recovery session (section "Recovery").
 
 The spec of the read-grant lifecycle owns partial completion and cost.
 
@@ -293,6 +301,7 @@ flowchart TB
     WAAS["WaaS provider (optional)<br/>backup owner key, isolated to the Passport app,<br/>no readable viewing key"]
     WPP["WPP storage<br/>ciphertext only"]
     IDX["Indexer<br/>sees what the viewing key opens"]
+    GUARD["Guardians<br/>their own shares only"]
   end
   ACC[("The user's ACC<br/>enforces devices and grants")]
 
@@ -302,6 +311,7 @@ flowchart TB
   DAPP -->|"grant-scoped calls"| ACC
   AGENT -->|"grant-scoped calls"| ACC
   DAPP -->|"package ciphertext"| WPP
+  GUARD <-->|"sealed share requests and responses"| KERNEL
   DAPP --> PROVER
   AGENT --> PROVER
   PROVER --> SPONSOR
@@ -317,6 +327,180 @@ tells the user this.
 The ACC is the last line of defense. It checks each grant on each call: the
 operations, the token color, the caps, the coin bound, the recipient pin, the
 caller pin, and the expiry.
+
+## Recovery
+
+Total-loss recovery lets a user who lost every device get control of the same
+ACC again. MIP-0022 owns the protocol. This section says where each part
+lives in the SDK, and what the SDK must enforce because the contract cannot.
+
+### How it works
+
+The user chooses guardians and a threshold, for example "any 3 of my 5".
+Guardians store nothing. Each guardian computes its share again on request,
+from a secret that it already holds:
+`sigma = H(share tag, session id, account, guardian secret)`.
+
+| Guardian profile (MIP-0022 §3) | Guardian secret | Needs Passport |
+|---|---|---|
+| A: passkey | The PRF output of the guardian's passkey, under the registered guardian salt | Yes |
+| B: cold signer | The hash of a deterministic signature (RFC 6979, or BIP-340 with zero auxiliary randomness) over the session binding | No |
+| C: paper key | A random field element, printed at enrollment and kept by no device | No |
+
+One roster can mix the three profiles.
+
+**Session** (set-up, each change to the roster or the threshold, and each
+rotation of the viewing key):
+
+1. The kernel samples a fresh recovery secret `s` and a fresh session id.
+2. `adapter-recovery` sends a `ShareRequest` to every guardian in the roster.
+   Each guardian answers with a `ShareResponse`.
+3. The kernel computes the public shares `phi`, the commitment `P = s * G`,
+   and the wrap of the viewing key under a key derived from `s`.
+4. After a passkey tap, `core` calls `publish_recovery_session` with the
+   artifact set. Then the kernel discards `s`.
+
+**Recovery** (every device is lost):
+
+1. On a fresh device, the user makes a new passkey. Its JubJub key is the
+   successor device key `Q`.
+2. `adapter-recovery` gets `t+1` shares from guardians. The user types in
+   paper keys.
+3. The kernel reconstructs `s` and checks it against `P` locally. Then, at
+   once, it decrypts the viewing key, samples the successor secret `s'`,
+   signs the submission challenge with `s` and with `Q`, and discards `s`.
+4. `core` calls `recover_submit` through the prover and the sponsor. The
+   prover sees two signatures only, never `s` (REC-11).
+5. The veto window runs. It is measured in days. Any enrolled device can call
+   `recover_cancel`.
+6. After the window, `core` (or anyone) calls `recover_finalise`. It retires
+   every old device, enrolls `Q` as the only device, rotates the commitment
+   to `P'`, and clears `phi`.
+7. The account has no recovery backup now. `core` warns the user and asks for
+   a new session at once.
+
+Assets never move. Recovery changes who can authorize, not where the assets
+are. The viewing key of the last session comes back from the wrap, and with it
+the coin store.
+The private data of dApps comes back only through WPP key recovery
+(requirements, section "Recovery").
+
+### Where each part lives
+
+| Part | Package | Holds a secret |
+|---|---|---|
+| `s`, the guardian secret, reconstruction, the local check, the wrap, the signatures under `s` and `Q` | `core` kernel | Yes |
+| The session, guard, recover, cancel, finalize, and liveness flows; the roster record; the roster policy below | `core` | Through the kernel only |
+| The guardian transport | `adapter-recovery` | No. Sealed messages only. |
+| The MIP-0022 §7 messages, the four recovery tags, the guardian PRF salt | `mn-passport-protocol` | No |
+| Bindings for the recovery circuits, the challenge hash, and the artifact-set version | `mn-passport-contract` | No |
+
+`core` runs only in the Passport app, and `connect` and `mn-passport-agent`
+never link it (dependency rule 3). Thus, no dApp or agent bundle contains
+recovery code. The BUSS arithmetic comes from the Pleiades library through
+`buss-wasm`, which the platform adapter loads into the kernel.
+
+### What the SDK must enforce
+
+The contract checks only what it can see. These rules are client
+obligations in MIP-0022, so the kernel enforces them (requirements, rules 15
+to 18):
+
+1. **Fresh `s` and fresh session id for each session** (REC-4). A reused id
+   lets a quorum open two sessions. With `2t+2` guardians, two correlated
+   sessions give `s` to anyone who reads the chain. The on-chain inequality
+   check only catches an accident.
+2. **Every guardian in the new roster answers.** There is no partial update.
+   A removed guardian is removed because `s` changes (REC-5).
+3. **`s` is never at rest** (REC-6). It exists only during steps 1–4 of a
+   session and step 3 of a recovery. It never goes to a screen, a log, or
+   an adapter. A paper key is shown once, at enrollment, after a passkey tap.
+4. **Check before submit.** A lying guardian shows only as a failed check
+   against `P`. The kernel tries other `t+1` subsets. It does not spend a
+   transaction on a wrong `s`.
+5. **Reject an unknown artifact-set version.** A misparsed `phi` looks the
+   same as a roster that is too small.
+6. **A for-cause session rotates the viewing key** and re-encrypts the live
+   inbox entries, because a past quorum can still open the old wrap.
+7. **Each rotation of the viewing key needs a new session.** The wrap holds
+   the key of its session. After a `rotate_enc_key` for a read grant, a
+   revocation, or a for-cause removal, the wrap is stale: a recovery would
+   restore a key that does not open new holdings. MIP-0022 §5 has no rewrap
+   and no partial update, so the only fix is a new session with a share from
+   every guardian. Until it completes, `core` marks the recovery backup as
+   stale and warns the user (MIP-0022 makes the warning a MUST). If a
+   guardian cannot answer, the backup stays stale until the user changes the
+   roster.
+
+### Security model
+
+MIP-0022 aims to protect `s` from parties outside the client. These
+properties rest on the open CRYPTO-MEMO answers:
+
+- Fewer than `t+1` guardians learn nothing about `s`.
+- The chain shows the artifact set and the session timing only: no guardian
+  identity, key, or channel.
+- No service holds shares, so there is no share store to breach.
+- A recovery cannot move assets.
+- The prover cannot learn `s` or change the successor (REC-11).
+
+It does not protect `s` from the client. The kernel samples `s`,
+reconstructs it, and enforces the rules above. The SDK already holds the
+device key, so a compromised SDK already controls the accounts it runs.
+Recovery adds three risks that the device path does not have:
+
+1. **A backdoor that outlives the compromise.** A malicious build can publish
+   a session with an `s` that the attacker knows. `P` does not show this. The
+   backdoor survives a fixed SDK, new devices, and new passkeys, until the
+   next session.
+2. **Guardians that share one code base.** A profile A guardian secret is a
+   PRF output, and it is the same for every session. A malicious Passport app
+   build can ask for the guardian salt during any tap that a user makes for
+   another reason. It then has that guardian's shares for every account it
+   guards, now and in the future. One release can thus act as `t+1`
+   colluding guardians, across many accounts at once.
+3. **Share requests at scale.** Each Passport app answers share requests for
+   other accounts. "Your friend needs help to recover" is a cheap phish.
+
+The veto window helps only while a device survives. In total loss it is a
+delay and an alarm, and the guardian quorum is the root of trust (MIP-0022,
+Security Considerations). The SDK adds the controls below. They reduce some
+risks and make some attacks easier to see. None of them removes a risk.
+
+| Control | Helps against |
+|---|---|
+| **Roster diversity.** By default, `core` refuses a roster in which profile A guardians alone can reach `t+1`. Each quorum must include a profile B or C share. These shares are not a PRF output that one build can harvest during an unrelated tap. They still pass through software: a compromised client can ask a cold signer to sign for its own session, and a paper key is typed into a device at recovery. An override exists. It needs a passkey tap, states the risk, and goes into the roster record. | Widespread harvesting of passkey guardian secrets (risk 2) |
+| **People, not credentials.** `core` warns when guardian credentials share a person, a provider, or a place (MIP-0022 people-counting rule). | Risk 2 |
+| **The roster record names the SDK version** that ran the session. Each release carries a signed list of revoked versions. A session made by a revoked version forces a new session. | Risk 1 |
+| **A deliberate guard flow.** Each share response needs a passkey tap. It shows the account and how the request arrived. The guardian secret is derived for that response only, and never cached. The PRF call for the guardian salt happens only in this flow. | Risks 2 and 3 |
+| **Sealed, authenticated transport.** A share goes only to an authenticated owner, sealed to the request (MIP-0022 §7). | Interception, risk 3 |
+| **Alarms.** Each enrolled device watches for a pending recovery. The guard flow watches the accounts that its user guards, and alerts the guardian to a submission. Repeated submissions suggest that `s` is known, so `core` proposes a new session. | Makes a submission visible, while a device or a guardian is watching |
+| **Clear signing for profile B,** where the signer supports it. The signer shows the account and the session before it signs. | A client that asks for a share for a different session, if the guardian checks the screen |
+| **Signed, reproducible builds** of `core` and `buss-wasm`, with exact pins and the 7-day cooldown. Pleiades is audited and published before release. | The supply chain |
+
+The client stays trusted after these controls. A compromised build that runs
+a session or a recovery can still misuse `s`, and nothing here detects a
+backdoored session (risk 1) until its version is revoked or the next session
+runs. Roster diversity limits how far one build can harvest passkey guardian
+secrets. It does not stop a compromised client from reaching a quorum.
+
+### Open questions
+
+- **The roster record.** It is not secret, and it must survive total loss.
+  It cannot live only in WPP, because the WPP keys are lost too. Options:
+  printed with the paper keys, in the WaaS metadata, or an exported file.
+- **Liveness attestation.** MIP-0022 makes it a MUST. The cadence and the
+  user experience are open.
+- **The successor key scheme.** The reference gate is JubJub only. A p256
+  passkey cannot be the successor device yet.
+- **Who calls `recover_finalise`.** The successor device, or the sponsor.
+- **Rotations and full-roster sessions.** The read-grant lifecycle rotates
+  the viewing key on each read grant and each revocation, and each rotation
+  needs every guardian to answer. A cheaper rewrap needs MIP-0022 to allow it
+  (CRYPTO-MEMO Q3). The order of a for-cause session, the rotation, and the
+  churn must leave the wrap with the current key (MIP-0022 §5).
+- **Pending upstream work.** The proof and node validation of the device-set
+  reset (#183), and the CRYPTO-MEMO answers (Q1–Q7).
 
 ## Library composition examples
 
@@ -549,6 +733,9 @@ for a dApp on each request. A Midnight dApp always uses a grant (example 3).
   §10), the signature-schemes MIP (§2), `contract/GRANTS-CALLER.md`,
   `contract/WEBAUTHN.md`, and PRs #170, #175, #176, and #180.
 - Planning workspace: the cross-chain integration interface (component C25).
+- Account recovery: MIP-0022 (Proposed, upstream #339, amended by #385), the
+  reference circuits in `contract/contracts/account.compact`, components C14
+  and C15, and ADR [0006](./adr/0006-guardian-recovery-scheme-in-kernel.md).
 - Wallet standards of other chains: the Solana Wallet Standard, EIP-6963, and
   EIP-1193.
 - midnight-js `PrivateStateProvider` and `submitCallTx`, checked at
