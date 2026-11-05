@@ -1,0 +1,292 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1480" height="930" viewBox="0 0 1480 930"><title>Midnight Passport SDK package map</title><defs><marker id="ah-3b4bd8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3b4bd8"/></marker><marker id="ah-0f8a8a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0f8a8a"/></marker><marker id="ah-b8660b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b8660b"/></marker><marker id="ah-8a3fc4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8a3fc4"/></marker><marker id="ah-6b7280" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker></defs>
+<rect x="0" y="0" width="1480" height="930" rx="18" fill="#ffffff"/>
+<rect x="40" y="24" width="560" height="46" rx="12" fill="#0b1026" stroke="#3b4bd8" stroke-width="1.5"/>
+<text x="60" y="54" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="21" font-weight="800" fill="#fff">Midnight Passport SDK <tspan font-weight="400" fill="#c7cdf5">· package map</tspan></text>
+<text x="1440" y="52" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#6b7280" text-anchor="end">Architecture · 2026/11/05 · @midnight-ntwrk/mn-passport-*</text>
+<rect x="40" y="112" width="1400" height="288" rx="16" fill="#3b4bd8" fill-opacity="0.06" stroke="#3b4bd8" stroke-width="1.5" stroke-opacity="0.5"/>
+<rect x="58" y="98" width="138.5" height="28" rx="14.0" fill="#3b4bd8"/>
+<text x="127.25" y="116.5" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" fill="#fff" font-weight="700" text-anchor="middle">ENTRY LIBRARIES</text>
+<text x="208.5" y="108" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#6b7280">what an integrator installs</text>
+<rect x="959.3" y="101" width="460.7" height="22" rx="11.0" fill="#b91c1c"/>
+<text x="1189.6499999999999" y="116.14" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#fff" font-weight="700" text-anchor="middle">connect and agent never link owner. Shared code goes into core.</text>
+<rect x="60" y="136" width="300" height="170" rx="10" fill="#fff" stroke="#3b4bd8" stroke-width="2"/>
+<rect x="60" y="136" width="300" height="34" rx="10" fill="#3b4bd8"/>
+<rect x="60" y="160" width="300" height="10" rx="0" fill="#3b4bd8"/>
+<text x="74" y="158" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="14" fill="#fff" font-weight="700">mn-passport-connect</text>
+<text x="74" y="192" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" fill="#111827" font-weight="700">dApp, browser</text>
+<text x="74" y="211" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#374151">Per-origin grant key</text>
+<text x="74" y="230" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#374151">Private state over its WPP package</text>
+<text x="74" y="249" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#374151">Pay with Passport · sign-in</text>
+<text x="74" y="268" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#374151">Sends a new user to the Passport app</text>
+<rect x="590" y="136" width="300" height="170" rx="10" fill="#fff" stroke="#3b4bd8" stroke-width="2"/>
+<rect x="590" y="136" width="300" height="34" rx="10" fill="#3b4bd8"/>
+<rect x="590" y="160" width="300" height="10" rx="0" fill="#3b4bd8"/>
+<text x="604" y="158" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="14" fill="#fff" font-weight="700">mn-passport-owner</text>
+<text x="604" y="192" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" fill="#111827" font-weight="700">Passport app, browser</text>
+<text x="604" y="211" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#374151">The kernel: owner keys, WPP account key,</text>
+<text x="604" y="230" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#374151">viewing key, recovery secrets</text>
+<text x="604" y="249" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#374151">Onboarding · devices · grants · recovery</text>
+<text x="604" y="268" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#374151">Handoff consent to a dApp</text>
+<rect x="1120" y="136" width="300" height="170" rx="10" fill="#fff" stroke="#3b4bd8" stroke-width="2"/>
+<rect x="1120" y="136" width="300" height="34" rx="10" fill="#3b4bd8"/>
+<rect x="1120" y="160" width="300" height="10" rx="0" fill="#3b4bd8"/>
+<text x="1134" y="158" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="14" fill="#fff" font-weight="700">mn-passport-agent</text>
+<text x="1134" y="192" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" fill="#111827" font-weight="700">Agent backend, Node.js</text>
+<text x="1134" y="211" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#374151">Grant key in OWS</text>
+<text x="1134" y="230" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#374151">Reads the grant status on chain</text>
+<text x="1134" y="249" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#374151">Runs dApp circuits from the registry</text>
+<line x1="362" y1="190" x2="586" y2="190" stroke="#6b7280" stroke-width="1.6" marker-end="url(#ah-6b7280)"/>
+<text x="474.0" y="182" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#374151" text-anchor="middle">GrantRequest · redirect</text>
+<line x1="588" y1="262" x2="364" y2="262" stroke="#6b7280" stroke-width="1.6" marker-end="url(#ah-6b7280)"/>
+<text x="476.0" y="254" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#374151" text-anchor="middle">handoff · redirect back</text>
+<line x1="1118" y1="190" x2="894" y2="190" stroke="#6b7280" stroke-width="1.6" marker-end="url(#ah-6b7280)"/>
+<text x="1006.0" y="182" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#374151" text-anchor="middle">GrantRequest · QR code or link</text>
+<line x1="892" y1="262" x2="1116" y2="262" stroke="#6b7280" stroke-width="1.6" marker-end="url(#ah-6b7280)"/>
+<text x="1004.0" y="254" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#374151" text-anchor="middle">readable scope and salt</text>
+<text x="475" y="230" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#6b7280" text-anchor="middle">grant ceremony</text>
+<text x="1005" y="230" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#6b7280" text-anchor="middle">grant ceremony</text>
+<rect x="590" y="318" width="300" height="68" rx="10" fill="#8a3fc4" fill-opacity="0.07" stroke="#8a3fc4" stroke-width="1.5" stroke-opacity="0.6"/>
+<text x="602" y="333" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#8a3fc4" font-weight="700" letter-spacing="0.4">PASSPORT-APP ONLY · seams and adapters of owner</text>
+<rect x="600" y="341" width="135" height="38" rx="8" fill="#fff" stroke="#8a3fc4" stroke-width="1.5"/>
+<text x="608" y="356" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="10.5" fill="#8a3fc4" font-weight="700">adapter-recovery</text>
+<text x="608" y="371" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#6b7280">Recovery seam: guardians</text>
+<rect x="745" y="341" width="135" height="38" rx="8" fill="#fff" stroke="#8a3fc4" stroke-width="1.5"/>
+<text x="753" y="356" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="10.5" fill="#8a3fc4" font-weight="700">adapter-did</text>
+<text x="753" y="371" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#6b7280">DID seam: did:midnight</text>
+<rect x="1120" y="318" width="300" height="68" rx="10" fill="#fff" stroke="#3b4bd8" stroke-width="1.6" stroke-dasharray="6 4"/>
+<text x="1134" y="340" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" fill="#3b4bd8" font-weight="700">mn-passport-ecosystems</text>
+<text x="1134" y="358" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#374151">After V1 · wallet pickers of other chains</text>
+<text x="1134" y="375" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#374151">Holds no key · imports protocol only</text>
+<line x1="740" y1="392" x2="740" y2="436" stroke="#3b4bd8" stroke-width="2.2" marker-end="url(#ah-3b4bd8)"/>
+<rect x="752" y="404" width="125.0" height="20" rx="10.0" fill="#3b4bd8"/>
+<text x="814.5" y="417.96" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#fff" font-weight="700" text-anchor="middle">all import core</text>
+<rect x="40" y="446" width="1400" height="208" rx="16" fill="#0f8a8a" fill-opacity="0.06" stroke="#0f8a8a" stroke-width="1.5" stroke-opacity="0.5"/>
+<rect x="58" y="432" width="101.0" height="28" rx="14.0" fill="#0f8a8a"/>
+<text x="108.5" y="450.5" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" fill="#fff" font-weight="700" text-anchor="middle">FOUNDATION</text>
+<text x="171.0" y="442" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#6b7280">shared by every entry library</text>
+<rect x="60" y="470" width="1000" height="170" rx="10" fill="#fff" stroke="#0f8a8a" stroke-width="2"/>
+<rect x="60" y="470" width="1000" height="34" rx="10" fill="#0f8a8a"/>
+<rect x="60" y="494" width="1000" height="10" rx="0" fill="#0f8a8a"/>
+<text x="74" y="492" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="14" fill="#fff" font-weight="700">mn-passport-core</text>
+<text x="238" y="492" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#e6fffb">the shared ACC client</text>
+<text x="74" y="526" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#374151">Challenges and grant signatures · on-chain grant reads · grant-ceremony client · coin store · payments · joiner</text>
+<text x="74" y="544" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#374151">WPP client: package format, encryption, integrity, private-state provider. One package key, never the account key.</text>
+<text x="74" y="566" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#0f8a8a" font-weight="700" letter-spacing="0.6">SEAMS</text>
+<rect x="74" y="574" width="100" height="54" rx="8" fill="#0f8a8a" fill-opacity="0.08" stroke="#0f8a8a" stroke-width="1.3"/>
+<text x="124.0" y="594" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#111827" font-weight="700" text-anchor="middle">Key provider</text>
+<circle cx="104.0" cy="614" r="7.5" fill="#0f8a8a"/>
+<text x="104.0" y="617.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">O</text>
+<circle cx="124.0" cy="614" r="7.5" fill="#0f8a8a"/>
+<text x="124.0" y="617.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">C</text>
+<circle cx="144.0" cy="614" r="7.5" fill="#0f8a8a"/>
+<text x="144.0" y="617.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">A</text>
+<rect x="182" y="574" width="100" height="54" rx="8" fill="#0f8a8a" fill-opacity="0.08" stroke="#0f8a8a" stroke-width="1.3"/>
+<text x="232.0" y="594" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#111827" font-weight="700" text-anchor="middle">Metadata</text>
+<circle cx="212.0" cy="614" r="7.5" fill="#0f8a8a"/>
+<text x="212.0" y="617.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">O</text>
+<circle cx="232.0" cy="614" r="7.5" fill="#fff" stroke="#d1d5db"/>
+<text x="232.0" y="617.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#c0c4cc" font-weight="700" text-anchor="middle">C</text>
+<circle cx="252.0" cy="614" r="7.5" fill="#fff" stroke="#d1d5db"/>
+<text x="252.0" y="617.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#c0c4cc" font-weight="700" text-anchor="middle">A</text>
+<rect x="290" y="574" width="100" height="54" rx="8" fill="#0f8a8a" fill-opacity="0.08" stroke="#0f8a8a" stroke-width="1.3"/>
+<text x="340.0" y="594" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#111827" font-weight="700" text-anchor="middle">Prover</text>
+<circle cx="320.0" cy="614" r="7.5" fill="#0f8a8a"/>
+<text x="320.0" y="617.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">O</text>
+<circle cx="340.0" cy="614" r="7.5" fill="#0f8a8a"/>
+<text x="340.0" y="617.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">C</text>
+<circle cx="360.0" cy="614" r="7.5" fill="#0f8a8a"/>
+<text x="360.0" y="617.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">A</text>
+<rect x="398" y="574" width="100" height="54" rx="8" fill="#0f8a8a" fill-opacity="0.08" stroke="#0f8a8a" stroke-width="1.3"/>
+<text x="448.0" y="594" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#111827" font-weight="700" text-anchor="middle">Broadcast</text>
+<circle cx="428.0" cy="614" r="7.5" fill="#0f8a8a"/>
+<text x="428.0" y="617.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">O</text>
+<circle cx="448.0" cy="614" r="7.5" fill="#0f8a8a"/>
+<text x="448.0" y="617.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">C</text>
+<circle cx="468.0" cy="614" r="7.5" fill="#0f8a8a"/>
+<text x="468.0" y="617.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">A</text>
+<rect x="506" y="574" width="100" height="54" rx="8" fill="#0f8a8a" fill-opacity="0.08" stroke="#0f8a8a" stroke-width="1.3"/>
+<text x="556.0" y="594" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#111827" font-weight="700" text-anchor="middle">Fees</text>
+<circle cx="536.0" cy="614" r="7.5" fill="#0f8a8a"/>
+<text x="536.0" y="617.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">O</text>
+<circle cx="556.0" cy="614" r="7.5" fill="#0f8a8a"/>
+<text x="556.0" y="617.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">C</text>
+<circle cx="576.0" cy="614" r="7.5" fill="#0f8a8a"/>
+<text x="576.0" y="617.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">A</text>
+<rect x="614" y="574" width="100" height="54" rx="8" fill="#0f8a8a" fill-opacity="0.08" stroke="#0f8a8a" stroke-width="1.3"/>
+<text x="664.0" y="594" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#111827" font-weight="700" text-anchor="middle">Platform</text>
+<circle cx="644.0" cy="614" r="7.5" fill="#0f8a8a"/>
+<text x="644.0" y="617.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">O</text>
+<circle cx="664.0" cy="614" r="7.5" fill="#0f8a8a"/>
+<text x="664.0" y="617.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">C</text>
+<circle cx="684.0" cy="614" r="7.5" fill="#0f8a8a"/>
+<text x="684.0" y="617.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">A</text>
+<rect x="722" y="574" width="100" height="54" rx="8" fill="#0f8a8a" fill-opacity="0.08" stroke="#0f8a8a" stroke-width="1.3"/>
+<text x="772.0" y="594" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#111827" font-weight="700" text-anchor="middle">Private state</text>
+<circle cx="752.0" cy="614" r="7.5" fill="#fff" stroke="#d1d5db"/>
+<text x="752.0" y="617.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#c0c4cc" font-weight="700" text-anchor="middle">O</text>
+<circle cx="772.0" cy="614" r="7.5" fill="#0f8a8a"/>
+<text x="772.0" y="617.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">C</text>
+<circle cx="792.0" cy="614" r="7.5" fill="#fff" stroke="#d1d5db"/>
+<text x="792.0" y="617.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#c0c4cc" font-weight="700" text-anchor="middle">A</text>
+<rect x="830" y="574" width="100" height="54" rx="8" fill="#0f8a8a" fill-opacity="0.08" stroke="#0f8a8a" stroke-width="1.3"/>
+<text x="880.0" y="594" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#111827" font-weight="700" text-anchor="middle">Storage</text>
+<circle cx="860.0" cy="614" r="7.5" fill="#0f8a8a"/>
+<text x="860.0" y="617.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">O</text>
+<circle cx="880.0" cy="614" r="7.5" fill="#0f8a8a"/>
+<text x="880.0" y="617.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">C</text>
+<circle cx="900.0" cy="614" r="7.5" fill="#fff" stroke="#d1d5db"/>
+<text x="900.0" y="617.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#c0c4cc" font-weight="700" text-anchor="middle">A</text>
+<rect x="938" y="574" width="100" height="54" rx="8" fill="#0f8a8a" fill-opacity="0.08" stroke="#0f8a8a" stroke-width="1.3" stroke-dasharray="5 3"/>
+<text x="988.0" y="594" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#111827" font-weight="700" text-anchor="middle">Multi-chain</text>
+<circle cx="968.0" cy="614" r="7.5" fill="#0f8a8a"/>
+<text x="968.0" y="617.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">O</text>
+<circle cx="988.0" cy="614" r="7.5" fill="#0f8a8a"/>
+<text x="988.0" y="617.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">C</text>
+<circle cx="1008.0" cy="614" r="7.5" fill="#0f8a8a"/>
+<text x="1008.0" y="617.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">A</text>
+<rect x="1080" y="470" width="340" height="104" rx="10" fill="#fff" stroke="#0f8a8a" stroke-width="2"/>
+<text x="1094" y="492" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="14" fill="#0f8a8a" font-weight="700">mn-passport-contract</text>
+<rect x="1094" y="520" width="100" height="50" rx="8" fill="#0f8a8a" fill-opacity="0.08" stroke="#0f8a8a" stroke-width="1.3"/>
+<text x="1144.0" y="540" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#111827" font-weight="700" text-anchor="middle">Registry</text>
+<circle cx="1124.0" cy="558" r="7.5" fill="#fff" stroke="#d1d5db"/>
+<text x="1124.0" y="561.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#c0c4cc" font-weight="700" text-anchor="middle">O</text>
+<circle cx="1144.0" cy="558" r="7.5" fill="#fff" stroke="#d1d5db"/>
+<text x="1144.0" y="561.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#c0c4cc" font-weight="700" text-anchor="middle">C</text>
+<circle cx="1164.0" cy="558" r="7.5" fill="#0f8a8a"/>
+<text x="1164.0" y="561.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">A</text>
+<text x="1210" y="532" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#374151">Typed ACC bindings</text>
+<text x="1210" y="549" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#374151">Version registry</text>
+<text x="1210" y="566" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#374151">Integrity checks</text>
+<rect x="1214" y="586" width="206" height="54" rx="10" fill="#fff" stroke="#0f8a8a" stroke-width="2"/>
+<text x="1228" y="608" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="13" fill="#0f8a8a" font-weight="700">mn-passport-protocol</text>
+<text x="1228" y="627" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#374151">message types · no logic</text>
+<line x1="124.0" y1="628" x2="124.0" y2="700" stroke="#b8660b" stroke-width="1.3"/>
+<line x1="232.0" y1="628" x2="232.0" y2="700" stroke="#b8660b" stroke-width="1.3"/>
+<line x1="340.0" y1="628" x2="340.0" y2="700" stroke="#b8660b" stroke-width="1.3"/>
+<line x1="448.0" y1="628" x2="448.0" y2="700" stroke="#b8660b" stroke-width="1.3"/>
+<line x1="556.0" y1="628" x2="556.0" y2="700" stroke="#b8660b" stroke-width="1.3"/>
+<line x1="664.0" y1="628" x2="664.0" y2="700" stroke="#b8660b" stroke-width="1.3"/>
+<line x1="880.0" y1="628" x2="880.0" y2="700" stroke="#b8660b" stroke-width="1.3"/>
+<line x1="988.0" y1="628" x2="988.0" y2="700" stroke="#b8660b" stroke-width="1.3"/>
+<line x1="1144.0" y1="570" x2="1144.0" y2="700" stroke="#b8660b" stroke-width="1.3"/>
+<rect x="40" y="674" width="1400" height="166" rx="16" fill="#b8660b" fill-opacity="0.06" stroke="#b8660b" stroke-width="1.5" stroke-opacity="0.5"/>
+<rect x="58" y="660" width="138.5" height="28" rx="14.0" fill="#b8660b"/>
+<text x="127.25" y="678.5" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" fill="#fff" font-weight="700" text-anchor="middle">SHARED ADAPTERS</text>
+<rect x="74" y="700" width="208" height="56" rx="8" fill="#fff" stroke="#b8660b" stroke-width="1.6"/>
+<text x="82" y="717" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="10.5" fill="#b8660b" font-weight="700">waas</text>
+<circle cx="90" cy="745" r="7.5" fill="#b8660b"/>
+<text x="90" y="748.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">O</text>
+<circle cx="110" cy="745" r="7.5" fill="#fff" stroke="#d1d5db"/>
+<text x="110" y="748.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#c0c4cc" font-weight="700" text-anchor="middle">C</text>
+<circle cx="130" cy="745" r="7.5" fill="#fff" stroke="#d1d5db"/>
+<text x="130" y="748.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#c0c4cc" font-weight="700" text-anchor="middle">A</text>
+<rect x="290" y="700" width="100" height="56" rx="8" fill="#fff" stroke="#b8660b" stroke-width="1.6"/>
+<text x="298" y="717" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="10.5" fill="#b8660b" font-weight="700">prover-remote</text>
+<circle cx="306" cy="745" r="7.5" fill="#b8660b"/>
+<text x="306" y="748.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">O</text>
+<circle cx="326" cy="745" r="7.5" fill="#b8660b"/>
+<text x="326" y="748.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">C</text>
+<circle cx="346" cy="745" r="7.5" fill="#b8660b"/>
+<text x="346" y="748.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">A</text>
+<rect x="290" y="764" width="100" height="56" rx="8" fill="#fff" stroke="#b8660b" stroke-width="1.6" stroke-dasharray="5 3"/>
+<text x="298" y="781" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="10.5" fill="#b8660b" font-weight="700">prover-wasm</text>
+<circle cx="306" cy="809" r="7.5" fill="#b8660b"/>
+<text x="306" y="812.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">O</text>
+<circle cx="326" cy="809" r="7.5" fill="#b8660b"/>
+<text x="326" y="812.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">C</text>
+<circle cx="346" cy="809" r="7.5" fill="#b8660b"/>
+<text x="346" y="812.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">A</text>
+<rect x="398" y="700" width="208" height="56" rx="8" fill="#fff" stroke="#b8660b" stroke-width="1.6"/>
+<text x="406" y="717" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="10.5" fill="#b8660b" font-weight="700">broadcast</text>
+<circle cx="414" cy="745" r="7.5" fill="#b8660b"/>
+<text x="414" y="748.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">O</text>
+<circle cx="434" cy="745" r="7.5" fill="#b8660b"/>
+<text x="434" y="748.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">C</text>
+<circle cx="454" cy="745" r="7.5" fill="#b8660b"/>
+<text x="454" y="748.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">A</text>
+<rect x="506" y="764" width="100" height="56" rx="8" fill="#fff" stroke="#b8660b" stroke-width="1.6" stroke-dasharray="5 3"/>
+<text x="514" y="781" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="10.5" fill="#b8660b" font-weight="700">fee-capacity-</text>
+<text x="514" y="794" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="10.5" fill="#b8660b" font-weight="700">exchange</text>
+<circle cx="522" cy="809" r="7.5" fill="#b8660b"/>
+<text x="522" y="812.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">O</text>
+<circle cx="542" cy="809" r="7.5" fill="#b8660b"/>
+<text x="542" y="812.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">C</text>
+<circle cx="562" cy="809" r="7.5" fill="#b8660b"/>
+<text x="562" y="812.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">A</text>
+<rect x="614" y="700" width="100" height="56" rx="8" fill="#fff" stroke="#b8660b" stroke-width="1.6"/>
+<text x="622" y="717" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="10.5" fill="#b8660b" font-weight="700">browser</text>
+<circle cx="630" cy="745" r="7.5" fill="#b8660b"/>
+<text x="630" y="748.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">O</text>
+<circle cx="650" cy="745" r="7.5" fill="#b8660b"/>
+<text x="650" y="748.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">C</text>
+<circle cx="670" cy="745" r="7.5" fill="#fff" stroke="#d1d5db"/>
+<text x="670" y="748.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#c0c4cc" font-weight="700" text-anchor="middle">A</text>
+<rect x="614" y="764" width="100" height="56" rx="8" fill="#fff" stroke="#b8660b" stroke-width="1.6"/>
+<text x="622" y="781" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="10.5" fill="#b8660b" font-weight="700">nodejs</text>
+<circle cx="630" cy="809" r="7.5" fill="#fff" stroke="#d1d5db"/>
+<text x="630" y="812.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#c0c4cc" font-weight="700" text-anchor="middle">O</text>
+<circle cx="650" cy="809" r="7.5" fill="#fff" stroke="#d1d5db"/>
+<text x="650" y="812.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#c0c4cc" font-weight="700" text-anchor="middle">C</text>
+<circle cx="670" cy="809" r="7.5" fill="#b8660b"/>
+<text x="670" y="812.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">A</text>
+<rect x="830" y="700" width="100" height="56" rx="8" fill="#fff" stroke="#b8660b" stroke-width="1.6"/>
+<text x="838" y="717" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="10.5" fill="#b8660b" font-weight="700">wpp-drive</text>
+<circle cx="846" cy="745" r="7.5" fill="#b8660b"/>
+<text x="846" y="748.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">O</text>
+<circle cx="866" cy="745" r="7.5" fill="#b8660b"/>
+<text x="866" y="748.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">C</text>
+<circle cx="886" cy="745" r="7.5" fill="#fff" stroke="#d1d5db"/>
+<text x="886" y="748.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#c0c4cc" font-weight="700" text-anchor="middle">A</text>
+<rect x="830" y="764" width="100" height="56" rx="8" fill="#fff" stroke="#b8660b" stroke-width="1.6" stroke-dasharray="5 3"/>
+<text x="838" y="781" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="10.5" fill="#b8660b" font-weight="700">wpp-&lt;backend&gt;</text>
+<circle cx="846" cy="809" r="7.5" fill="#b8660b"/>
+<text x="846" y="812.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">O</text>
+<circle cx="866" cy="809" r="7.5" fill="#b8660b"/>
+<text x="866" y="812.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">C</text>
+<circle cx="886" cy="809" r="7.5" fill="#fff" stroke="#d1d5db"/>
+<text x="886" y="812.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#c0c4cc" font-weight="700" text-anchor="middle">A</text>
+<rect x="938" y="700" width="100" height="56" rx="8" fill="#fff" stroke="#b8660b" stroke-width="1.6" stroke-dasharray="5 3"/>
+<text x="946" y="717" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="10.5" fill="#b8660b" font-weight="700">multi-chain</text>
+<circle cx="954" cy="745" r="7.5" fill="#b8660b"/>
+<text x="954" y="748.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">O</text>
+<circle cx="974" cy="745" r="7.5" fill="#b8660b"/>
+<text x="974" y="748.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">C</text>
+<circle cx="994" cy="745" r="7.5" fill="#b8660b"/>
+<text x="994" y="748.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">A</text>
+<rect x="722" y="700" width="100" height="56" rx="8" fill="#0f8a8a" fill-opacity="0.06" stroke="#0f8a8a" stroke-width="1.3" stroke-dasharray="2 3"/>
+<text x="730" y="718" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10.5" fill="#0f8a8a" font-weight="700">in core:</text>
+<text x="730" y="732" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="10.5" fill="#0f8a8a" font-weight="700">WPP client</text>
+<circle cx="738" cy="745" r="7.5" fill="#fff" stroke="#d1d5db"/>
+<text x="738" y="748.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#c0c4cc" font-weight="700" text-anchor="middle">O</text>
+<circle cx="758" cy="745" r="7.5" fill="#0f8a8a"/>
+<text x="758" y="748.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">C</text>
+<circle cx="778" cy="745" r="7.5" fill="#fff" stroke="#d1d5db"/>
+<text x="778" y="748.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#c0c4cc" font-weight="700" text-anchor="middle">A</text>
+<rect x="1094" y="700" width="100" height="56" rx="8" fill="#fff" stroke="#b8660b" stroke-width="1.6"/>
+<text x="1102" y="717" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="10.5" fill="#b8660b" font-weight="700">registry</text>
+<text x="1102" y="730" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="10.5" fill="#b8660b" font-weight="700">(name open)</text>
+<circle cx="1110" cy="745" r="7.5" fill="#fff" stroke="#d1d5db"/>
+<text x="1110" y="748.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#c0c4cc" font-weight="700" text-anchor="middle">O</text>
+<circle cx="1130" cy="745" r="7.5" fill="#fff" stroke="#d1d5db"/>
+<text x="1130" y="748.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#c0c4cc" font-weight="700" text-anchor="middle">C</text>
+<circle cx="1150" cy="745" r="7.5" fill="#b8660b"/>
+<text x="1150" y="748.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">A</text>
+<text x="1214" y="718" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#374151">Later backends follow</text>
+<text x="1214" y="734" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace" font-size="11.5" fill="#374151">adapter-wpp-&lt;backend&gt;.</text>
+<text x="1214" y="756" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#374151">The registry adapter</text>
+<text x="1214" y="772" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#374151">implements a contract seam.</text>
+<circle cx="60" cy="868" r="7.5" fill="#3b4bd8"/>
+<text x="60" y="871.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">O</text>
+<circle cx="80" cy="868" r="7.5" fill="#3b4bd8"/>
+<text x="80" y="871.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">C</text>
+<circle cx="100" cy="868" r="7.5" fill="#3b4bd8"/>
+<text x="100" y="871.6" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="9.5" fill="#fff" font-weight="700" text-anchor="middle">A</text>
+<text x="122" y="872" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#374151">used by owner, connect, agent (filled = uses it)</text>
+<rect x="470" y="859" width="34" height="18" rx="5" fill="#fff" stroke="#6b7280" stroke-width="1.4" stroke-dasharray="5 3"/>
+<text x="512" y="872" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#374151">after V1 or later</text>
+<line x1="660" y1="868" x2="700" y2="868" stroke="#6b7280" stroke-width="1.6" marker-end="url(#ah-6b7280)"/>
+<text x="708" y="872" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#374151">message between apps (types from protocol)</text>
+<line x1="1040" y1="868" x2="1070" y2="868" stroke="#b8660b" stroke-width="1.3"/>
+<text x="1078" y="872" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#374151">adapter implements the seam above it</text>
+<text x="60" y="898" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" fill="#6b7280">Adapters publish as @midnight-ntwrk/mn-passport-adapter-*; tiles drop the adapter- prefix.</text>
+</svg>

@@ -29,9 +29,9 @@ where the component canvases and promises are maintained.
 Published under the `@midnight-ntwrk/` scope. Development was reset on
 2026/10/15, so no package exists yet.
 
-- Entry libraries: `mn-passport-core` (the Passport app), `mn-passport-connect`
+- Entry libraries: `mn-passport-owner` (the Passport app), `mn-passport-connect`
   (dApps), and `mn-passport-agent` (agents).
-- Foundation: `mn-passport-account`, `mn-passport-contract`, and
+- Foundation: `mn-passport-core`, `mn-passport-contract`, and
   `mn-passport-protocol`.
 - `mn-passport-adapter-*`: the shared and Passport-app adapters.
 

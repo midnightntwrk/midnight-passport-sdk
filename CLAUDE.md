@@ -80,7 +80,7 @@ the ones most often in play:
   trusted-hardware prover exists (rule 2).
 - **Deposit, not address** — paying an account is a deposit contract call, never
   a raw address transfer (rule 3).
-- **`connect` and `mn-passport-agent` never link `core`** (rule 4; architecture
+- **`connect` and `mn-passport-agent` never link `owner`** (rule 4; architecture
   "Dependency rules").
 - **Two version axes** — wire (`mn-passport-protocol`) and binding
   (`mn-passport-contract` ↔ deployed ACC) (rule 5).

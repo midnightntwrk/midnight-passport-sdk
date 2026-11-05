@@ -103,7 +103,7 @@ Each origin of the provider can read the metadata. Thus, it has two parts.
 A dApp that signs in with the same provider never gets the viewing key from the
 metadata. It gets the key only through a read grant, after consent.
 
-The account-metadata seam in `mn-passport-account` defines these operations.
+The account-metadata seam in `mn-passport-core` defines these operations.
 `adapter-waas` implements them for one provider. The adapter names no vendor.
 
 ### Recovery with the backup key
@@ -183,7 +183,7 @@ facts:
 ### Transaction in, proof out
 
 The prover seam is `prove(unprovenTx, circuitIds) → provenTx`. It lives in
-`mn-passport-account`, and `adapter-prover-remote` implements it. The Passport
+`mn-passport-core`, and `adapter-prover-remote` implements it. The Passport
 app, dApps, and agents use the same seam.
 
 The client never uploads a proving key. It loads only the compiled module, the ledger decoder, and the manifest,
@@ -227,7 +227,7 @@ trusted-hardware prover exists. Until then, the disclosure applies.
 
 ### The sponsor
 
-A user never holds or pays with DUST. The broadcast seam in `mn-passport-account` takes the proven transaction.
+A user never holds or pays with DUST. The broadcast seam in `mn-passport-core` takes the proven transaction.
 `adapter-broadcast` gives it to the sponsor. The sponsor adds the fee payment
 and broadcasts the transaction. The sponsor also pays the fees of account
 creation and the opening balance.

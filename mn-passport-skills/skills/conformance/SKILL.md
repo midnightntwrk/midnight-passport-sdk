@@ -24,18 +24,18 @@ other than JubJub are **not** findings.
 
 ## 1. Package and dependency rules (architecture, "Dependency rules")
 
-- An entry library (`core`, `connect`, `mn-passport-agent`) depends on the
+- An entry library (`owner`, `connect`, `mn-passport-agent`) depends on the
   foundation; the foundation never depends on an entry library.
-- `mn-passport-account` depends only on `mn-passport-contract` and
+- `mn-passport-core` depends only on `mn-passport-contract` and
   `mn-passport-protocol`; those two depend on no other SDK package.
-- **`connect` and `mn-passport-agent` never link `core`** or a Passport-app
-  adapter, not even transitively. Shared code goes into `mn-passport-account`.
+- **`connect` and `mn-passport-agent` never link `owner`** or a Passport-app
+  adapter, not even transitively. Shared code goes into `mn-passport-core`.
 - `mn-passport-ecosystems` depends only on `mn-passport-protocol`.
 - A shared adapter depends on the package that defines its seam and on its own
-  provider SDK — never on `core` or another adapter. A Passport-app adapter
-  (`adapter-storage-wpp`, `adapter-recovery`, `adapter-did`) implements a seam
-  from `core`, and only `core` uses it. `adapter-waas` is used only by `core`.
-- `core` and the foundation hold **no platform code** (`fs`, `window`,
+  provider SDK — never on `owner` or another adapter. A Passport-app adapter
+  (`adapter-recovery`, `adapter-did`) implements a seam
+  from `owner`, and only `owner` uses it. `adapter-waas` is used only by `owner`.
+- `owner` and the foundation hold **no platform code** (`fs`, `window`,
   `fetch`); the platform adapters supply it.
 - The SDK never compiles or owns the ACC; it consumes the published artifact.
 - `scripts/dependency-graph.mjs` is the graph; `scripts/lint-boundaries.mjs`
@@ -44,9 +44,9 @@ other than JubJub are **not** findings.
   same PR.
 - Naming: packages under `@midnight-ntwrk/`, prefixed `mn-passport-`.
 
-## 2. Kernel secret boundary (architecture, "The core kernel invariant")
+## 2. Kernel secret boundary (architecture, "The owner kernel invariant")
 
-- Only the kernel in `core` holds in plaintext: the PRF output and the JubJub
+- Only the kernel in `owner` holds in plaintext: the PRF output and the JubJub
   device key derived from it; the WPP account key and the package keys; the
   viewing key. It derives the device key and the WPP account key for one
   operation only.
@@ -59,6 +59,10 @@ other than JubJub are **not** findings.
 - The viewing key leaves whole only to the holder of a read grant, after a
   separate consent, under the read-access lifecycle (rule 13).
 - On the p256 arm, the device key stays in the authenticator.
+- The WPP client in `mn-passport-core` never receives, derives, or stores the
+  WPP account key. It works with the one package key it was given at the
+  handoff. Storage backends are `adapter-wpp-<backend>` shared adapters and
+  see ciphertext only.
 - A dApp or an agent holds only its own grant key. It never holds or drives a
   device key or an owner key (rules 9 to 11).
 
@@ -74,7 +78,7 @@ Check each rule the change touches:
    becomes mandatory once a trusted-hardware prover exists.
 3. **Deposit, not address** — a payment to an account is a deposit call; UIs
    never present the raw ACC address as a payment address.
-4. **No `core` in `connect` or `mn-passport-agent`** (§1 above).
+4. **No `owner` in `connect` or `mn-passport-agent`** (§1 above).
 5. **Two version axes** (§4 below).
 6. **A full shielded address**, both halves from one parsed address.
 7. **The recipient key at the time of the seal**, and again for each retry.

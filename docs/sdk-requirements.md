@@ -1,6 +1,6 @@
 # Midnight Passport SDK requirements
 
-> **Status:** draft · 2026/10/19
+> **Status:** draft · 2026/11/05
 > **Owns:** what the SDK must do, and the normative rules (the MUSTs) that the
 > `conformance` lens checks.
 > **Companions:** [`architecture.md`](./architecture.md) (packages, seams, and
@@ -131,7 +131,7 @@ the dApp.
 
 Each passkey signature in the Passport app also needs a tap, so no process can
 make a device signature without the user. On the JubJub arm, the kernel of
-`core` derives the device key and the WPP account key from the PRF output, for
+`owner` derives the device key and the WPP account key from the PRF output, for
 one operation only. On the p256 arm, the key stays in the authenticator.
 [`architecture.md`](./architecture.md) owns the kernel invariant.
 
@@ -231,7 +231,7 @@ partly deployed account, and a client checks only the circuits that it calls.
 5. The user can opt in to a backup owner key: the embedded wallet of a WaaS
    provider (below).
 
-**Recognition.** `core` recognizes an account from the passkey and its
+**Recognition.** `owner` recognizes an account from the passkey and its
 largeBlob. The largeBlob is a cache, never the source of truth: a hit is checked
 against the chain. The RP ID, the PRF salt, and the largeBlob schema come from
 `mn-passport-protocol`.
@@ -334,7 +334,7 @@ witness `held_coin`. Thus:
 | Deposits, unshielded withdrawals, device and grant management, `append_inbox_with_*` | `withdraw_shielded_*`, `withdraw_shielded_to_contract_*`, and their grant forms |
 
 A shielded spend from the ACC thus needs two intents in one transaction. The
-**transaction joiner** in `mn-passport-account` joins them with `addIntent`,
+**transaction joiner** in `mn-passport-core` joins them with `addIntent`,
 never `merge`.
 
 ### Independent operation
@@ -350,13 +350,13 @@ iframe, or an owner ceremony.
 project as an AI-agent skill. A user without a Passport goes to the Passport app
 and back.
 
-**`connect` never links `core`.** A dApp must not pull in the kernel of the
-Passport app. Shared code goes into `mn-passport-account`.
+**`connect` never links `owner`.** A dApp must not pull in the kernel of the
+Passport app. Shared code goes into `mn-passport-core`.
 
 ## Agents
 
 An agent uses the same grant message as a dApp, with the **agent profile**. The
-library is `mn-passport-agent`, for Node.js. It never links `core`.
+library is `mn-passport-agent`, for Node.js. It never links `owner`.
 
 1. The agent backend makes its key in OWS.
 2. The library builds a grant request with no web origin. It binds the agent key
@@ -385,9 +385,15 @@ without Passport, and its witness code does not change.
 
 - **WPP.** Passport keeps the private data and makes backups through the
   Witness Protection Program (WPP). No plaintext crosses the storage seam.
+  The WPP client lives in `mn-passport-core`, so the Passport app and a dApp
+  share it. Each storage backend is its own `adapter-wpp-<backend>` package,
+  with `adapter-wpp-drive` first.
+- **The account key stays in `owner`.** Only `owner` holds the WPP account key
+  and derives package keys. The WPP client of a dApp works with the one package
+  key from the handoff.
 - **Three consents.** The grant, private-state access, and the viewing key are
   three separate consents. The viewing key comes only with read access.
-- **The handoff.** After the passkey tap, `core` makes a key for the WPP package
+- **The handoff.** After the passkey tap, `owner` makes a key for the WPP package
   of the dApp, and only for that package. The dApp never sees other packages,
   the full profile, or a bulk export.
 - **Write-back.** The dApp writes new state only after the transaction finalizes
@@ -476,7 +482,7 @@ the security model.
 ACC stores in encrypted form. With it, Passport makes the coin store again. WPP
 key recovery restores the private data of dApps, and it does not replace account
 recovery. The account-recovery MIP owns the protocol, and `adapter-recovery`
-implements it behind `core`.
+implements it behind `owner`.
 
 ## Identity (DID)
 
@@ -486,7 +492,7 @@ update reads a timestamp witness, so the DID can only start a transaction. Thus,
 the ACC cannot be its controller today.
 
 **In V1, the Passport app operates the DID** through `adapter-did`, behind
-`core`. It creates the DID with the account. It links them: `alsoKnownAs`
+`owner`. It creates the DID with the account. It links them: `alsoKnownAs`
 carries the Passport name, and a service entry names the ACC. It holds the
 controller and recovery keys (open question 4), signs each update, and resolves
 from the indexer.
@@ -536,7 +542,7 @@ These rules apply:
 
 Wallets that only do address-to-address transfers cannot pay a Passport. Thus,
 the deposit is an ecosystem requirement. `connect` exposes it as Pay with
-Passport, without `core`.
+Passport, without `owner`.
 
 ## External wallets
 
@@ -562,7 +568,7 @@ passkey tap. Only in this flow does Passport act for each request.
 
 These are expectations on the SDK, not SDK deliverables:
 
-1. **The Passport app** of the Midnight Foundation, built on `core`.
+1. **The Passport app** of the Midnight Foundation, built on `owner`.
 2. **A reference Midnight dApp.** It holds a grant and passes the acceptance
    test of deliverable D13. It sends a new user to the Passport app to
    onboard.
@@ -576,7 +582,7 @@ The `conformance` lens checks these rules. The sections above give the detail.
 | 1 | **Ceremony gate:** a passkey tap at grant issuance and at the handoff. No tap for each call, except for a passkey grant key on the dApp origin. |
 | 2 | **Prover disclosure:** the V1 prover sees the private inputs of each proof, for the ACC and for each dApp circuit, and the user is told. Enclave encryption is mandatory once a trusted-hardware prover exists. |
 | 3 | **Deposit, not address:** a payment to an account is a deposit call, with an inbox entry for a payment from a Passport. |
-| 4 | **`connect` and `mn-passport-agent` never link `core`.** Shared code goes into `mn-passport-account`. |
+| 4 | **`connect` and `mn-passport-agent` never link `owner`.** Shared code goes into `mn-passport-core`. |
 | 5 | **Two version axes:** the wire axis (the MIP §9 messages) and the binding axis (`mn-passport-contract` and the deployed ACC). |
 | 6 | **A full shielded address**, with both halves from one parsed address. |
 | 7 | **The recipient key at the time of the seal**, and again for each retry. |

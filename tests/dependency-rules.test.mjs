@@ -55,37 +55,37 @@ test('a workspace with permitted edges passes', () => {
   const root = workspace({
     protocol: {},
     contract: {},
-    account: { deps: ['contract', 'protocol'] },
-    core: { deps: ['account', 'contract', 'protocol'] },
-    connect: { deps: ['account', 'protocol'] },
-    'adapter-recovery': { deps: ['core'] },
+    core: { deps: ['contract', 'protocol'] },
+    owner: { deps: ['core', 'contract', 'protocol'] },
+    connect: { deps: ['core', 'protocol'] },
+    'adapter-recovery': { deps: ['owner'] },
   });
   assert.deepEqual(checkWorkspace(root), []);
 });
 
-test('connect depending on core is rejected, in the manifest and the reference', () => {
-  const root = workspace({ core: {}, connect: { deps: ['core'] } });
+test('connect depending on owner is rejected, in the manifest and the reference', () => {
+  const root = workspace({ owner: {}, connect: { deps: ['owner'] } });
   const violations = checkWorkspace(root);
-  assert.ok(violations.some((v) => v.startsWith('"connect" must not depend on "core"')));
-  assert.ok(violations.some((v) => v.startsWith('"connect" must not reference "core"')));
-  assert.ok(violations.some((v) => v.startsWith('"connect" reaches "core"')));
+  assert.ok(violations.some((v) => v.startsWith('"connect" must not depend on "owner"')));
+  assert.ok(violations.some((v) => v.startsWith('"connect" must not reference "owner"')));
+  assert.ok(violations.some((v) => v.startsWith('"connect" reaches "owner"')));
 });
 
-test('a transitive path from agent to core is rejected', () => {
-  const root = workspace({ core: {}, account: { deps: ['core'] }, agent: { deps: ['account'] } });
+test('a transitive path from agent to owner is rejected', () => {
+  const root = workspace({ owner: {}, core: { deps: ['owner'] }, agent: { deps: ['core'] } });
   const violations = checkWorkspace(root);
-  assert.ok(violations.some((v) => v.startsWith('"account" must not depend on "core"')));
-  assert.ok(violations.some((v) => v.startsWith('"agent" reaches "core"')));
+  assert.ok(violations.some((v) => v.startsWith('"core" must not depend on "owner"')));
+  assert.ok(violations.some((v) => v.startsWith('"agent" reaches "owner"')));
 });
 
 test('a project reference must mirror a dependency', () => {
   const root = workspace({
     protocol: {},
     contract: {},
-    account: { deps: ['contract'], refs: ['contract', 'protocol'] },
+    core: { deps: ['contract'], refs: ['contract', 'protocol'] },
   });
   assert.deepEqual(checkWorkspace(root), [
-    '"account" references "protocol" without depending on it (architecture, Dependency rules).',
+    '"core" references "protocol" without depending on it (architecture, Dependency rules).',
   ]);
 });
 

@@ -122,7 +122,7 @@ the kernel invariant, the naming, and these normative rules:
 | Ceremony gate | A passkey tap occurs when Passport issues a grant and when the handoff completes. There is no tap for each call, unless the grant key is a passkey on the origin of the dApp. |
 | Prover disclosure | In V1, the prover gets the unproven transaction and sees the private inputs of each proof, for the ACC and for each dApp circuit. The user is told this. Encryption to an enclave becomes mandatory when a trusted-hardware prover exists. |
 | Deposit, not address | A payment to an account is a deposit contract call, never a transfer to a raw ACC address. Unshielded value goes in through `deposit_unshielded`. |
-| No `core` in clients | `connect` and `mn-passport-agent` never link `core` or a Passport-app adapter. Shared code goes into `mn-passport-account`. |
+| No `owner` in clients | `connect` and `mn-passport-agent` never link `owner` or a Passport-app adapter. Shared code goes into `mn-passport-core`. |
 | Two version axes | The wire axis (`mn-passport-protocol`, the grant messages) and the binding axis (`mn-passport-contract` and the deployed ACC) stay separate. |
 
 A decided component of the planning workspace wins over a stale SDK doc. In

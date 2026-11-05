@@ -31,7 +31,7 @@ per-feature spec grounded in the source-of-truth docs.
    same gate `spec-driver` enforces, pulled forward so planning never stalls.
 3. **Respect the normative rules** in `docs/sdk-requirements.md` ("Normative
    rules"): among them the ceremony gate (rule 1), the prover disclosure
-   (rule 2), deposit-not-address (rule 3), no `core` in `connect` or
+   (rule 2), deposit-not-address (rule 3), no `owner` in `connect` or
    `mn-passport-agent` (rule 4), the two version axes (rule 5), and owner keys
    only in the Passport app (rules 11 and 12). The spec must not contradict
    them.

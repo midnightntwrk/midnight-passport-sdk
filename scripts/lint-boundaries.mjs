@@ -2,7 +2,7 @@
 // Import-level dependency-boundary lint (docs/architecture.md, "Dependency
 // rules"). Each workspace package can import only the
 // @midnight-ntwrk/mn-passport-* packages that the graph permits. Most
-// important: `connect` and `agent` never import `core`. Platform-neutral
+// important: `connect` and `agent` never import `owner`. Platform-neutral
 // packages must not import Node built-ins. The graph lives in
 // scripts/dependency-graph.mjs.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
