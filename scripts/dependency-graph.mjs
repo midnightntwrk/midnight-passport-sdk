@@ -5,58 +5,58 @@
 // yet is skipped, so the graph can list the full target.
 export const SCOPE = '@midnight-ntwrk/mn-passport-';
 
-const FOUNDATION = ['account', 'contract', 'protocol'];
+const FOUNDATION = ['core', 'contract', 'protocol'];
 
 /** @type {Record<string, string[]>} */
 export const ALLOWED = {
   // Foundation
   protocol: [],
   contract: [],
-  account: ['contract', 'protocol'],
-  // Entry libraries: never `core` outside the Passport app
-  core: FOUNDATION,
+  core: ['contract', 'protocol'],
+  // Entry libraries: never `owner` outside the Passport app
+  owner: FOUNDATION,
   connect: FOUNDATION,
   agent: FOUNDATION,
   ecosystems: ['protocol'],
   // Shared adapters: the package that defines the seam
-  'adapter-prover-remote': ['account'],
-  'adapter-broadcast': ['account'],
-  'adapter-fee-capacity-exchange': ['account'],
-  'adapter-browser': ['account'],
-  'adapter-nodejs': ['account'],
-  'adapter-waas': ['account'],
-  'adapter-multi-chain': ['account'],
-  'adapter-prover-wasm': ['account'],
-  // Passport-app adapters: seams from `core`
-  'adapter-storage-wpp': ['core'],
-  'adapter-recovery': ['core'],
-  'adapter-did': ['core'],
+  'adapter-prover-remote': ['core'],
+  'adapter-broadcast': ['core'],
+  'adapter-fee-capacity-exchange': ['core'],
+  'adapter-browser': ['core'],
+  'adapter-nodejs': ['core'],
+  'adapter-waas': ['core'],
+  'adapter-multi-chain': ['core'],
+  'adapter-prover-wasm': ['core'],
+  'adapter-wpp-drive': ['core'],
+  // Passport-app adapters: seams from `owner`
+  'adapter-recovery': ['owner'],
+  'adapter-did': ['owner'],
 };
 
-// Packages that hold no platform code (`core` and the foundation), plus the
+// Packages that hold no platform code (`owner` and the foundation), plus the
 // browser entry libraries.
 export const PLATFORM_NEUTRAL = new Set([
   'protocol',
   'contract',
-  'account',
   'core',
+  'owner',
   'connect',
   'ecosystems',
 ]);
 
-// The Passport-app adapters: they implement a seam from `core`.
+// The Passport-app adapters: they implement a seam from `owner`.
 export const PASSPORT_APP_ADAPTERS = Object.keys(ALLOWED).filter((pkg) =>
-  (ALLOWED[pkg] ?? []).includes('core'),
+  (ALLOWED[pkg] ?? []).includes('owner'),
 );
 
 // Packages that no path may reach from the key, not even transitively.
 /** @type {Record<string, string[]>} */
 export const NEVER_REACHES = {
-  connect: ['core', ...PASSPORT_APP_ADAPTERS],
-  agent: ['core', ...PASSPORT_APP_ADAPTERS],
+  connect: ['owner', ...PASSPORT_APP_ADAPTERS],
+  agent: ['owner', ...PASSPORT_APP_ADAPTERS],
   ecosystems: [
+    'owner',
     'core',
-    'account',
     ...Object.keys(ALLOWED).filter((pkg) => pkg.startsWith('adapter-')),
   ],
 };

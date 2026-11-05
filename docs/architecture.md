@@ -1,6 +1,6 @@
 # Midnight Passport SDK architecture
 
-> **Status:** draft · 2026/10/19
+> **Status:** draft · 2026/11/05
 > **Owns:** the packages, the seams, the adapters, and the dependency rules of
 > the SDK.
 > **Companions:** [`sdk-requirements.md`](./sdk-requirements.md) (what the SDK
@@ -9,20 +9,24 @@
 
 ## Summary
 
-- The SDK has **three entry libraries** on a **shared foundation**. `core` is
+- The SDK has **three entry libraries** on a **shared foundation**. `owner` is
   the engine of the Passport app. `connect` is the dApp library.
   `mn-passport-agent` is the agent library.
 - **After V1**, a fourth entry library, `mn-passport-ecosystems`, shows
   Passport in the wallet pickers of other chains, such as Solana and EVM
   chains.
-- The foundation has three packages: `mn-passport-account` (the ACC client and
+- The foundation has three packages: `mn-passport-core` (the ACC client and
   the shared seams), `mn-passport-contract` (bindings and artifacts), and
   `mn-passport-protocol` (wire messages).
-- **`connect` and `mn-passport-agent` never link `core`.** Code that more than
-  one entry library needs goes into `mn-passport-account`.
-- Most seams live in `mn-passport-account`, so that the three entry libraries
-  share one prover, one broadcast client, and one key-provider interface.
-  Storage, recovery, and DID stay behind `core`.
+- **`connect` and `mn-passport-agent` never link `owner`.** Code that more than
+  one entry library needs goes into `mn-passport-core`.
+- Most seams live in `mn-passport-core`, so that the three entry libraries
+  share one prover, one broadcast client, one key-provider interface, and one
+  WPP client. Recovery and DID stay behind `owner`.
+- **The WPP account key stays in `owner`.** The WPP client in
+  `mn-passport-core` works with one package key that it was given, and never
+  with the account key. Each storage backend is its own `adapter-wpp-<backend>`
+  package, with `adapter-wpp-drive` first.
 - **Transaction in, proof out.** The prover gets the unproven transaction and
   holds the proving keys. In V1, the prover sees the private inputs of each
   proof, for example the coin and the amount. The user is told.
@@ -38,12 +42,12 @@
 
 ## The package map
 
-![Midnight Passport SDK package map](./proposals/assets/2026-09-25-sdk-packages.svg)
+![Midnight Passport SDK package map](./assets/sdk-packages.svg)
 
 _The entry libraries depend on the foundation. The shared adapters implement
-seams from `mn-passport-account`, and the registry adapter implements a seam
+seams from `mn-passport-core`, and the registry adapter implements a seam
 from `mn-passport-contract`. The Passport-app adapters implement seams from
-`core`, and only `core` uses them._
+`owner`, and only `owner` uses them._
 
 ## Design approach
 
@@ -54,7 +58,7 @@ in how many of them V1 adopts.
 | Approach | Shape | Verdict |
 |---|---|---|
 | 1. Thin typed wrappers | Typed bindings and injected providers. No kernel, no reactive surface. | Rejected as a target. It does not contain secrets or discipline state. |
-| 2. Layered core and adapters | A minimal kernel boundary, seams as adapter packages, observable reads, and imperative writes | **V1.** |
+| 2. Layered kernel and adapters | A minimal kernel boundary, seams as adapter packages, observable reads, and imperative writes | **V1.** |
 | 3. Kernel, adapters, and a command bus | Each mutation goes through one pipeline: authorize, build, prove, broadcast, confirm. | The target end state. |
 
 V1 builds approach 2 with seams that already have the approach 3 shape. Thus,
@@ -68,8 +72,8 @@ All packages publish under the `@midnight-ntwrk/` scope.
 
 | Package | Runs in | What it does |
 |---|---|---|
-| `mn-passport-core` | The Passport app (browser) | Onboarding, devices, grant issuance and revocation (the authorizer page of MIP §9), and recovery. It also onboards a new user who arrives from a dApp, and then issues the grant of that dApp (example 2). It keeps private data through WPP and gives out the viewing key. It recognizes an account from the passkey and its largeBlob. It is not on the path of a dApp or an agent. |
-| `mn-passport-connect` | A dApp (browser) | The grant ceremony with the browser profile. The per-origin key provider. The signature of the ACC challenge with the grant key. The private-data handoff, then a private-state provider over the WPP package of the dApp. Pay with Passport. It never onboards a user: it sends a new user to the Passport app (example 2). |
+| `mn-passport-owner` | The Passport app (browser) | Onboarding, devices, grant issuance and revocation (the authorizer page of MIP §9), and recovery. It also onboards a new user who arrives from a dApp, and then issues the grant of that dApp (example 2). It holds the WPP account key, derives the package key of each dApp, and gives out the viewing key. It recognizes an account from the passkey and its largeBlob. It is not on the path of a dApp or an agent. |
+| `mn-passport-connect` | A dApp (browser) | The grant ceremony with the browser profile. The per-origin key provider. The signature of the ACC challenge with the grant key. The private-data handoff, then the private-state provider of `mn-passport-core` over the WPP package of the dApp. Pay with Passport. It never onboards a user: it sends a new user to the Passport app (example 2). |
 | `mn-passport-agent` | An agent backend (Node.js) | The grant ceremony with the agent profile. OWS as the key provider. On-chain grant reads, so that OWS can enforce the grant as its policy. A registry client that gets and runs the circuit of a dApp. |
 | `mn-passport-ecosystems` | A dApp on a different chain (browser) | **After V1.** It registers Passport in the wallet standards of other chains: `/solana` for the Solana Wallet Standard, and `/evm` for EIP-6963 and EIP-1193. It holds no key. It sends each request to the Passport app (example 8). |
 
@@ -77,7 +81,7 @@ All packages publish under the `@midnight-ntwrk/` scope.
 
 | Package | What it does |
 |---|---|
-| `mn-passport-account` | The ACC client that the three entry libraries share. It builds and signs ACC challenges for each arm, and it reads grants on chain. It has the grant-ceremony client, the coin store, the inbox codec, payments, the transaction joiner, and the grant-scope helpers. It defines the shared seams. |
+| `mn-passport-core` | The ACC client that the three entry libraries share. It builds and signs ACC challenges for each arm, and it reads grants on chain. It has the grant-ceremony client, the coin store, the inbox codec, payments, the transaction joiner, and the grant-scope helpers. It has the WPP client: the package format, the encryption, the entry integrity checks, and the private-state provider over one package key. It defines the shared seams, storage included. |
 | `mn-passport-contract` | Typed bindings over the published ACC artifact, the version registry, and the integrity checks. It loads the compiled module, the ledger decoder, and the manifest. It loads the ZKIR only for a client that verifies circuits. It accepts a partly deployed account. It publishes the interface of the ACC for dApp circuits, and it defines the registry seam. |
 | `mn-passport-protocol` | The MIP §9 messages: the grant request, the possession proof, the redirect response, and the sign-in message (MIP §10). It also carries the shared constants: the RP ID, the PRF salt, and the largeBlob schema. It carries the guardian messages of MIP-0022 §7 and the recovery tags too (section "Recovery"). Types and constants only, with no logic. |
 
@@ -88,18 +92,18 @@ entry library uses lives in the foundation.
 
 | Seam | Shape (indicative) | Defined in | Used by | Implemented by |
 |---|---|---|---|---|
-| Key provider | `scheme`, `envelope`, `publicKey()`, `sign(challenge)` | `account` | All three | The key providers below |
-| Prover | `prove(unprovenTx, circuitIds) → provenTx` | `account` | All three | `adapter-prover-remote` |
-| Broadcast | `broadcast(provenTx)`, then monitor until final | `account` | All three | `adapter-broadcast` |
-| Fees | A sponsor pays, or a Capacity Exchange swap | `account` | All three | `adapter-broadcast` (sponsor), `adapter-fee-capacity-exchange` |
-| Platform | Network, WASM load order, WebAuthn or its Node.js equivalent | `account` | All three | `adapter-browser`, `adapter-nodejs` |
-| Private state | The midnight-js `PrivateStateProvider` | `account` | `connect` (agents: open) | `connect`, over the WPP package of the dApp |
-| Account metadata | Namespaced, versioned entries; read, merge, write, read back | `account` | `core` | `adapter-waas` |
+| Key provider | `scheme`, `envelope`, `publicKey()`, `sign(challenge)` | `core` | All three | The key providers below |
+| Prover | `prove(unprovenTx, circuitIds) → provenTx` | `core` | All three | `adapter-prover-remote` |
+| Broadcast | `broadcast(provenTx)`, then monitor until final | `core` | All three | `adapter-broadcast` |
+| Fees | A sponsor pays, or a Capacity Exchange swap | `core` | All three | `adapter-broadcast` (sponsor), `adapter-fee-capacity-exchange` |
+| Platform | Network, WASM load order, WebAuthn or its Node.js equivalent | `core` | All three | `adapter-browser`, `adapter-nodejs` |
+| Private state | The midnight-js `PrivateStateProvider` | `core` | `connect` (agents: open) | The WPP client in `core`, over the WPP package of the dApp |
+| Account metadata | Namespaced, versioned entries; read, merge, write, read back | `core` | `owner` | `adapter-waas` |
 | Registry | Get dApp artifacts by content hash, and verify them | `contract` | `mn-passport-agent` | The registry adapter |
-| Multi-chain | Submit an authorized intent for a different chain, then report its settlement or its failure | `account` | All three | `adapter-multi-chain` |
-| Storage | Ciphertext only: WPP packages, catalogs, conflict retention, backup states | `core` | `core` | `adapter-storage-wpp` |
-| Recovery | Send share requests, collect share responses and liveness attestations, over a confidential and authenticated channel | `core` | `core` | `adapter-recovery` |
-| DID | Create, link, sign, and resolve `did:midnight` | `core` | `core` | `adapter-did` |
+| Multi-chain | Submit an authorized intent for a different chain, then report its settlement or its failure | `core` | All three | `adapter-multi-chain` |
+| Storage | Ciphertext only: WPP packages, catalogs, conflict retention, backup states | `core` | `owner`, `connect` (agents: open) | `adapter-wpp-<backend>`, with `adapter-wpp-drive` first |
+| Recovery | Send share requests, collect share responses and liveness attestations, over a confidential and authenticated channel | `owner` | `owner` | `adapter-recovery` |
+| DID | Create, link, sign, and resolve `did:midnight` | `owner` | `owner` | `adapter-did` |
 
 ### Key providers
 
@@ -119,14 +123,14 @@ interface KeyProvider {
 
 | Key provider | Scheme | Usual registration | Lives in |
 |---|---|---|---|
-| Passkey | JubJub, from the PRF output | Device | `core` |
-| Passkey on secp256r1 | p256, `wa-json134` WebAuthn profile only | Device or grant | `core`, `connect` |
+| Passkey | JubJub, from the PRF output | Device | `owner` |
+| Passkey on secp256r1 | p256, `wa-json134` WebAuthn profile only | Device or grant | `owner`, `connect` |
 | Embedded wallet of a WaaS provider | k256, envelope 0 | Device: an optional backup owner key | `adapter-waas` |
-| Midnight connector wallet | k256, envelope 1 (`signData` with `ecdsa_secp256k1_sha256`) | Device, or a read-only grant | `core`, `connect` |
+| Midnight connector wallet | k256, envelope 1 (`signData` with `ecdsa_secp256k1_sha256`) | Device, or a read-only grant | `owner`, `connect` |
 | dApp per-origin key | JubJub, k256 (envelope 0), or p256 | Grant | `connect` |
 | Agent key in OWS | JubJub or k256 (envelope 0) | Grant | `mn-passport-agent` |
-| EVM wallet | k256, EIP-191 | **After V1.** Device or grant | `core`, `connect` |
-| Solana wallet | Ed25519 | **After V1.** Device or grant | `core`, `connect` |
+| EVM wallet | k256, EIP-191 | **After V1.** Device or grant | `owner`, `connect` |
+| Solana wallet | Ed25519 | **After V1.** Device or grant | `owner`, `connect` |
 
 [`sdk-requirements.md`](./sdk-requirements.md) owns the exact signing digests.
 
@@ -143,7 +147,7 @@ the seam and on its own provider SDK.
 ### Shared adapters
 
 dApps and agents need these adapters too. Thus, they implement seams from the
-foundation, never from `core`.
+foundation, never from `owner`.
 
 | Adapter | Seam | Note |
 |---|---|---|
@@ -152,18 +156,18 @@ foundation, never from `core`.
 | `adapter-fee-capacity-exchange` | Fees | The other fee route: a swap through the Capacity Exchange. Planned for later. |
 | `adapter-browser` | Platform | The browser runtime: passkeys with PRF and the two WASM runtimes in the correct order. |
 | `adapter-nodejs` | Platform | The Node.js runtime for backends, `mn-passport-agent` included. |
-| `adapter-waas` | Key provider, account metadata | The embedded key of a WaaS provider (k256, envelope 0) and the metadata on it. It names no vendor. Only `core` uses it, because this key is an optional backup owner key with full authority. It enrolls the key only when the provider isolates it to the Passport app. It never writes the viewing key or the WPP account key in readable form (the kernel invariant). |
+| `adapter-waas` | Key provider, account metadata | The embedded key of a WaaS provider (k256, envelope 0) and the metadata on it. It names no vendor. Only `owner` uses it, because this key is an optional backup owner key with full authority. It enrolls the key only when the provider isolates it to the Passport app. It never writes the viewing key or the WPP account key in readable form (the kernel invariant). |
+| `adapter-wpp-<backend>` | Storage | One package per WPP storage backend, so that an app loads only the backend it uses. Each stores ciphertext only. The first is `adapter-wpp-drive`, on Google Drive. |
 | Registry adapter (name open) | Registry | Content-addressed fetch, verification, and a local cache. It makes the verifier key again from the ZKIR and the SRS, and compares it with the key on chain. |
 | `adapter-multi-chain` | Multi-chain | **After V1.** It connects to a multi-chain signature network. The network signs for the ACC on other chains, after the ACC authorizes the intent. |
 | `adapter-prover-wasm` | Prover | **After V1.** ACC proving keys are 112–224 MB, and the zkir WASM package has no key generation. |
 
 ### Passport-app adapters
 
-Only `core` uses these adapters.
+Only `owner` uses these adapters.
 
 | Adapter | Seam | Note |
 |---|---|---|
-| `adapter-storage-wpp` | Storage | The storage adapters of WPP, with Google Drive first. |
 | `adapter-recovery` | Recovery | The guardian transport of MIP-0022 §7. It carries sealed messages only. The recovery secret and the shares in plaintext stay in the kernel (section "Recovery"). |
 | `adapter-did` | DID | A wrapper over `midnight-did-api`. It makes the DID with the account and links it to the ACC. |
 
@@ -171,34 +175,39 @@ Only `core` uses these adapters.
 
 1. An entry library depends on the foundation. The foundation never depends on
    an entry library.
-2. `mn-passport-account` depends on `mn-passport-contract` and
+2. `mn-passport-core` depends on `mn-passport-contract` and
    `mn-passport-protocol`. These two depend on no other SDK package.
-3. **`connect` and `mn-passport-agent` never link `core`**, and never link a
-   Passport-app adapter. Shared code goes into `mn-passport-account`.
+3. **`connect` and `mn-passport-agent` never link `owner`**, and never link a
+   Passport-app adapter. Shared code goes into `mn-passport-core`.
 4. `mn-passport-ecosystems` depends only on `mn-passport-protocol`. It never
-   links `core`, `mn-passport-account`, or an adapter, so that a dApp on a
+   links `owner`, `mn-passport-core`, or an adapter, so that a dApp on a
    different chain loads only a small package.
 5. A shared adapter depends on the package that defines its seam, and on its own
-   provider SDK. It never depends on `core` or on a different adapter.
-6. A Passport-app adapter implements a seam from `core`. Only `core` uses it.
-7. `core` and the foundation hold no platform code (`fs`, `window`, `fetch`).
+   provider SDK. It never depends on `owner` or on a different adapter.
+6. A Passport-app adapter implements a seam from `owner`. Only `owner` uses it.
+7. `owner` and the foundation hold no platform code (`fs`, `window`, `fetch`).
    The platform adapters supply it.
 8. The SDK never compiles or owns the ACC. It consumes the published artifact.
 
 The workspace lint and the manifest test enforce these rules on each change.
 
-## The core kernel invariant
+## The owner kernel invariant
 
-The kernel in `core` is the only code that holds these secrets in plaintext:
+The kernel in `owner` is the only code that holds these secrets in plaintext:
 
 - the PRF output of the passkey, and the JubJub device key derived from it;
-- the WPP keys of the account: the account key, and the package keys derived
-  from it;
+- the WPP account key, and the package keys derived from it, before the
+  handoff;
 - the viewing key;
 - the recovery secret `s`, only during a session or a recovery (section
   "Recovery");
 - the guardian secret, when this user acts as a guardian, only during one
   share response.
+
+The WPP client in `mn-passport-core` is outside the kernel. It holds only the
+key of one package, which the handoff gave it, and it sees only that package in
+plaintext. It never gets the account key, so a dApp cannot open the package of
+a different dApp.
 
 ### Passkey devices: two arms
 
@@ -289,7 +298,7 @@ These rules complete the invariant:
 ```mermaid
 flowchart TB
   subgraph APP["Passport app (trusted)"]
-    KERNEL["core kernel<br/>PRF output · WPP keys · viewing key"]
+    KERNEL["owner kernel<br/>PRF output · WPP account key · viewing key"]
   end
   subgraph CLIENTS["dApps and agents (untrusted)"]
     DAPP["dApp + connect<br/>grant key only"]
@@ -357,7 +366,7 @@ rotation of the viewing key):
    Each guardian answers with a `ShareResponse`.
 3. The kernel computes the public shares `phi`, the commitment `P = s * G`,
    and the wrap of the viewing key under a key derived from `s`.
-4. After a passkey tap, `core` calls `publish_recovery_session` with the
+4. After a passkey tap, `owner` calls `publish_recovery_session` with the
    artifact set. Then the kernel discards `s`.
 
 **Recovery** (every device is lost):
@@ -369,14 +378,14 @@ rotation of the viewing key):
 3. The kernel reconstructs `s` and checks it against `P` locally. Then, at
    once, it decrypts the viewing key, samples the successor secret `s'`,
    signs the submission challenge with `s` and with `Q`, and discards `s`.
-4. `core` calls `recover_submit` through the prover and the sponsor. The
+4. `owner` calls `recover_submit` through the prover and the sponsor. The
    prover sees two signatures only, never `s` (REC-11).
 5. The veto window runs. It is measured in days. Any enrolled device can call
    `recover_cancel`.
-6. After the window, `core` (or anyone) calls `recover_finalise`. It retires
+6. After the window, `owner` (or anyone) calls `recover_finalise`. It retires
    every old device, enrolls `Q` as the only device, rotates the commitment
    to `P'`, and clears `phi`.
-7. The account has no recovery backup now. `core` warns the user and asks for
+7. The account has no recovery backup now. `owner` warns the user and asks for
    a new session at once.
 
 Assets never move. Recovery changes who can authorize, not where the assets
@@ -389,13 +398,13 @@ The private data of dApps comes back only through WPP key recovery
 
 | Part | Package | Holds a secret |
 |---|---|---|
-| `s`, the guardian secret, reconstruction, the local check, the wrap, the signatures under `s` and `Q` | `core` kernel | Yes |
-| The session, guard, recover, cancel, finalize, and liveness flows; the roster record; the roster policy below | `core` | Through the kernel only |
+| `s`, the guardian secret, reconstruction, the local check, the wrap, the signatures under `s` and `Q` | `owner` kernel | Yes |
+| The session, guard, recover, cancel, finalize, and liveness flows; the roster record; the roster policy below | `owner` | Through the kernel only |
 | The guardian transport | `adapter-recovery` | No. Sealed messages only. |
 | The MIP-0022 §7 messages, the four recovery tags, the guardian PRF salt | `mn-passport-protocol` | No |
 | Bindings for the recovery circuits, the challenge hash, and the artifact-set version | `mn-passport-contract` | No |
 
-`core` runs only in the Passport app, and `connect` and `mn-passport-agent`
+`owner` runs only in the Passport app, and `connect` and `mn-passport-agent`
 never link it (dependency rule 3). Thus, no dApp or agent bundle contains
 recovery code. The BUSS arithmetic comes from the Pleiades library through
 `buss-wasm`, which the platform adapter loads into the kernel.
@@ -427,7 +436,7 @@ to 18):
    revocation, or a for-cause removal, the wrap is stale: a recovery would
    restore a key that does not open new holdings. MIP-0022 §5 has no rewrap
    and no partial update, so the only fix is a new session with a share from
-   every guardian. Until it completes, `core` marks the recovery backup as
+   every guardian. Until it completes, `owner` marks the recovery backup as
    stale and warns the user (MIP-0022 makes the warning a MUST). If a
    guardian cannot answer, the backup stays stale until the user changes the
    roster.
@@ -469,14 +478,14 @@ risks and make some attacks easier to see. None of them removes a risk.
 
 | Control | Helps against |
 |---|---|
-| **Roster diversity.** By default, `core` refuses a roster in which profile A guardians alone can reach `t+1`. Each quorum must include a profile B or C share. These shares are not a PRF output that one build can harvest during an unrelated tap. They still pass through software: a compromised client can ask a cold signer to sign for its own session, and a paper key is typed into a device at recovery. An override exists. It needs a passkey tap, states the risk, and goes into the roster record. | Widespread harvesting of passkey guardian secrets (risk 2) |
-| **People, not credentials.** `core` warns when guardian credentials share a person, a provider, or a place (MIP-0022 people-counting rule). | Risk 2 |
+| **Roster diversity.** By default, `owner` refuses a roster in which profile A guardians alone can reach `t+1`. Each quorum must include a profile B or C share. These shares are not a PRF output that one build can harvest during an unrelated tap. They still pass through software: a compromised client can ask a cold signer to sign for its own session, and a paper key is typed into a device at recovery. An override exists. It needs a passkey tap, states the risk, and goes into the roster record. | Widespread harvesting of passkey guardian secrets (risk 2) |
+| **People, not credentials.** `owner` warns when guardian credentials share a person, a provider, or a place (MIP-0022 people-counting rule). | Risk 2 |
 | **The roster record names the SDK version** that ran the session. Each release carries a signed list of revoked versions. A session made by a revoked version forces a new session. | Risk 1 |
 | **A deliberate guard flow.** Each share response needs a passkey tap. It shows the account and how the request arrived. The guardian secret is derived for that response only, and never cached. The PRF call for the guardian salt happens only in this flow. | Risks 2 and 3 |
 | **Sealed, authenticated transport.** A share goes only to an authenticated owner, sealed to the request (MIP-0022 §7). | Interception, risk 3 |
-| **Alarms.** Each enrolled device watches for a pending recovery. The guard flow watches the accounts that its user guards, and alerts the guardian to a submission. Repeated submissions suggest that `s` is known, so `core` proposes a new session. | Makes a submission visible, while a device or a guardian is watching |
+| **Alarms.** Each enrolled device watches for a pending recovery. The guard flow watches the accounts that its user guards, and alerts the guardian to a submission. Repeated submissions suggest that `s` is known, so `owner` proposes a new session. | Makes a submission visible, while a device or a guardian is watching |
 | **Clear signing for profile B,** where the signer supports it. The signer shows the account and the session before it signs. | A client that asks for a share for a different session, if the guardian checks the screen |
-| **Signed, reproducible builds** of `core` and `buss-wasm`, with exact pins and the 7-day cooldown. Pleiades is audited and published before release. | The supply chain |
+| **Signed, reproducible builds** of `owner` and `buss-wasm`, with exact pins and the 7-day cooldown. Pleiades is audited and published before release. | The supply chain |
 
 The client stays trusted after these controls. A compromised build that runs
 a session or a recovery can still misuse `s`, and nothing here detects a
@@ -510,23 +519,23 @@ secrets. It does not stop a compromised client from reaching a quorum.
 ### Example 1: onboarding in the Passport app
 
 ```ts
-import { PassportApp, passkeyKeyProvider } from '@midnight-ntwrk/mn-passport-core';
+import { PassportApp, passkeyKeyProvider } from '@midnight-ntwrk/mn-passport-owner';
 import { browserPlatform } from '@midnight-ntwrk/mn-passport-adapter-browser';
 import { remoteProver } from '@midnight-ntwrk/mn-passport-adapter-prover-remote';
 import { sponsoredBroadcast } from '@midnight-ntwrk/mn-passport-adapter-broadcast';
-import { wppStorage } from '@midnight-ntwrk/mn-passport-adapter-storage-wpp';
+import { driveStorage } from '@midnight-ntwrk/mn-passport-adapter-wpp-drive';
 
 const app = await PassportApp.create({
-  platform: browserPlatform(), storage: wppStorage(),
+  platform: browserPlatform(), storage: driveStorage(),
   prover: remoteProver({ url: proverUrl }), broadcast: sponsoredBroadcast({ url: sponsorUrl }),
 });
 
 const account = await app.onboard({ device: passkeyKeyProvider(), name: 'alice' });
 ```
 
-`core` deploys the ACC in waves. The deploy planner packs the circuits within
+`owner` deploys the ACC in waves. The deploy planner packs the circuits within
 the 15,000-byte verifier budget, so the wave count comes from the artifacts.
-Then `core` activates the passkey as the first device and claims the name. The
+Then `owner` activates the passkey as the first device and claims the name. The
 prover proves each wave, and `adapter-broadcast` gives it to the sponsor.
 
 The user can then opt in to a backup owner key: the embedded wallet of a WaaS
@@ -535,7 +544,7 @@ Thus, it adds trust in the provider, and the app tells the user this. The app
 enrolls it only if the provider isolates it to the Passport app.
 
 If the user loses the passkey, the user signs in to the Passport app with the
-provider. Then `core` restores three things:
+provider. Then `owner` restores three things:
 
 - signing: the backup key approves a new passkey (`add_device`);
 - the viewing key, from the metadata of the provider;
@@ -556,9 +565,9 @@ const session = await passport.completeConnection();
 ```
 
 A dApp never onboards a user. The authorizer page of the Passport app finds no
-account for the user, so `core` onboards the user first, as in example 1. The
+account for the user, so `owner` onboards the user first, as in example 1. The
 user makes a passkey there, and it becomes the first device. Then, in the same
-visit, `core` issues the grant to the per-origin key of the dApp that sent the
+visit, `owner` issues the grant to the per-origin key of the dApp that sent the
 request. The redirect takes the user back to the dApp with the grant response.
 
 The first device has full authority. If the page of a dApp drives that key, a
@@ -570,7 +579,7 @@ dApp holds only its grant key.
 
 ```ts
 import { PassportConnect } from '@midnight-ntwrk/mn-passport-connect';
-import { joinIntents } from '@midnight-ntwrk/mn-passport-account';
+import { joinIntents } from '@midnight-ntwrk/mn-passport-core';
 
 const passport = PassportConnect.create({ platform, prover, broadcast });
 
@@ -630,7 +639,7 @@ operates with the Passport app closed.
 ### Example 5: a payment to a shielded address
 
 ```ts
-import { pay, parseShieldedAddress } from '@midnight-ntwrk/mn-passport-account';
+import { pay, parseShieldedAddress } from '@midnight-ntwrk/mn-passport-core';
 
 // The coin key and the encryption key come from one parse.
 await pay(account, { to: parseShieldedAddress(address), color: NIGHT, amount: 25n });
@@ -646,7 +655,7 @@ indexer. A payment to an unshielded `mn_addr` address calls
 ### Example 6: a payment to another Passport
 
 ```ts
-import { pay, resolvePassport } from '@midnight-ntwrk/mn-passport-account';
+import { pay, resolvePassport } from '@midnight-ntwrk/mn-passport-core';
 
 const recipient = await resolvePassport('bob.passport.night'); // the ACC address
 await pay(account, { to: recipient, color: NIGHT, amount: 25n });
@@ -687,7 +696,7 @@ export interface GrantResponse {
 }
 ```
 
-`connect` and `mn-passport-agent` build a `GrantRequest`, and `core` validates
+`connect` and `mn-passport-agent` build a `GrantRequest`, and `owner` validates
 it on the authorizer page. Neither side imports the other. The wire axis
 (`PROTOCOL_VERSION`) is separate from the binding axis.
 [`sdk-requirements.md`](./sdk-requirements.md) rule 5 owns both.
@@ -707,7 +716,7 @@ Passport shows in its wallet picker, next to the other wallets. The package
 holds no key and no ACC logic. It sends each request to the Passport app in a
 popup:
 
-1. `core` shows the request, and the user approves it with a passkey tap.
+1. `owner` shows the request, and the user approves it with a passkey tap.
 2. The ACC authorizes the intent.
 3. `adapter-multi-chain` gets the signature for the other chain and reports the
    settlement.
@@ -724,7 +733,8 @@ for a dApp on each request. A Midnight dApp always uses a grant (example 3).
 - SDK deliverables:
   [`2026-09-25-sdk-deliverables.md`](./proposals/2026-09-25-sdk-deliverables.md),
   D1 to D5.
-- Package map:
+- Package map: [`sdk-packages.svg`](./assets/sdk-packages.svg). The
+  realignment version is
   [`2026-09-25-sdk-packages.svg`](./proposals/assets/2026-09-25-sdk-packages.svg).
 - ADR [0002](./adr/0002-m0-per-seam-specs-with-dev-defaults.md) (per-seam
   specs) and ADR [0004](./adr/0004-artefact-hashes-committed-compiler-deterministic.md)

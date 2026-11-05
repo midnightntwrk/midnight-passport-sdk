@@ -17,7 +17,7 @@ and "provider-integration" name a section of those docs.
 - **Plaintext secret outside the kernel** — the PRF output, the JubJub device
   key, a WPP account or package key, or the viewing key passed to an adapter,
   dApp, agent, log line, error message, telemetry, or state projection, other
-  than as "What leaves the kernel" allows (architecture, "The core kernel
+  than as "What leaves the kernel" allows (architecture, "The owner kernel
   invariant").
 - **Secret held beyond its operation** — the kernel derives the device key and
   the WPP account key for one operation only, then wipes them (requirements,
