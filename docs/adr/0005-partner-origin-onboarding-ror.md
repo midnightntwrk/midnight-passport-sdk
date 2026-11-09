@@ -11,6 +11,9 @@ output is the same across origins, and the largeBlob is a cache only.
 Refs: [midnightntwrk/passport#77](https://github.com/midnightntwrk/passport/issues/77)
 (C27 · Passport Facade)
 
+> **Names (2026/11/05):** in this record, `core` means `mn-passport-owner`
+> ([ADR 0007](./0007-package-names-and-shared-wpp-client.md)).
+
 ## Context
 
 The `experiments/passkey-prf-linking/` experiment (findings 2026/08/17–18)

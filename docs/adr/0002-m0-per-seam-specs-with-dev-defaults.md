@@ -3,6 +3,9 @@
 Date: 2026/07/29 · Status: accepted
 Refs: midnightntwrk/passport#TBD
 
+> **Names (2026/11/05):** in this record, `core` means `mn-passport-owner`
+> ([ADR 0007](./0007-package-names-and-shared-wpp-client.md)).
+
 ## Context
 
 The original M0 brief bundled all five seam interfaces (Signer, Prover,
