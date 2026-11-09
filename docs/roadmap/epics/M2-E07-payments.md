@@ -12,7 +12,7 @@ The owner can receive and send money from their Passport: incoming payments arri
 
 ## Description
 
-Once the account exists, the first thing an owner does with it is move money. This epic gives `core` the payment primitives, and `owner` the owner-signed flows on top. It was originally "Devices, names, and payments"; names moved to E04 so onboarding can claim one, devices moved to E14 so a new device can sync in the same milestone, and the WaaS backup key moved to E13 because it carries WPP ciphertext.
+Once the account exists, the first thing an owner does with it is move money. This epic gives `core` the payment primitives, and `owner` the owner-signed flows on top. It was originally "Devices, names, and payments"; names moved to E04 so onboarding can claim one, devices moved to E19 so a new device can sync in the same milestone, and the WaaS backup key moved to E17 because it carries WPP ciphertext.
 
 **Coins and the inbox.** The coin store in `core` tracks the account's coins. Payments to the account arrive encrypted in the account's inbox: each one is sealed to the recipient key that was current at the time of the seal (rule 7), and the SDK opens them from the inbox and adds them to the coin store.
 
@@ -24,7 +24,7 @@ Once the account exists, the first thing an owner does with it is move money. Th
 
 **In:** the coin store, the encrypted inbox, and transfers through deposit calls to a name or an address.
 
-**Out:** device management (E14), the WaaS backup key (E13), names (E04), payments from dApps (Pay with Passport, E21), and cross-chain assets (E24).
+**Out:** device management (E19), the WaaS backup key (E04), names (E04), payments from dApps (Pay with Passport, E15), and cross-chain assets (E25).
 
 ## Stories
 
@@ -36,9 +36,9 @@ Once the account exists, the first thing an owner does with it is move money. Th
 ## Dependencies
 
 **Blocked by:**
-- E04 Account deployment: E04.11 Multi-wave ACC deploy planner, E04.16 Name-to-ACC resolution
+- E04 Account deployment: E04.12 Multi-wave ACC deploy planner, E04.18 Name-to-ACC resolution
 
-**Unlocks:** E08 Passport app: the account (2 stories), E21 Execution under a grant key (1 story), E24 Cross-chain assets (1 story).
+**Unlocks:** E08 Passport app: the account (2 stories), E15 Execution under a grant key (1 story), E25 Cross-chain assets (1 story).
 
 **Parallel with:** no other epic in this milestone.
 

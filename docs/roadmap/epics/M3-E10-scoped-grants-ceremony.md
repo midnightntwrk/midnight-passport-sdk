@@ -24,13 +24,13 @@ Grants are what make Passport different from a wallet. Instead of handing a dApp
 
 **Spend limits and child Passports.** A grant can carry a spending limit and an expiry, enforced by the ACC on chain. A child Passport is a subdomain name under the owner's (such as agent.maya.night) backed by its own grant, which the parent can revoke.
 
-This epic covers grants without read access. Grants that can read private data need the viewing-key rotations of rule 13, which depend on sync and recovery, so they are in E17.
+This epic covers grants without read access. Grants that can read private data need the viewing-key rotations of rule 13, which depend on sync and recovery, so they are in E22.
 
 ## Scope
 
 **In:** the shared scope type, the authorizer page logic, `issue_grant`, on-chain grant reads, the grant list, revocation, spend-limited grants, and child Passports.
 
-**Out:** the client side of the ceremony (E11), the app screens (E12), read grants and viewing-key rotation (E17), and the private-data handoff (E13).
+**Out:** the client side of the ceremony (E11), the app screens (E12), read grants and viewing-key rotation (E22), and the private-data handoff (E18).
 
 ## Stories
 
@@ -48,10 +48,10 @@ This epic covers grants without read access. Grants that can read private data n
 ## Dependencies
 
 **Blocked by:**
-- E04 Account deployment: E04.11 Multi-wave ACC deploy planner
+- E04 Account deployment: E04.12 Multi-wave ACC deploy planner
 - E09 Scoped grants foundation: E09.01 GrantRequest: browser profile, E09.02 GrantRequest: agent profile
 
-**Unlocks:** E11 Grant ceremony clients (1 story), E12 Passport app: grants (3 stories), E17 Read-access lifecycle (2 stories), E19 Connect for dApps (1 story), E20 Agents (2 stories), E21 Execution under a grant key (1 story).
+**Unlocks:** E11 Grant ceremony clients (1 story), E12 Passport app: grants (3 stories), E14 Agents (2 stories), E15 Execution under a grant key (1 story), E22 Read-access lifecycle (3 stories).
 
 **Parallel with:** no other epic in this milestone.
 

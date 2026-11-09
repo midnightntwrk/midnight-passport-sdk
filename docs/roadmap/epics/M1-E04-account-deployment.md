@@ -1,14 +1,14 @@
 # E04 · Account deployment
 
 **Issue:** [#47](https://github.com/midnightntwrk/midnight-passport-sdk/issues/47)  
-**Milestone:** 1 Foundation · **Track:** SDK, owner and foundation · **Steps:** 1–9 · **Stories:** 16  
-**Packages:** `core`, `adapter-broadcast`, `adapter-prover-remote`, `adapter-browser`, `adapter-nodejs`, `owner`, `contract`  
+**Milestone:** 1 Foundation · **Track:** SDK, owner and foundation · **Steps:** 1–9 · **Stories:** 19  
+**Packages:** `core`, `adapter-broadcast`, `adapter-prover-remote`, `adapter-browser`, `adapter-nodejs`, `adapter-waas`, `owner`, `contract`  
 **Sheet code:** E16  
-**Readiness:** ready, no story marked to discuss
+**Readiness:** 1 story to discuss: "Recovery via the WaaS backup owner key"
 
 ## Goal
 
-The SDK deploys a user's Account Custody Contract (ACC) with the device passkey as the first owner key, and a sponsor pays the fees. The user ends with a named account. Every later epic needs a live account, so this is the first end-to-end milestone.
+The SDK deploys a user's Account Custody Contract (ACC) with the device passkey as the first owner key, and a sponsor pays the fees. The user ends with a named account, and can add a WaaS backup owner key to recover with. Every later epic needs a live account, so this is the first end-to-end milestone.
 
 ## Description
 
@@ -22,13 +22,15 @@ Everything in Midnight Passport starts from the user's Account Custody Contract 
 
 **Design choices.** Proving is remote in V1, because ACC proving keys are 112–224 MB. The user is told that the prover sees the private inputs of each proof (rule 2), and `owner` exposes the disclosure text and a consent hook for the app. Fees are always sponsored: no SDK path needs DUST that the user holds (rule 14). The sponsor's limits are a written policy, and each refusal is a typed error rather than a generic failure.
 
-**Boundaries.** The PRF output and the JubJub device key exist only inside the owner kernel, and only for one operation; they are never stored or sent. Owner keys are created only in the Passport app, never in a dApp (rule 11). This epic adds the first owner key only; adding and removing further devices is E14.
+**Boundaries.** The PRF output and the JubJub device key exist only inside the owner kernel, and only for one operation; they are never stored or sent. Owner keys are created only in the Passport app, never in a dApp (rule 11). This epic adds the first owner key, and the optional WaaS backup owner key at deploy; adding and removing further devices is E19.
+
+**The WaaS backup key.** An optional backup owner key held by a WaaS provider, enrolled at deploy as a second owner key on the k256 arm, and only when the provider isolates it to the Passport app (rule 12). `adapter-waas` holds the key and the account's public metadata: namespaced, versioned entries, each small enough for providers that keep only 2 KB. It gives an early recovery path, long before guardians: on a new device, the WaaS key signs the add of the new passkey's owner key. Whether that add is direct or goes through the timelocked recovery with cancel and alarms is still open, and its story is marked to discuss.
 
 ## Scope
 
-**In:** passkey creation (PRF → JubJub, with the p256 fallback), the multi-wave deploy, the sponsored start, the prover and broadcast adapters, the platform adapters, the indexer seam, the existing-account lookup, the prover disclosure hook, and name registration and resolution.
+**In:** passkey creation (PRF → JubJub, with the p256 fallback), the multi-wave deploy, the sponsored start, the prover and broadcast adapters, the platform adapters, the indexer seam, the existing-account lookup, the prover disclosure hook, name registration and resolution, and the WaaS adapter, backup owner key, and recovery with it.
 
-**Out:** the onboarding screens (E06), adding devices (E14), grant keys (E10), payments (E07), the in-browser prover (E21, after V1), and the Capacity Exchange fee route (later).
+**Out:** the onboarding screens (E06), adding devices (E19), grant keys (E10), payments (E07), the in-browser prover (E15, after V1), guardian recovery (E21), and the Capacity Exchange fee route (later).
 
 ## Stories
 
@@ -40,16 +42,19 @@ Everything in Midnight Passport starts from the user's Account Custody Contract 
 | E04.04 | adapter-broadcast: submit, finality, resubmit | 5 | core, adapter-broadcast |
 | E04.05 | adapter-browser and adapter-nodejs | 5 | adapter-browser, adapter-nodejs |
 | E04.06 | Indexer seam: tx status and ACC state | 5 | core |
-| E04.07 | WebAuthn create with PRF → JubJub device key | 6 | owner, adapter-browser |
-| E04.08 | Sponsored deploy and starting balance | 6 | owner, adapter-broadcast |
-| E04.09 | Prover disclosure text and consent hook (rule 2) | 6 | owner |
-| E04.10 | p256 arm: non-PRF passkeys as owner keys | 6 | core, adapter-browser |
-| E04.11 | Multi-wave ACC deploy planner | 7 | owner, contract |
-| E04.12 | Existing-account lookup by passkey | 7 | owner |
-| E04.13 | WebAuthn PRF support matrix and fallbacks | 7 | adapter-browser |
-| E04.14 | Partial-deploy circuit checks | 8 | owner, core |
-| E04.15 | Name registration call | 8 | owner |
-| E04.16 | Name-to-ACC resolution | 9 | core |
+| E04.07 | adapter-waas: k256 key and account metadata | 5 | adapter-waas, core |
+| E04.08 | WebAuthn create with PRF → JubJub device key | 6 | owner, adapter-browser |
+| E04.09 | Sponsored deploy and starting balance | 6 | owner, adapter-broadcast |
+| E04.10 | Prover disclosure text and consent hook (rule 2) | 6 | owner |
+| E04.11 | p256 arm: non-PRF passkeys as owner keys | 6 | core, adapter-browser |
+| E04.12 | Multi-wave ACC deploy planner | 7 | owner, contract |
+| E04.13 | Existing-account lookup by passkey | 7 | owner |
+| E04.14 | WebAuthn PRF support matrix and fallbacks | 7 | adapter-browser |
+| E04.15 | Partial-deploy circuit checks | 8 | owner, core |
+| E04.16 | Name registration call | 8 | owner |
+| E04.17 | WaaS key as isolated backup owner key | 8 | owner, adapter-waas |
+| E04.18 | Name-to-ACC resolution | 9 | core |
+| E04.19 | Recovery via the WaaS backup owner key (to discuss) | 9 | owner, adapter-waas |
 
 ## Dependencies
 
@@ -57,7 +62,7 @@ Everything in Midnight Passport starts from the user's Account Custody Contract 
 - E03 Workspace, seams, and guardrails: E03.03 Seam interface definitions, E03.04 Owner kernel secret boundary, E03.08 Domain-separation tag constants
 - E05 Contract binding: E05.03 ACC artifact loader (module, decoder, manifest)
 
-**Unlocks:** E06 Passport app: onboarding (4 stories), E07 Payments (2 stories), E08 Passport app: the account (2 stories), E10 Scoped grants ceremony (1 story), E11 Grant ceremony clients (1 story), E13 Private data and backup (1 story), E14 Devices and multi-device sync (2 stories), E19 Connect for dApps (1 story), E21 Execution under a grant key (2 stories), E23 Identity and credentials (1 story).
+**Unlocks:** E06 Passport app: onboarding (4 stories), E07 Payments (2 stories), E08 Passport app: the account (2 stories), E10 Scoped grants ceremony (1 story), E11 Grant ceremony clients (1 story), E13 Connect for dApps (1 story), E15 Execution under a grant key (2 stories), E17 Private data and backup (1 story), E19 Devices and multi-device sync (2 stories), E24 Identity and credentials (1 story).
 
 **Parallel with:** E02 Passport app: brand and identity.
 
@@ -69,6 +74,7 @@ Everything in Midnight Passport starts from the user's Account Custody Contract 
 - The same user returning on the same device lands on the existing account.
 - A device without PRF completes the same flow on the p256 arm.
 - Each sponsor refusal surfaces as a typed error.
+- A user with an isolated WaaS backup owner key gets back into the same account on a fresh device.
 
 ## Verification plan
 

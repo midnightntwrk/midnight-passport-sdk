@@ -24,7 +24,7 @@ After onboarding, the owner needs a home in the app. This epic builds it on top 
 
 **In:** the name claim screen, the send and deposit screens, and the activity feed.
 
-**Out:** the devices screen (E15), grants (E12), and backup and recovery screens (E15, E18).
+**Out:** the devices screen (E20), grants (E12), and backup and recovery screens (E20, E23).
 
 ## Stories
 
@@ -37,7 +37,7 @@ After onboarding, the owner needs a home in the app. This epic builds it on top 
 ## Dependencies
 
 **Blocked by:**
-- E04 Account deployment: E04.06 Indexer seam: tx status and ACC state, E04.15 Name registration call
+- E04 Account deployment: E04.06 Indexer seam: tx status and ACC state, E04.16 Name registration call
 - E07 Payments: E07.01 Coin store and encrypted inbox, E07.02 Transfers via deposit calls
 
 **Unlocks:** no other epic waits on it.

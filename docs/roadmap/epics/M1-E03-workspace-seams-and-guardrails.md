@@ -49,7 +49,7 @@ The architecture defines a small set of packages with strict rules about who may
 **Blocked by:**
 - E01 Review and alignment: E01.03 Roadmap sign-off and issue filing
 
-**Unlocks:** E04 Account deployment (6 stories), E05 Contract binding (2 stories), E09 Scoped grants foundation (4 stories), E13 Private data and backup (2 stories), E14 Devices and multi-device sync (1 story), E16 Guardian recovery (1 story), E24 Cross-chain assets (1 story).
+**Unlocks:** E04 Account deployment (7 stories), E05 Contract binding (2 stories), E09 Scoped grants foundation (4 stories), E17 Private data and backup (1 story), E19 Devices and multi-device sync (1 story), E21 Guardian recovery (1 story), E25 Cross-chain assets (1 story).
 
 **Parallel with:** E02 Passport app: brand and identity, E06 Passport app: onboarding.
 

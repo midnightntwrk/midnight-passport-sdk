@@ -38,7 +38,7 @@ Every Passport app epic after this one builds screens, and all of them need the 
 
 **Blocked by:** nothing outside this epic.
 
-**Unlocks:** E06 Passport app: onboarding (1 story), E12 Passport app: grants (1 story), E15 Passport app: backup and devices (1 story).
+**Unlocks:** E06 Passport app: onboarding (1 story), E12 Passport app: grants (1 story), E20 Passport app: backup and devices (1 story).
 
 **Parallel with:** E03 Workspace, seams, and guardrails, E04 Account deployment, E05 Contract binding.
 

@@ -12,19 +12,19 @@ Build the client side of the grant ceremony early, so a real dApp and a real age
 
 ## Description
 
-The ceremony is the riskiest flow in the system: a redirect across two origins, a possession proof, an origin binding, and for agents a self-signed request over a QR code or link. If the clients only arrived with the integrations, the first real test of that flow would come last. This epic pulls the client side forward, next to the Passport side in E10. It is new and not in the sheet; its stories came from E19 and E20.
+The ceremony is the riskiest flow in the system: a redirect across two origins, a possession proof, an origin binding, and for agents a self-signed request over a QR code or link. If the clients only arrived with the integrations, the first real test of that flow would come last. This epic pulls the client side forward, next to the Passport side in E10. It is new and not in the sheet; its stories came from E13 and E14.
 
 **dApps.** `connect` builds the browser-profile `GrantRequest`, makes the grant key on the dApp's origin, redirects the user to the Passport app, and receives the result when the user comes back.
 
 **Agents.** The agent's key lives in OWS, which acts as the key provider for `mn-passport-agent`. The agent builds the agent-profile request, shows it as a QR code or a link, and receives the readable scope and its salt once the user approves.
 
-Both clients stop at the grant. The private-data handoff follows in E13, once WPP exists, and calls under the grant key follow in E21.
+Both clients stop at the grant. Calls under the grant key follow in E15, and the private-data handoff in E18, once WPP exists.
 
 ## Scope
 
 **In:** the `connect` browser grant ceremony, the OWS key provider, and the agent-profile grant ceremony.
 
-**Out:** the package-key handoffs (E13), calls under a grant key (E21), and the rest of `connect` and `agent` (E19, E20).
+**Out:** the package-key handoffs (E18), calls under a grant key (E15), and the rest of `connect` and `agent` (E13, E14).
 
 ## Stories
 
@@ -41,7 +41,7 @@ Both clients stop at the grant. The private-data handoff follows in E13, once WP
 - E09 Scoped grants foundation: E09.01 GrantRequest: browser profile, E09.02 GrantRequest: agent profile
 - E10 Scoped grants ceremony: E10.02 Authorizer page (MIP §9)
 
-**Unlocks:** E12 Passport app: grants (2 stories), E13 Private data and backup (2 stories), E19 Connect for dApps (1 story), E20 Agents (1 story), E21 Execution under a grant key (2 stories).
+**Unlocks:** E12 Passport app: grants (2 stories), E13 Connect for dApps (1 story), E14 Agents (1 story), E15 Execution under a grant key (2 stories), E18 Private data in connect and agent (2 stories).
 
 **Parallel with:** no other epic in this milestone.
 

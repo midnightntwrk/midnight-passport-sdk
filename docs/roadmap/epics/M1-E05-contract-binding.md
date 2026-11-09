@@ -45,7 +45,7 @@ The SDK never compiles or owns the ACC. The ACC is built and published as an art
 **Blocked by:**
 - E03 Workspace, seams, and guardrails: E03.02 Monorepo scaffold for mn-passport-* packages, E03.05 Wire and binding version axes
 
-**Unlocks:** E04 Account deployment (1 story), E21 Execution under a grant key (1 story).
+**Unlocks:** E04 Account deployment (1 story), E15 Execution under a grant key (1 story).
 
 **Parallel with:** E02 Passport app: brand and identity, E06 Passport app: onboarding.
 

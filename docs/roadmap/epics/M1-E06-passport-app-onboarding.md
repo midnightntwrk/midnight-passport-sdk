@@ -28,7 +28,7 @@ The prover disclosure (rule 2) is shown through the consent hook that E04 provid
 
 **In:** the sign-up flow, the deploy progress and balance screens, the name claim step, and the returning-user resume.
 
-**Out:** the SDK logic (E04), and later account screens such as payments (E08) and devices (E15).
+**Out:** the SDK logic (E04), and later account screens such as payments (E08) and devices (E20).
 
 ## Stories
 
@@ -43,9 +43,9 @@ The prover disclosure (rule 2) is shown through the consent hook that E04 provid
 
 **Blocked by:**
 - E02 Passport app: brand and identity: E02.02 UI component library and interaction patterns
-- E04 Account deployment: E04.07 WebAuthn create with PRF → JubJub device key, E04.08 Sponsored deploy and starting balance, E04.11 Multi-wave ACC deploy planner, E04.12 Existing-account lookup by passkey, E04.15 Name registration call, E04.16 Name-to-ACC resolution
+- E04 Account deployment: E04.08 WebAuthn create with PRF → JubJub device key, E04.09 Sponsored deploy and starting balance, E04.12 Multi-wave ACC deploy planner, E04.13 Existing-account lookup by passkey, E04.16 Name registration call, E04.18 Name-to-ACC resolution
 
-**Unlocks:** E19 Connect for dApps (1 story).
+**Unlocks:** E13 Connect for dApps (1 story).
 
 **Parallel with:** E03 Workspace, seams, and guardrails, E05 Contract binding.
 
