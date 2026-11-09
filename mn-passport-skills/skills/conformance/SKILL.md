@@ -53,7 +53,8 @@ other than JubJub are **not** findings.
 - Only the items in "What leaves the kernel" leave it: a signature over an ACC
   challenge; the unproven transaction to the V1 prover (with the disclosure);
   one WPP package key to its dApp at the handoff, after a tap and a separate
-  consent; ciphertext to WPP storage; the ACC address, with the viewing key and
+  consent (to an agent, sealed to the encryption key its self-signature
+  binds); ciphertext to WPP storage; the ACC address, with the viewing key and
   the WPP account key only as ciphertext, in the metadata of an isolated WaaS
   backup key.
 - The viewing key leaves whole only to the holder of a read grant, after a

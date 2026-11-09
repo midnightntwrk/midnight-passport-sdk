@@ -1,6 +1,6 @@
 # Midnight Passport SDK requirements
 
-> **Status:** draft · 2026/11/05
+> **Status:** draft · 2026/11/09
 > **Owns:** what the SDK must do, and the normative rules (the MUSTs) that the
 > `conformance` lens checks.
 > **Companions:** [`architecture.md`](./architecture.md) (packages, seams, and
@@ -365,6 +365,10 @@ library is `mn-passport-agent`, for Node.js. It never links `owner`.
    approves a scope in the Passport app, which shows the agent profile.
 4. The agent gets the readable scope and its salt, because the chain stores most
    limits as salted commitments.
+5. If the agent runs the circuit of a dApp with private state, the user gives a
+   separate consent for private-state access. Passport then returns the key of
+   that dApp's WPP package with the readable scope, sealed to an encryption key
+   that the agent's self-signature binds. Only the agent can open it.
 
 **On-chain grant status.** Before OWS signs, the library reads the grant from
 the ACC: its status and the commitments that the readable scope opens. OWS then
@@ -373,15 +377,18 @@ server.
 
 **Execution.** The library gets the artifacts of a dApp from a registry, by
 content hash. It makes the verifier key again from the ZKIR and compares it
-with the key on chain. Then it runs the circuit. OWS signs, the prover proves,
-and the sponsor broadcasts, with the Passport app closed. In V1, the agent
-verifies the client code against a hash that the dApp publishes.
+with the key on chain. Then it runs the circuit. Its witnesses read the private
+state through the private-state provider of `mn-passport-core`, over the
+package key from step 5. OWS signs, the prover proves, and the sponsor
+broadcasts, with the Passport app closed. In V1, the agent verifies the client
+code against a hash that the dApp publishes.
 
 ## Private data
 
 The witness functions of a dApp read its private state from a midnight-js
 `PrivateStateProvider`. After the handoff, the dApp reads and writes that state
-without Passport, and its witness code does not change.
+without Passport, and its witness code does not change. An agent that runs the
+circuit of the dApp uses the same provider (section "Agents").
 
 - **WPP.** Passport keeps the private data and makes backups through the
   Witness Protection Program (WPP). No plaintext crosses the storage seam.
@@ -389,13 +396,15 @@ without Passport, and its witness code does not change.
   share it. Each storage backend is its own `adapter-wpp-<backend>` package,
   with `adapter-wpp-drive` first.
 - **The account key stays in `owner`.** Only `owner` holds the WPP account key
-  and derives package keys. The WPP client of a dApp works with the one package
-  key from the handoff.
+  and derives package keys. The WPP client of a dApp or an agent works with the
+  one package key from the handoff.
 - **Three consents.** The grant, private-state access, and the viewing key are
   three separate consents. The viewing key comes only with read access.
 - **The handoff.** After the passkey tap, `owner` makes a key for the WPP package
   of the dApp, and only for that package. The dApp never sees other packages,
-  the full profile, or a bulk export.
+  the full profile, or a bulk export. An agent gets the same key, sealed to the
+  encryption key that its self-signature binds, with the same tap and the same
+  separate consent.
 - **Write-back.** The dApp writes new state only after the transaction finalizes
   with `SucceedEntirely`, on each submit path. If the write fails, the dApp
   keeps the state locally as not yet saved and tries again.
@@ -604,8 +613,9 @@ The `conformance` lens checks these rules. The sections above give the detail.
    ceremony use a password with a key-derivation function? This is open.
 2. **The activation guard.** _Closed 2026/10/19._ A dApp never onboards a user,
    so no dApp drives an owner key (realignment open question 15).
-3. **Agents and private data.** Can an agent backend get the private data of a
-   dApp (realignment open question 3)?
+3. **Agents and private data.** _Closed 2026/11/09._ Yes. An agent gets the
+   package key of the dApp through a sealed handoff
+   ([ADR 0008](./adr/0008-agents-get-private-data-through-a-sealed-handoff.md)).
 4. **DID keys in V1.** Is the DID controller key derived from the PRF output, or
    kept in WPP? Where does its recovery key go (realignment open question 12)?
 5. **One signing primitive.** Is a separate JubJub DID key acceptable until the
