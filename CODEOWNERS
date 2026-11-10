@@ -1,4 +1,4 @@
-* @midnightntwrk/mn-passport
+* @midnightntwrk/mn-codeowners-midnight-passport
 /.github @midnightntwrk/mn-security @midnightntwrk/mn-sre
 CODE_OF_CONDUCT.md @midnightntwrk/mn-security @midnightntwrk/mn-sre
 CODEOWNERS @midnightntwrk/mn-security @midnightntwrk/mn-sre
