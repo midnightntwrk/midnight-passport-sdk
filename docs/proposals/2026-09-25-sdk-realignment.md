@@ -25,6 +25,10 @@
 
 ---
 
+> **Names (2026/11/05):** in this proposal, `core` means `mn-passport-owner`,
+> and `mn-passport-account` means `mn-passport-core`
+> ([ADR 0007](../adr/0007-package-names-and-shared-wpp-client.md)).
+
 ## 1. Why this proposal
 
 The SDK docs describe a model in which Passport is the place where transactions

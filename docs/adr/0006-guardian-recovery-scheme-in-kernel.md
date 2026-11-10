@@ -4,6 +4,9 @@ Date: 2026/10/26 · Status: proposed
 Refs: MIP-0022 (account recovery) · C14 (total-loss recovery flow) · C15
 (helper protocol) — planning workspace
 
+> **Names (2026/11/05):** in this record, `core` means `mn-passport-owner`
+> ([ADR 0007](./0007-package-names-and-shared-wpp-client.md)).
+
 ## Context
 
 The requirements (section "Recovery") ask the SDK to recover a lost account

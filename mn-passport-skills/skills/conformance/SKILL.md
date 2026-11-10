@@ -47,9 +47,9 @@ other than JubJub are **not** findings.
 ## 2. Kernel secret boundary (architecture, "The owner kernel invariant")
 
 - Only the kernel in `owner` holds in plaintext: the PRF output and the JubJub
-  device key derived from it; the WPP account key and the package keys; the
-  viewing key. It derives the device key and the WPP account key for one
-  operation only.
+  device key derived from it; the WPP account key, and the package keys
+  derived from it before the handoff; the viewing key. It derives the device
+  key and the WPP account key for one operation only.
 - Only the items in "What leaves the kernel" leave it: a signature over an ACC
   challenge; the unproven transaction to the V1 prover (with the disclosure);
   one WPP package key to its dApp at the handoff, after a tap and a separate
