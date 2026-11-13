@@ -37,7 +37,7 @@ This is the app side of milestone 6. It brings the devices screen, the backup sc
 ## Dependencies
 
 **Blocked by:**
-- E02 Passport app: brand and identity: E02.02 UI component library and interaction patterns
+- E02 Passport app: brand and identity: E02.01 App design: UX flow, pages, and design foundations
 - E17 Private data and backup: E17.05 WPP restore on a new device, E17.06 Backup freshness state
 - E19 Devices and multi-device sync: E19.02 Owner key add and remove on the ACC, E19.05 New-device bootstrap: keys and state
 

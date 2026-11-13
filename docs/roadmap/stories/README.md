@@ -21,6 +21,7 @@ replaces them with the real tranches when it plans the spec.
 
 | Story | Title | Step |
 |---|---|---|
+| [E02.01](./accepted/M1-E02-S01-E02.01-app-design-ux-flow-pages-and-design-foundations.md) | App design: UX flow, pages, and design foundations | 01 |
 | [E03.01](./accepted/M1-E03-S01-E03.01-exact-pins-7-day-cooldown-lockfile-the-remaining-work.md) | Exact pins, 7-day cooldown, lockfile: the remaining work | 01 |
 | [E03.02](./accepted/M1-E03-S03-E03.02-monorepo-scaffold-for-mn-passport-packages.md) | Monorepo scaffold for mn-passport-* packages | 03 |
 | [E03.04](./accepted/M1-E03-S04-E03.04-owner-kernel-secret-boundary-and-secret-hygiene.md) | Owner kernel: secret boundary and secret hygiene | 04 |
@@ -76,9 +77,6 @@ replaces them with the real tranches when it plans the spec.
 | [E01.01](./proposed/M0-E01-S01-E01.01-architecture-and-requirements-review-doc-sync.md) | Architecture and requirements review (doc-sync) | 01 |
 | [E01.02](./proposed/M0-E01-S01-E01.02-dev-workflow-review-skills-ci-non-negotiables.md) | Dev workflow review: skills, CI, non-negotiables | 01 |
 | [E01.03](./proposed/M0-E01-S02-E01.03-roadmap-sign-off-and-issue-filing.md) | Roadmap sign-off and issue filing | 02 |
-| [E02.01](./proposed/M1-E02-S01-E02.01-brand-tokens-color-type-iconography.md) | Brand tokens: color, type, iconography | 01 |
-| [E02.02](./proposed/M1-E02-S02-E02.02-ui-component-library-and-interaction-patterns.md) | UI component library and interaction patterns | 02 |
-| [E02.03](./proposed/M1-E02-S02-E02.03-voice-and-copy-guidelines.md) | Voice and copy guidelines | 02 |
 | [E04.19](./proposed/M1-E04-S11-E04.19-recovery-via-the-waas-backup-owner-key.md) | Recovery via the WaaS backup owner key | 11 |
 | [E05.05](./proposed/M1-E05-S06-E05.05-dapp-artifact-loader-with-integrity-checks.md) | dApp artifact loader with integrity checks | 06 |
 | [E09.01](./proposed/M3-E09-S05-E09.01-grantrequest-browser-profile.md) | GrantRequest: browser profile | 05 |

@@ -18,7 +18,7 @@
 
 ## Milestones
 
-The work is split into 9 milestones, 25 epics, and 136 stories. Each epic is in
+The work is split into 9 milestones, 25 epics, and 134 stories. Each epic is in
 [`epics/`](./epics/README.md) and each story in
 [`stories/`](./stories/README.md), in roadmap order. The milestones are GitHub
 milestones; the stories carry them, and the epics group the stories as

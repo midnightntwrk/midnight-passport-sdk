@@ -41,7 +41,7 @@ This is the Passport app half of the grant ceremony in milestone 3. It was split
 ## Dependencies
 
 **Blocked by:**
-- E02 Passport app: brand and identity: E02.02 UI component library and interaction patterns
+- E02 Passport app: brand and identity: E02.01 App design: UX flow, pages, and design foundations
 - E10 Scoped grants ceremony: E10.02 Authorizer page (MIP §9), E10.03 issue_grant call, E10.05 Grant revocation call, E10.07 Grant listing from chain, E10.08 Child Passport: subdomain name and grant
 - E11 Grant ceremony clients: E11.02 agent: agent-profile grant ceremony, E11.03 connect: browser grant ceremony
 

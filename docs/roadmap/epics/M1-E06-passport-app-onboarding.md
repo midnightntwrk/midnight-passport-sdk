@@ -39,7 +39,7 @@ The prover disclosure (rule 2) is shown through the consent hook that E04 provid
 ## Dependencies
 
 **Blocked by:**
-- E02 Passport app: brand and identity: E02.02 UI component library and interaction patterns
+- E02 Passport app: brand and identity: E02.01 App design: UX flow, pages, and design foundations
 - E04 Account deployment: E04.10 Prover disclosure text and consent hook (rule 2), E04.11 Passkey on the p256 arm as the first owner key, E04.12 Account deploy in waves: plan, send, resume, activate, E04.13 Existing-account lookup, E04.14 WebAuthn authenticator support matrix and fallbacks
 
 **Unlocks:** E08 Passport app: the account (2 stories), E13 Connect for dApps (1 story).

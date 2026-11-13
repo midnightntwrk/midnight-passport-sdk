@@ -43,7 +43,7 @@ After onboarding, the owner needs a home in the app. This epic builds it on top 
 ## Dependencies
 
 **Blocked by:**
-- E02 Passport app: brand and identity: E02.02 UI component library and interaction patterns
+- E02 Passport app: brand and identity: E02.01 App design: UX flow, pages, and design foundations
 - E04 Account deployment: E04.06 Indexer seam: transaction status and account state, E04.16 Name registration call, E04.18 Name-to-ACC resolution
 - E06 Passport app: onboarding: E06.02 Deploy progress and balance UI, E06.03 Returning-user account resume
 - E07 Payments: E07.01 Inbox entries, the coin store, and deposits into an account, E07.02 Pay another Passport: shielded, in one joined transaction, E07.03 Send from the account to a wallet address, E07.05 Holdings and activity reads
