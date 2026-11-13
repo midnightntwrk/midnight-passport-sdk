@@ -48,7 +48,7 @@ This epic covers grants without read access. Grants that can read private data n
 ## Dependencies
 
 **Blocked by:**
-- E04 Account deployment: E04.12 Multi-wave ACC deploy planner
+- E04 Account deployment: E04.12 Account deploy in waves: plan, send, resume, activate
 - E09 Scoped grants foundation: E09.01 GrantRequest: browser profile, E09.02 GrantRequest: agent profile
 
 **Unlocks:** E11 Grant ceremony clients (1 story), E12 Passport app: grants (3 stories), E14 Agents (2 stories), E15 Execution under a grant key (1 story), E22 Read-access lifecycle (3 stories).

@@ -1,7 +1,7 @@
 # E05 · Contract binding
 
 **Issue:** [#48](https://github.com/midnightntwrk/midnight-passport-sdk/issues/48)  
-**Milestone:** 1 Foundation · **Track:** SDK, owner and foundation · **Steps:** 1–5 · **Stories:** 5  
+**Milestone:** 1 Foundation · **Track:** SDK, owner and foundation · **Steps:** 1–7 · **Stories:** 5  
 **Packages:** `contract`  
 **Sheet code:** E3  
 **Readiness:** ready, no story marked to discuss
@@ -36,16 +36,17 @@ The SDK never compiles or owns the ACC. The ACC is built and published as an art
 |---|---|---|---|
 | E05.01 | ACC artifact build and publication (ADR) | 1 | contract |
 | E05.02 | ACC circuit interface for dApp composition | 2 | contract |
-| E05.03 | ACC artifact loader (module, decoder, manifest) | 4 | contract |
-| E05.04 | Binding version registry | 5 | contract |
-| E05.05 | dApp artifact loader with integrity checks | 5 | contract |
+| E05.03 | ACC artifact loader (module, decoder, manifest) | 5 | contract |
+| E05.05 | dApp artifact loader with integrity checks | 6 | contract |
+| E05.04 | Binding version registry | 7 | contract |
 
 ## Dependencies
 
 **Blocked by:**
-- E03 Workspace, seams, and guardrails: E03.02 Monorepo scaffold for mn-passport-* packages, E03.05 Wire and binding version axes
+- E03 Workspace, seams, and guardrails: E03.02 Monorepo scaffold for mn-passport-* packages, E03.05 Wire and binding version axes, E03.10 Effect 4 inside the SDK: bundling and the midnight-js adapter file
+- E04 Account deployment: E04.06 Indexer seam: transaction status and account state
 
-**Unlocks:** E04 Account deployment (1 story), E15 Execution under a grant key (1 story).
+**Unlocks:** E04 Account deployment (4 stories), E07 Payments (1 story), E15 Execution under a grant key (1 story).
 
 **Parallel with:** E02 Passport app: brand and identity, E06 Passport app: onboarding.
 

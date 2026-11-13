@@ -38,7 +38,7 @@ A Passport is more than an account: it can be an identity. This epic adds a `did
 ## Dependencies
 
 **Blocked by:**
-- E04 Account deployment: E04.12 Multi-wave ACC deploy planner
+- E04 Account deployment: E04.12 Account deploy in waves: plan, send, resume, activate
 - E19 Devices and multi-device sync: E19.02 Owner key add and remove on the ACC
 
 **Unlocks:** no other epic waits on it.

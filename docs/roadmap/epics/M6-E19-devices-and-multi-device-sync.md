@@ -42,7 +42,7 @@ A Passport should work the same on a phone and a laptop. That needs two things: 
 
 **Blocked by:**
 - E03 Workspace, seams, and guardrails: E03.08 Domain-separation tag constants
-- E04 Account deployment: E04.02 KeyProvider across k256, p256, and JubJub, E04.12 Multi-wave ACC deploy planner
+- E04 Account deployment: E04.02 KeyProvider across p256, k256 and JubJub, E04.12 Account deploy in waves: plan, send, resume, activate
 - E17 Private data and backup: E17.01 WPP client and storage seam, E17.02 Password-wrapped WPP backup
 
 **Unlocks:** E20 Passport app: backup and devices (2 stories), E21 Guardian recovery (1 story), E22 Read-access lifecycle (2 stories), E24 Identity and credentials (1 story).

@@ -37,7 +37,7 @@ Both clients stop at the grant. Calls under the grant key follow in E15, and the
 ## Dependencies
 
 **Blocked by:**
-- E04 Account deployment: E04.02 KeyProvider across k256, p256, and JubJub
+- E04 Account deployment: E04.02 KeyProvider across p256, k256 and JubJub
 - E09 Scoped grants foundation: E09.01 GrantRequest: browser profile, E09.02 GrantRequest: agent profile
 - E10 Scoped grants ceremony: E10.02 Authorizer page (MIP §9)
 

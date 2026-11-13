@@ -47,9 +47,9 @@ Everything before this milestone connects dApps and agents to Passport. This epi
 ## Dependencies
 
 **Blocked by:**
-- E04 Account deployment: E04.02 KeyProvider across k256, p256, and JubJub, E04.03 adapter-prover-remote, E04.04 adapter-broadcast: submit, finality, resubmit, E04.05 adapter-browser and adapter-nodejs
+- E04 Account deployment: E04.02 KeyProvider across p256, k256 and JubJub, E04.03 adapter-prover-remote, E04.04 adapter-broadcast: submit, finality, resubmit, E04.05 adapter-browser and adapter-nodejs
 - E05 Contract binding: E05.03 ACC artifact loader (module, decoder, manifest)
-- E07 Payments: E07.02 Transfers via deposit calls
+- E07 Payments: E07.02 Pay another Passport: shielded, in one joined transaction
 - E10 Scoped grants ceremony: E10.04 On-chain grant reads and scope helpers
 - E11 Grant ceremony clients: E11.02 agent: agent-profile grant ceremony, E11.03 connect: browser grant ceremony
 - E13 Connect for dApps: E13.01 connect project template

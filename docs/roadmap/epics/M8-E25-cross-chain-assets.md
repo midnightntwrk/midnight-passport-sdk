@@ -37,7 +37,7 @@ Many users hold assets on other chains. This epic lets a Passport use them insid
 
 **Blocked by:**
 - E03 Workspace, seams, and guardrails: E03.03 Seam interface definitions
-- E07 Payments: E07.01 Coin store and encrypted inbox
+- E07 Payments: E07.01 Inbox entries, the coin store, and deposits into an account
 - E15 Execution under a grant key: E15.01 Intent joiner: dApp intent + ACC payment
 
 **Unlocks:** no other epic waits on it.

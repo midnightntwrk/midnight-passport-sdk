@@ -45,8 +45,8 @@ Midnight dApps keep private state: the witness data their circuits need, which n
 ## Dependencies
 
 **Blocked by:**
-- E03 Workspace, seams, and guardrails: E03.03 Seam interface definitions, E03.04 Owner kernel secret boundary
-- E04 Account deployment: E04.12 Multi-wave ACC deploy planner
+- E03 Workspace, seams, and guardrails: E03.03 Seam interface definitions, E03.04 Owner kernel: secret boundary and secret hygiene
+- E04 Account deployment: E04.12 Account deploy in waves: plan, send, resume, activate
 
 **Unlocks:** E18 Private data in connect and agent (4 stories), E19 Devices and multi-device sync (2 stories), E20 Passport app: backup and devices (1 story), E21 Guardian recovery (1 story), E22 Read-access lifecycle (1 story).
 
