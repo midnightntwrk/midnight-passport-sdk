@@ -1,6 +1,6 @@
 # Midnight Passport SDK architecture
 
-> **Status:** draft · 2026/11/05
+> **Status:** draft · 2026/11/09
 > **Owns:** the packages, the seams, the adapters, and the dependency rules of
 > the SDK.
 > **Companions:** [`sdk-requirements.md`](./sdk-requirements.md) (what the SDK
@@ -74,7 +74,7 @@ All packages publish under the `@midnight-ntwrk/` scope.
 |---|---|---|
 | `mn-passport-owner` | The Passport app (browser) | Onboarding, devices, grant issuance and revocation (the authorizer page of MIP §9), and recovery. It also onboards a new user who arrives from a dApp, and then issues the grant of that dApp (example 2). It holds the WPP account key, derives the package key of each dApp, and gives out the viewing key. It recognizes an account from the passkey and its largeBlob. It is not on the path of a dApp or an agent. |
 | `mn-passport-connect` | A dApp (browser) | The grant ceremony with the browser profile. The per-origin key provider. The signature of the ACC challenge with the grant key. The private-data handoff, then the private-state provider of `mn-passport-core` over the WPP package of the dApp. Pay with Passport. It never onboards a user: it sends a new user to the Passport app (example 2). |
-| `mn-passport-agent` | An agent backend (Node.js) | The grant ceremony with the agent profile. OWS as the key provider. On-chain grant reads, so that OWS can enforce the grant as its policy. A registry client that gets and runs the circuit of a dApp. |
+| `mn-passport-agent` | An agent backend (Node.js) | The grant ceremony with the agent profile. OWS as the key provider. On-chain grant reads, so that OWS can enforce the grant as its policy. A registry client that gets and runs the circuit of a dApp. The sealed package-key handoff, then the private-state provider of `mn-passport-core` over the WPP package of that dApp. |
 | `mn-passport-ecosystems` | A dApp on a different chain (browser) | **After V1.** It registers Passport in the wallet standards of other chains: `/solana` for the Solana Wallet Standard, and `/evm` for EIP-6963 and EIP-1193. It holds no key. It sends each request to the Passport app (example 8). |
 
 ### Foundation
@@ -97,11 +97,11 @@ entry library uses lives in the foundation.
 | Broadcast | `broadcast(provenTx)`, then monitor until final | `core` | All three | `adapter-broadcast` |
 | Fees | A sponsor pays, or a Capacity Exchange swap | `core` | All three | `adapter-broadcast` (sponsor), `adapter-fee-capacity-exchange` |
 | Platform | Network, WASM load order, WebAuthn or its Node.js equivalent | `core` | All three | `adapter-browser`, `adapter-nodejs` |
-| Private state | The midnight-js `PrivateStateProvider` | `core` | `connect` (agents: open) | The WPP client in `core`, over the WPP package of the dApp |
+| Private state | The midnight-js `PrivateStateProvider` | `core` | `connect`, `mn-passport-agent` | The WPP client in `core`, over the WPP package of the dApp |
 | Account metadata | Namespaced, versioned entries; read, merge, write, read back | `core` | `owner` | `adapter-waas` |
 | Registry | Get dApp artifacts by content hash, and verify them | `contract` | `mn-passport-agent` | The registry adapter |
 | Multi-chain | Submit an authorized intent for a different chain, then report its settlement or its failure | `core` | All three | `adapter-multi-chain` |
-| Storage | Ciphertext only: WPP packages, catalogs, conflict retention, backup states | `core` | `owner`, `connect` (agents: open) | `adapter-wpp-<backend>`, with `adapter-wpp-drive` first |
+| Storage | Ciphertext only: WPP packages, catalogs, conflict retention, backup states | `core` | `owner`, `connect`, `mn-passport-agent` | `adapter-wpp-<backend>`, with `adapter-wpp-drive` first |
 | Recovery | Send share requests, collect share responses and liveness attestations, over a confidential and authenticated channel | `owner` | `owner` | `adapter-recovery` |
 | DID | Create, link, sign, and resolve `did:midnight` | `owner` | `owner` | `adapter-did` |
 
@@ -206,8 +206,8 @@ The kernel in `owner` is the only code that holds these secrets in plaintext:
 
 The WPP client in `mn-passport-core` is outside the kernel. It holds only the
 key of one package, which the handoff gave it, and it sees only that package in
-plaintext. It never gets the account key, so a dApp cannot open the package of
-a different dApp.
+plaintext. It never gets the account key, so a dApp or an agent cannot open the
+package of a different dApp.
 
 ### Passkey devices: two arms
 
@@ -240,7 +240,7 @@ it:
 |---|---|---|
 | A signature over an ACC challenge | The prover, inside the transaction | A device operation in the Passport app |
 | The unproven transaction | The V1 prover | The prover sees the private inputs of each proof, for the ACC and for each dApp circuit. The user is told. |
-| A key for one WPP package | One dApp | At the handoff, after a passkey tap and a separate consent. It opens only the package of that dApp. |
+| A key for one WPP package | One dApp, or an agent that runs its circuit | At the handoff, after a passkey tap and a separate consent. It opens only the package of that dApp. An agent gets it sealed to the encryption key that its self-signature binds. |
 | Ciphertext | WPP storage | Always |
 | A guardian share, sealed to the requesting owner | The owner, through `adapter-recovery` | After a passkey tap and an explicit confirmation of the account |
 | Two signatures: one under `s`, one under the successor device key | The prover, inside `recover_submit` | A recovery. The prover learns no scalar (MIP-0022 REC-11). |
@@ -316,10 +316,12 @@ flowchart TB
 
   KERNEL -->|"issue_grant, add_device"| ACC
   KERNEL -.->|"handoff: scoped package key,<br/>viewing key if read access"| DAPP
+  KERNEL -.->|"sealed handoff: scoped package key"| AGENT
   KERNEL -->|"ciphertext"| WPP
   DAPP -->|"grant-scoped calls"| ACC
   AGENT -->|"grant-scoped calls"| ACC
   DAPP -->|"package ciphertext"| WPP
+  AGENT -->|"package ciphertext"| WPP
   GUARD <-->|"sealed share requests and responses"| KERNEL
   DAPP --> PROVER
   AGENT --> PROVER
@@ -624,17 +626,20 @@ const agent = PassportAgent.create({
 });
 
 const request = await agent.requestGrant({ label: 'Rebalancer', scope }); // show as a QR code or a link
-await request.approved(); // the readable scope and its salt
+const session = await request.approved(); // the readable scope, its salt, and the sealed package key
 
 const circuit = await agent.loadDappCircuit(contentHash); // verified against the on-chain verifier key
-await agent.call(circuit, 'rebalance', args); // reads the grant status first
+await session.call(circuit, 'rebalance', args); // reads the grant status first; witnesses use session.privateState
 ```
 
 The agent profile binds the agent key with a self-signature, a nonce, an
 expiry, and a label. It has no web origin. The Passport app shows that it
 validates an agent request. Before OWS signs, `mn-passport-agent` reads the
-grant on chain, so that OWS enforces the grant as its policy. The agent then
-operates with the Passport app closed.
+grant on chain, so that OWS enforces the grant as its policy. When the scope
+includes private-state access, the approval returns the package key of the
+dApp, sealed to an encryption key that the self-signature binds, and the
+session wraps it as the private-state provider of `mn-passport-core`. The
+agent then operates with the Passport app closed.
 
 ### Example 5: a payment to a shielded address
 

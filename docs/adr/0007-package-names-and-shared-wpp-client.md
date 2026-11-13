@@ -58,7 +58,8 @@ rule 4) keeps its meaning under the new name.
   handles the WPP account key.
 - `scripts/dependency-graph.mjs` and its tests use the new names, and list
   `adapter-wpp-drive` as a shared adapter.
-- Open: whether agents use WPP. The seam tables mark it "agents: open".
+- Closed 2026/11/09: agents use WPP
+  ([ADR 0008](./0008-agents-get-private-data-through-a-sealed-handoff.md)).
 - Open, and a blocker before this ADR is accepted: the `drive.file` scope.
   Under it, an OAuth client sees only the files that it created or that the
   user opened with it. A dApp is a different client from the Passport app, so
