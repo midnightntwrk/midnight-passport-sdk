@@ -24,7 +24,7 @@ The grant ceremony has two sides that ship separately: the client side (`connect
 
 **In:** the browser-profile and agent-profile grant requests, the sign-in message, and version handling.
 
-**Out:** building or verifying the ceremony itself (E10, E11), and the encryption key the agent request will carry for the sealed handoff (ADR 0008, added with E13).
+**Out:** building or verifying the ceremony itself (E10, E11), and the encryption key the agent request will carry for the sealed handoff (ADR 0008, added with E18).
 
 ## Stories
 
@@ -40,7 +40,7 @@ The grant ceremony has two sides that ship separately: the client side (`connect
 **Blocked by:**
 - E03 Workspace, seams, and guardrails: E03.05 Wire and binding version axes, E03.08 Domain-separation tag constants
 
-**Unlocks:** E10 Scoped grants ceremony (2 stories), E11 Grant ceremony clients (2 stories), E19 Connect for dApps (1 story).
+**Unlocks:** E10 Scoped grants ceremony (2 stories), E11 Grant ceremony clients (2 stories), E13 Connect for dApps (1 story).
 
 **Parallel with:** E12 Passport app: grants.
 
