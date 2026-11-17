@@ -22,13 +22,18 @@
 
 | SDK | `PROTOCOL_VERSION` | Status |
 |---|---|---|
-| dev (unreleased) | None | Set when `mn-passport-protocol` lands |
+| dev (unreleased) | 2.0 | First wire version (major.minor). Only a higher major is refused; the full rule is E09.04. |
 
 ## Binding axis
 
-| SDK | ACC binding | Compact CLI | Compiler | Language | Runtime (`@midnight-ntwrk/compact-runtime`) | Status |
-|---|---|---|---|---|---|---|
-| dev (unreleased) | None | | | | | Set when `mn-passport-contract` lands |
+| SDK | ACC binding | Compact CLI | Compiler | Manifest hash | Origin length | Language | Runtime (`@midnight-ntwrk/compact-runtime`) | Status |
+|---|---|---|---|---|---|---|---|---|
+| dev (unreleased) | None | — | — | — | — | — | — | Placeholder. Pending the first ACC build (E05.01). |
+
+The `Compiler`, `Manifest hash`, and `Origin length` columns are the three
+fields of `BindingVersion` (`mn-passport-contract`). The manifest hash commits
+to the per-file artifact hashes, including the verifier keys. A build for
+another origin length has other verifier keys and other addresses.
 
 The runtime column must equal the runtime version that the binding records.
 
