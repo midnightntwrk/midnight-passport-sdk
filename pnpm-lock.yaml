@@ -18,6 +18,30 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
 
+  packages/agent:
+    dependencies:
+      '@midnight-ntwrk/mn-passport-contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@midnight-ntwrk/mn-passport-core':
+        specifier: workspace:*
+        version: link:../core
+      '@midnight-ntwrk/mn-passport-protocol':
+        specifier: workspace:*
+        version: link:../protocol
+
+  packages/connect:
+    dependencies:
+      '@midnight-ntwrk/mn-passport-contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@midnight-ntwrk/mn-passport-core':
+        specifier: workspace:*
+        version: link:../core
+      '@midnight-ntwrk/mn-passport-protocol':
+        specifier: workspace:*
+        version: link:../protocol
+
   packages/contract: {}
 
   packages/core:
@@ -25,6 +49,18 @@ importers:
       '@midnight-ntwrk/mn-passport-contract':
         specifier: workspace:*
         version: link:../contract
+      '@midnight-ntwrk/mn-passport-protocol':
+        specifier: workspace:*
+        version: link:../protocol
+
+  packages/owner:
+    dependencies:
+      '@midnight-ntwrk/mn-passport-contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@midnight-ntwrk/mn-passport-core':
+        specifier: workspace:*
+        version: link:../core
       '@midnight-ntwrk/mn-passport-protocol':
         specifier: workspace:*
         version: link:../protocol
