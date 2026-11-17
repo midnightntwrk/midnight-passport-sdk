@@ -15,7 +15,9 @@ const COOLDOWN_DAYS = 7;
 const LOCKFILES = ['pnpm-lock.yaml', 'package-lock.json'];
 const base = process.argv[2] ?? 'origin/main';
 
-const override = (process.env.PR_BODY ?? '').match(/^\s*cooldown-override:\s*(\S.*)$/im);
+// Use [ \t], not \s: \s matches a line end, and an empty reason then takes the next line.
+// With the m flag, $ also matches before \r, so a CRLF body parses.
+const override = (process.env.PR_BODY ?? '').match(/^[ \t]*cooldown-override:[ \t]*(\S[^\r\n]*)$/im);
 
 function gitShow(ref, path) {
   try {
@@ -97,6 +99,7 @@ console.log(`Checking ${added.length} new package version(s) against the ${COOLD
 
 const now = Date.now();
 const violations = [];
+const unchecked = [];
 for (const pair of added) {
   const at = pair.lastIndexOf('@');
   const name = pair.slice(0, at);
@@ -107,21 +110,39 @@ for (const pair of added) {
       execFileSync('npm', ['view', name, 'time', '--json'], {
         encoding: 'utf8',
         maxBuffer: 16 * 1024 * 1024,
+        timeout: 60_000,
+        stdio: ['ignore', 'pipe', 'pipe'],
       }),
     );
   } catch {
-    console.log(`::warning::Could not fetch publish times for ${pair} — skipping.`);
+    unchecked.push(`${pair} — could not fetch the publish times`);
     continue;
   }
-  const published = times?.[version];
-  if (!published) {
-    console.log(`::warning::No publish time recorded for ${pair} — skipping.`);
+  // npm 10 returns the object. npm 12 returns an array that holds it.
+  if (Array.isArray(times) && times.length === 1) times = times[0];
+  if (times === null || typeof times !== 'object' || Array.isArray(times)) {
+    unchecked.push(`${pair} — npm view returned an unknown shape`);
     continue;
   }
-  const ageDays = (now - Date.parse(published)) / 86_400_000;
+  const published = times[version];
+  const publishedAt = typeof published === 'string' ? Date.parse(published) : NaN;
+  if (Number.isNaN(publishedAt)) {
+    unchecked.push(`${pair} — no publish time for this version`);
+    continue;
+  }
+  const ageDays = (now - publishedAt) / 86_400_000;
   if (ageDays < COOLDOWN_DAYS) {
     violations.push(`${pair} — published ${ageDays.toFixed(1)} days ago (${published})`);
   }
+}
+
+if (unchecked.length > 0) {
+  console.log('::error::The age of these versions is unknown. The cooldown fails closed:');
+  for (const u of unchecked) console.log(`::error::  ${u}`);
+  console.log('::error::A Cooldown-override: line does not cover a version of unknown age. If npm view could not be reached, run the job again.');
+  if (violations.length > 0) console.log('::error::These versions are also younger than 7 days:');
+  for (const v of violations) console.log(`::error::  ${v}`);
+  process.exit(1);
 }
 
 if (violations.length === 0) {
