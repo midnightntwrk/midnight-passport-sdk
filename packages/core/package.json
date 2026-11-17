@@ -1,0 +1,26 @@
+{
+  "name": "@midnight-ntwrk/mn-passport-core",
+  "version": "0.0.0",
+  "description": "The account contract client that the Midnight Passport entry libraries share.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "!dist/.tsbuildinfo"
+  ],
+  "scripts": {
+    "build": "tsc -b tsconfig.test.json",
+    "test": "node --test \"dist-test/**/*.test.js\""
+  },
+  "dependencies": {
+    "@midnight-ntwrk/mn-passport-contract": "workspace:*",
+    "@midnight-ntwrk/mn-passport-protocol": "workspace:*"
+  }
+}

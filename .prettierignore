@@ -3,6 +3,7 @@
 # conventions (code-style lens; the org manages its template files).
 node_modules/
 dist/
+dist-test/
 build/
 coverage/
 pnpm-lock.yaml
