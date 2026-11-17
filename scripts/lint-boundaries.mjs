@@ -5,8 +5,9 @@
 // important: `connect` and `agent` never import `owner`. Platform-neutral
 // packages must not import Node built-ins. The graph lives in
 // scripts/dependency-graph.mjs.
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { ALLOWED, PLATFORM_NEUTRAL, SCOPE } from './dependency-graph.mjs';
 
 // Matches static imports, re-exports, side-effect imports, require(), and
@@ -31,46 +32,86 @@ function sourceFiles(dir) {
   return out;
 }
 
-/** @type {string[]} */
-const violations = [];
-for (const [pkg, allowed] of Object.entries(ALLOWED)) {
-  const allowedNames = new Set(allowed.map((d) => SCOPE + d));
-  let files;
+/** @param {string} root @returns {{ violations: string[], linted: string[] }} */
+export function lintWorkspace(root) {
+  const packagesDir = join(root, 'packages');
+  /** @type {string[]} */
+  const violations = [];
+  /** @type {string[]} */
+  const linted = [];
+
+  /** @type {string[]} */
+  let dirs;
   try {
-    files = sourceFiles(join('packages', pkg, 'src'));
+    dirs = readdirSync(packagesDir)
+      .filter((dir) => statSync(join(packagesDir, dir)).isDirectory())
+      .sort();
   } catch {
-    continue; // The package is not scaffolded yet — nothing to lint.
+    return { violations, linted }; // A workspace with no packages/ has nothing to lint.
   }
-  for (const file of files) {
-    const text = readFileSync(file, 'utf8');
-    for (const match of text.matchAll(IMPORT_RE)) {
-      const target = match[1] ?? '';
-      if (!allowedNames.has(target)) {
-        violations.push(
-          `${file}: "${pkg}" must not import "${target}" (architecture, Dependency rules).`,
-        );
-      }
+
+  for (const pkg of dirs) {
+    const allowed = ALLOWED[pkg];
+    if (!allowed) {
+      violations.push(
+        `packages/${pkg}: "${pkg}" is not in the graph — add it to scripts/dependency-graph.mjs deliberately (architecture, Dependency rules).`,
+      );
+      continue;
     }
-    if (PLATFORM_NEUTRAL.has(pkg)) {
-      for (const match of text.matchAll(NODE_BUILTIN_RE)) {
-        violations.push(
-          `${file}: "${pkg}" must not import "${match[1]}" — it ships to browser/PWA bundles (architecture, Dependency rules).`,
-        );
-      }
-      for (const match of text.matchAll(GLOBAL_DECLARATION_RE)) {
-        const name = match[1] ?? '';
-        if (!ALLOWED_GLOBALS.has(name)) {
+    const srcDir = join(packagesDir, pkg, 'src');
+    /** @type {string[]} */
+    let files;
+    try {
+      files = sourceFiles(srcDir);
+    } catch {
+      violations.push(
+        `packages/${pkg}: "${pkg}" has no src/ to lint (architecture, Dependency rules).`,
+      );
+      continue;
+    }
+    linted.push(pkg);
+
+    const allowedNames = new Set(allowed.map((dep) => SCOPE + dep));
+    for (const file of files) {
+      const where = relative(root, file);
+      const text = readFileSync(file, 'utf8');
+      for (const match of text.matchAll(IMPORT_RE)) {
+        const target = match[1] ?? '';
+        if (!allowedNames.has(target)) {
           violations.push(
-            `${file}: "${pkg}" declares ambient global "${name}" — only allowlisted cross-platform globals are permitted (architecture, Dependency rules).`,
+            `${where}: "${pkg}" must not import "${target}" (architecture, Dependency rules).`,
           );
+        }
+      }
+      if (PLATFORM_NEUTRAL.has(pkg)) {
+        for (const match of text.matchAll(NODE_BUILTIN_RE)) {
+          violations.push(
+            `${where}: "${pkg}" must not import "${match[1]}" — it ships to browser/PWA bundles (architecture, Dependency rules).`,
+          );
+        }
+        for (const match of text.matchAll(GLOBAL_DECLARATION_RE)) {
+          const name = match[1] ?? '';
+          if (!ALLOWED_GLOBALS.has(name)) {
+            violations.push(
+              `${where}: "${pkg}" declares ambient global "${name}" — only allowlisted cross-platform globals are permitted (architecture, Dependency rules).`,
+            );
+          }
         }
       }
     }
   }
+  return { violations, linted };
 }
 
-if (violations.length > 0) {
-  for (const v of violations) console.error(`Boundary violation — ${v}`);
-  process.exit(1);
+// import.meta.main may be absent on Node 22, so compare the entry path.
+const entry = process.argv[1] ? realpathSync(process.argv[1]) : '';
+if (entry && entry === realpathSync(fileURLToPath(import.meta.url))) {
+  const { violations, linted } = lintWorkspace(process.cwd());
+  if (violations.length > 0) {
+    for (const v of violations) console.error(`Boundary violation — ${v}`);
+    process.exit(1);
+  }
+  console.log(
+    `Dependency boundaries respected across ${linted.length} package(s) (architecture, Dependency rules).`,
+  );
 }
-console.log('Dependency boundaries respected (architecture, Dependency rules).');
