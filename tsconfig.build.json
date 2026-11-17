@@ -18,6 +18,24 @@
     },
     {
       "path": "packages/agent/tsconfig.test.json"
+    },
+    {
+      "path": "packages/adapter-prover-remote/tsconfig.test.json"
+    },
+    {
+      "path": "packages/adapter-broadcast/tsconfig.test.json"
+    },
+    {
+      "path": "packages/adapter-browser/tsconfig.test.json"
+    },
+    {
+      "path": "packages/adapter-nodejs/tsconfig.test.json"
+    },
+    {
+      "path": "packages/adapter-indexer/tsconfig.test.json"
+    },
+    {
+      "path": "packages/dev/tsconfig.test.json"
     }
   ]
 }

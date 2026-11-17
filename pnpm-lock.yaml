@@ -18,6 +18,36 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
 
+  packages/adapter-broadcast:
+    dependencies:
+      '@midnight-ntwrk/mn-passport-core':
+        specifier: workspace:*
+        version: link:../core
+
+  packages/adapter-browser:
+    dependencies:
+      '@midnight-ntwrk/mn-passport-core':
+        specifier: workspace:*
+        version: link:../core
+
+  packages/adapter-indexer:
+    dependencies:
+      '@midnight-ntwrk/mn-passport-core':
+        specifier: workspace:*
+        version: link:../core
+
+  packages/adapter-nodejs:
+    dependencies:
+      '@midnight-ntwrk/mn-passport-core':
+        specifier: workspace:*
+        version: link:../core
+
+  packages/adapter-prover-remote:
+    dependencies:
+      '@midnight-ntwrk/mn-passport-core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/agent:
     dependencies:
       '@midnight-ntwrk/mn-passport-contract':
@@ -52,6 +82,12 @@ importers:
       '@midnight-ntwrk/mn-passport-protocol':
         specifier: workspace:*
         version: link:../protocol
+
+  packages/dev:
+    dependencies:
+      '@midnight-ntwrk/mn-passport-core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/owner:
     dependencies:
