@@ -1,33 +1,45 @@
 import assert from 'node:assert/strict';
-import { browserTest, runPage } from './chromium.mjs';
+import { addAuthenticator, browserTest, runPage } from './chromium.mjs';
 
 /**
  * Runs `body` as an async function in a page, and gives its value. The page bundle resolves
  * from the adapter's dist folder.
  * @param {string} bin
  * @param {string} body
+ * @param {Parameters<typeof runPage>[2]} [options]
  */
-async function inPage(bin, body) {
+async function inPage(bin, body, options = {}) {
   const page = `
     import { browserPlatform } from './index.js';
     import { platformContract } from '../../dev/dist/index.js';
     import { platformCases } from '../../../tests/platform-cases.mjs';
-    window.result = (async () => { ${body} })();
+    window.run = async () => { ${body} };
   `;
-  const { value, errors } = await runPage(bin, page);
+  const { value, errors } = await runPage(bin, page, { ...options, expression: 'window.run()' });
   assert.deepEqual(errors, []);
   return value;
 }
 
+// The contract's WebAuthn case uses the RP ID example.test. A synchronous request makes the
+// authenticator change before the prompt starts.
 const CONTRACT = `
+  const post = (path) => {
+    const request = new XMLHttpRequest();
+    request.open('POST', path, false);
+    request.send();
+  };
   let made = 0;
-  const make = async () => ({
-    platform: browserPlatform({ namespace: 'mn-passport-contract-' + made++ }),
-    okUrl: location.origin + '/ok',
-    notFoundUrl: location.origin + '/missing',
-    redirectUrl: location.origin + '/moved',
-    pendingUrl: location.origin + '/pending',
-  });
+  const make = async () => {
+    post('/verify');
+    return {
+      platform: browserPlatform({ namespace: 'mn-passport-contract-' + made++ }),
+      okUrl: location.origin + '/ok',
+      notFoundUrl: location.origin + '/missing',
+      redirectUrl: location.origin + '/moved',
+      pendingUrl: location.origin + '/pending',
+      dismissNextPrompt: () => post('/dismiss'),
+    };
+  };
   const results = [];
   for (const c of [...platformContract(make), ...platformCases(make)]) {
     results.push(await c.run().then(() => ({ name: c.name }), (e) => ({ name: c.name, error: String(e?.stack ?? e) })));
@@ -36,7 +48,23 @@ const CONTRACT = `
 `;
 
 browserTest('browserPlatform passes the Platform contract in Chromium', async (bin, t) => {
-  const results = /** @type {{ name: string, error?: string }[]} */ (await inPage(bin, CONTRACT));
+  let authenticatorId = '';
+  /** @param {import('./chromium.mjs').Page} page @param {boolean} verified */
+  const setVerified = async (page, verified) => {
+    await page.send('WebAuthn.setUserVerified', { authenticatorId, isUserVerified: verified });
+  };
+  const value = await inPage(bin, CONTRACT, {
+    host: 'example.test',
+    async before(page) {
+      authenticatorId = await addAuthenticator(page, true);
+    },
+    // A user who does not verify ends the prompt the way a dismissal does.
+    routes: {
+      '/dismiss': (page) => setVerified(page, false),
+      '/verify': (page) => setVerified(page, true),
+    },
+  });
+  const results = /** @type {{ name: string, error?: string }[]} */ (value);
   assert.ok(results.length > 0, 'the page ran no case');
   for (const { name, error } of results) {
     await t.test(name, () => assert.equal(error, undefined));

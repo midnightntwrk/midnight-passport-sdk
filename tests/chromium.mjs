@@ -59,11 +59,12 @@ const open = new Set();
 const TYPES = { '.js': 'text/javascript', '.wasm': 'application/wasm' };
 
 /**
- * Serves the bundle on `localhost`, a secure context, and counts the WASM requests.
+ * Serves the bundle and counts the WASM requests. A request to a route waits for it, then gets 204.
  * @param {string} outdir
  * @param {(url: string, wasmRequests: () => number) => Promise<void>} run
+ * @param {{ routes: Record<string, () => Promise<void>>, host: string }} options
  */
-async function serve(outdir, run) {
+async function serve(outdir, run, { routes, host }) {
   let wasm = 0;
   /** @type {Error | undefined} */
   let failure;
@@ -74,6 +75,8 @@ async function serve(outdir, run) {
       response.writeHead(200, { 'content-type': 'text/html' });
       return response.end('<script type="module" src="/page.js"></script>');
     }
+    const route = routes[path];
+    if (route) return route().then(() => response.writeHead(204).end());
     if (contractRoutes(request, response)) return;
     if (path === '/cookie') return response.writeHead(200).end(request.headers.cookie ?? '');
     if (path === '/referer') return response.writeHead(200).end(request.headers.referer ?? '');
@@ -94,29 +97,79 @@ async function serve(outdir, run) {
     });
   });
   const base = await listen(server, (close) => open.add(async () => close()), 'localhost');
-  await run(`${base}/`, () => wasm);
+  await run(`http://${host}:${new URL(base).port}/`, () => wasm);
   if (failure !== undefined) throw failure;
 }
 
 /**
- * Bundles `contents` as the page, opens it, and reads `window.result`.
+ * Bundles `contents` as the page, opens it, runs `before`, and evaluates `expression`.
  * @param {string} bin
  * @param {string} contents
+ * @param {{ expression?: string, before?: (page: Page) => Promise<void>,
+ *   routes?: Record<string, (page: Page) => Promise<void>>, host?: string }} [options]
  */
-export async function runPage(bin, contents) {
+export async function runPage(bin, contents, options = {}) {
+  const { expression = 'window.result', before, host = 'localhost' } = options;
+  /** @type {Page | undefined} */
+  let opened;
+  const routes = Object.fromEntries(
+    Object.entries(options.routes ?? {}).map(([path, route]) => [
+      path,
+      async () => {
+        assert.ok(opened, `${path} came before the page opened`);
+        await route(opened);
+      },
+    ]),
+  );
   const { outdir } = await bundle(contents);
   /** @type {{ value: unknown, errors: string[], wasmRequests: number }} */
   let out = { value: undefined, errors: [], wasmRequests: 0 };
-  await serve(outdir, async (url, wasmRequests) => {
-    const page = await openPage(bin, url);
-    try {
-      const value = await page.evaluate('window.result');
-      out = { value, errors: page.errors, wasmRequests: wasmRequests() };
-    } finally {
-      await page.close();
-    }
-  });
+  await serve(
+    outdir,
+    async (url, wasmRequests) => {
+      // Another host maps to localhost and counts as a secure context.
+      const flags =
+        host === 'localhost'
+          ? []
+          : [
+              `--host-resolver-rules=MAP ${host} localhost`,
+              `--unsafely-treat-insecure-origin-as-secure=${url}`,
+            ];
+      const page = await openPage(bin, url, flags);
+      opened = page;
+      try {
+        await before?.(page);
+        const value = await page.evaluate(expression);
+        out = { value, errors: page.errors, wasmRequests: wasmRequests() };
+      } finally {
+        await page.close();
+      }
+    },
+    { routes, host },
+  );
   return out;
+}
+
+/** @typedef {Awaited<ReturnType<typeof openPage>>} Page */
+
+/**
+ * Adds a virtual authenticator that holds resident keys and presses itself, and gives its ID.
+ * @param {Page} page
+ * @param {boolean} verifies
+ */
+export async function addAuthenticator(page, verifies) {
+  await page.send('WebAuthn.enable', { enableUI: false });
+  const added = await page.send('WebAuthn.addVirtualAuthenticator', {
+    options: {
+      protocol: 'ctap2',
+      transport: 'internal',
+      hasResidentKey: true,
+      hasUserVerification: verifies,
+      isUserVerified: verifies,
+      automaticPresenceSimulation: true,
+    },
+  });
+  return String(Reflect.get(added, 'authenticatorId'));
 }
 
 const NAMES = ['chromium', 'chromium-browser', 'google-chrome-stable', 'google-chrome'];
@@ -156,10 +209,16 @@ export function browserTest(name, run) {
  * Opens `url` in headless Chromium over the DevTools protocol. `close()` removes the profile.
  * @param {string} bin
  * @param {string} url
+ * @param {string[]} [extraFlags]
  */
-async function openPage(bin, url) {
+async function openPage(bin, url, extraFlags = []) {
   const profile = await mkdtemp(join(tmpdir(), 'mn-passport-chromium-'));
-  const flags = ['--no-first-run', '--disable-background-networking', '--disable-component-update'];
+  const flags = [
+    '--no-first-run',
+    '--disable-background-networking',
+    '--disable-component-update',
+    ...extraFlags,
+  ];
   // The profile is also the working folder and TMPDIR, so the browser leaves no file outside it.
   const chrome = spawn(
     bin,
@@ -244,6 +303,8 @@ async function openPage(bin, url) {
         // The page decides the type of the value.
         return result?.value;
       },
+      /** @param {string} method @param {object} [params] */
+      send: (method, params) => send(method, params, sessionId),
       close: stop,
     };
   } catch (error) {
