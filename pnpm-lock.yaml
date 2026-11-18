@@ -80,6 +80,10 @@ importers:
       '@midnightntwrk/ledger-v9':
         specifier: 1.0.2
         version: 1.0.2
+    devDependencies:
+      '@midnight-ntwrk/mn-passport-dev':
+        specifier: workspace:*
+        version: link:../dev
 
   packages/agent:
     dependencies:
