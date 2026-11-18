@@ -8,9 +8,14 @@ import type {
   PassportError,
   StateSource,
 } from '@midnight-ntwrk/mn-passport-core';
-import { createIndexer } from '@midnight-ntwrk/mn-passport-adapter-indexer';
+import {
+  createIndexer,
+  type WebSocketConstructorLike,
+  type WebSocketLike,
+} from '@midnight-ntwrk/mn-passport-adapter-indexer';
 import { INDEXER_URL, NODE_URL, block, nodeWith, ok, route, stateAnswer } from './fakes.js';
 
+const WS_URL = 'wss://indexer.test/graphql/ws';
 const id = 'cd'.repeat(32);
 
 const down: HttpResponse = { status: 503, headers: {}, body: new Uint8Array() };
@@ -22,7 +27,7 @@ const bytesOf = (lookup: Lookup<{ readonly bytes: Uint8Array }> | undefined) =>
 let clock: TestContext['mock']['timers'] | undefined;
 /** Each test runs on fake time, so a busy machine cannot change what it sees. */
 const fakeTime = (t: TestContext): void => {
-  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'] });
   clock = t.mock.timers;
 };
 // A macrotask runs every pending microtask, so each read finishes before the next tick.
@@ -292,4 +297,214 @@ test('after a reorg, a node answer past the held block replaces the held bytes',
     watch.values.map((v) => bytesOf(v)),
     [[0xbb], [0xaa]],
   );
+});
+
+class FakeSocket implements WebSocketLike {
+  static all: FakeSocket[] = [];
+  readonly sent: Record<string, unknown>[] = [];
+  closed = false;
+  private readonly listeners = new Map<string, ((event: { readonly data: unknown }) => void)[]>();
+
+  constructor(
+    readonly url: string,
+    readonly protocol: string,
+  ) {
+    FakeSocket.all.push(this);
+    queueMicrotask(() => this.emit('open'));
+  }
+  addEventListener(type: string, listener: (event: { readonly data: unknown }) => void): void {
+    this.listeners.set(type, [...(this.listeners.get(type) ?? []), listener]);
+  }
+  send(data: string): void {
+    this.sent.push(JSON.parse(data) as Record<string, unknown>);
+  }
+  close(): void {
+    if (this.closed) return;
+    this.closed = true;
+    queueMicrotask(() => this.emit('close'));
+  }
+  emit(type: string, data?: unknown): void {
+    for (const listener of this.listeners.get(type) ?? []) listener({ data });
+  }
+  server(message: object): void {
+    this.emit('message', JSON.stringify(message));
+  }
+}
+
+const socketWatch = (http: Http, extra: Partial<Parameters<typeof createIndexer>[0]> = {}) => {
+  FakeSocket.all = [];
+  const webSocket = FakeSocket satisfies WebSocketConstructorLike;
+  return record(
+    indexer(http, { indexerWsUrl: WS_URL, webSocket, ...extra }).watchContract(address),
+  );
+};
+const opened = (n: number) => until(() => FakeSocket.all[n]?.sent.length === 1);
+const acked = async (n: number): Promise<FakeSocket> => {
+  await opened(n);
+  const socket = FakeSocket.all[n];
+  assert.ok(socket);
+  socket.server({ type: 'connection_ack' });
+  return socket;
+};
+const event = { id: '1', type: 'next', payload: { data: { contractActions: { address } } } };
+
+test('each subscription event reads the state, and a closed socket reconnects', async (t) => {
+  fakeTime(t);
+  let state = '01';
+  const fake = counting(() => stateAnswer(state));
+  const watch = socketWatch(fake.http, { pollMs: 60_000, maxBackoffMs: 10 });
+  await until(() => watch.values.length === 1);
+  await opened(0);
+  const socket = FakeSocket.all[0];
+  assert.ok(socket);
+  assert.equal(socket.url, WS_URL);
+  assert.equal(socket.protocol, 'graphql-transport-ws');
+  assert.deepEqual(socket.sent[0], { type: 'connection_init' });
+
+  socket.server({ type: 'connection_ack' });
+  const subscribe = socket.sent[1] as {
+    type: string;
+    payload: { query: string; variables: unknown };
+  };
+  assert.equal(subscribe.type, 'subscribe');
+  assert.match(subscribe.payload.query, /contractActions\(address: \$address\)/);
+  assert.deepEqual(subscribe.payload.variables, { address });
+  socket.server({ type: 'ping' });
+  assert.deepEqual(socket.sent[2], { type: 'pong' });
+
+  state = '02';
+  socket.server(event);
+  await until(() => watch.values.length === 2);
+  assert.deepEqual(bytesOf(watch.values[1]), [2]);
+
+  socket.close();
+  const again = await acked(1);
+  const readsBefore = fake.calls;
+  again.server(event);
+  await until(() => fake.calls > readsBefore);
+  await wait(5);
+  assert.equal(watch.values.length, 2, 'a replayed event emitted a value');
+
+  watch.stop();
+  assert.equal(again.closed, true);
+  await wait(30);
+  assert.equal(FakeSocket.all.length, 2);
+});
+
+const endings: readonly (readonly [string, string])[] = [
+  ['a bad frame', '{not json'],
+  ['a frame over 16 MiB', JSON.stringify({ ...event, pad: ' '.repeat(16 * 1024 * 1024) })],
+];
+
+for (const [name, frame] of endings) {
+  test(`${name} ends the socket, starts no read, and the watch goes on`, async (t) => {
+    fakeTime(t);
+    const fake = counting(() => stateAnswer('01'));
+    const watch = socketWatch(fake.http, { pollMs: 60_000, maxBackoffMs: 10 });
+    const socket = await acked(0);
+    const reads = fake.calls;
+    socket.emit('message', frame);
+    await until(() => FakeSocket.all.length === 2);
+    assert.equal(socket.closed, true);
+    assert.equal(fake.calls, reads);
+    assert.equal(socket.sent.filter((m) => m.type === 'subscribe').length, 1);
+    assert.equal(watch.errors.length, 0);
+  });
+}
+
+test('an event during a read starts one more read after it', async (t) => {
+  fakeTime(t);
+  let state = '01';
+  let release: () => void = () => {};
+  let slow = false;
+  const watch = socketWatch(
+    async () => {
+      const answer = stateAnswer(state);
+      if (slow) await new Promise<void>((resolve) => (release = resolve));
+      return answer;
+    },
+    // The slow polling must not do the second read.
+    { pollMs: 60_000, maxBackoffMs: 60_000 },
+  );
+  await until(() => watch.values.length === 1);
+  const socket = await acked(0);
+  slow = true;
+  socket.server(event);
+  await wait(5);
+  state = '02';
+  slow = false;
+  socket.server(event);
+  release();
+  await until(() => watch.values.length === 2);
+  assert.deepEqual(bytesOf(watch.values[1]), [2]);
+});
+
+test('a stop during a reconnect wait leaves no timer and opens no socket', async () => {
+  const before = timers();
+  const watch = socketWatch(async () => stateAnswer('01'), { pollMs: 60_000, maxBackoffMs: 20 });
+  await opened(0);
+  FakeSocket.all[0]?.close();
+  await flush();
+  // A socket timer is live beside the poll timer, so the check after the stop can fail.
+  assert.ok(timers() > before + 1);
+  watch.stop();
+  assert.equal(timers(), before);
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  assert.equal(FakeSocket.all.length, 1);
+});
+
+for (const node of [false, true]) {
+  const name = node
+    ? 'with a node, a live subscription keeps the normal polling'
+    : 'a live subscription slows the polling, and polling is fast again when the socket ends';
+  test(name, async (t) => {
+    fakeTime(t);
+    const fake = counting(() => stateAnswer('01'));
+    // The node has no contract, so only the indexer reads count.
+    const http = route(fake.http, nodeWith(undefined, 1).http);
+    socketWatch(http, { pollMs: 5, maxBackoffMs: 1_000, ...(node ? { nodeUrl: NODE_URL } : {}) });
+    const socket = await acked(0);
+    await wait(15);
+    const live = fake.calls;
+    await wait(60);
+    const reads = fake.calls - live;
+    assert.ok(node ? reads >= 4 : reads <= 1, `${reads} reads in 60 ms while live`);
+    if (node) return;
+    socket.close();
+    const ended = fake.calls;
+    await wait(60);
+    assert.ok(
+      fake.calls - ended >= 4,
+      `${fake.calls - ended} reads in 60 ms after the socket ended`,
+    );
+  });
+}
+
+test('an event during an outage does not end the backoff', async (t) => {
+  fakeTime(t);
+  const fake = counting(() => down);
+  socketWatch(fake.http, { pollMs: 10, maxBackoffMs: 1_000 });
+  const socket = await acked(0);
+  await until(() => fake.calls >= 1);
+  for (let i = 0; i < 20; i++) {
+    socket.server(event);
+    await wait(2);
+  }
+  // Backoff gives reads at 0, 20, and 60 ms. One read for each event gives about 20.
+  assert.ok(fake.calls <= 4, `${fake.calls} reads`);
+});
+
+test('an event during a read that fails does not end the backoff', async (t) => {
+  fakeTime(t);
+  const pending: ((response: HttpResponse) => void)[] = [];
+  socketWatch(() => new Promise<HttpResponse>((resolve) => pending.push(resolve)), {
+    pollMs: 50,
+    maxBackoffMs: 1_000,
+  });
+  const socket = await acked(0);
+  assert.equal(pending.length, 1);
+  socket.server(event);
+  pending[0]?.(down);
+  await wait(30);
+  assert.equal(pending.length, 1, 'a read went out before the backoff ended');
 });

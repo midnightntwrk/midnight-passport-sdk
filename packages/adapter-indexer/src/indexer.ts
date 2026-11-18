@@ -7,13 +7,17 @@ import {
   type Lookup,
   type TransactionStatus,
 } from '@midnight-ntwrk/mn-passport-core';
+import { globalWebSocket } from './globals.js';
 import { sameBytes } from './merge.js';
 import { startPolling, type Timing } from './poll.js';
 import { createReads } from './reads.js';
+import { followContractActions, type WebSocketConstructorLike } from './subscription.js';
 
 export interface IndexerOptions {
   /** The indexer's GraphQL endpoint over HTTP. */
   readonly indexerUrl: string;
+  /** The indexer's GraphQL endpoint over WebSocket. Without it, watches only poll. */
+  readonly indexerWsUrl?: string;
   /**
    * The node's JSON-RPC endpoint over HTTP. Without it, state reads use the indexer only. A state
    * from the indexer has the block where it last changed. A state from the node has the node's
@@ -21,6 +25,8 @@ export interface IndexerOptions {
    */
   readonly nodeUrl?: string;
   readonly http: (request: HttpRequest) => Promise<HttpResponse>;
+  /** Default: `globalThis.WebSocket`. */
+  readonly webSocket?: WebSocketConstructorLike;
   /** For each indexer request, and for the whole node read. Default: 10,000. */
   readonly requestTimeoutMs?: number;
   /** Default: 2,000. */
@@ -54,6 +60,8 @@ export function createIndexer(options: IndexerOptions): Indexer {
     pollMs: options.pollMs ?? 2_000,
     maxBackoffMs: options.maxBackoffMs ?? 30_000,
   };
+  const webSocket = options.webSocket ?? globalWebSocket();
+  const wsUrl = options.indexerWsUrl;
 
   return {
     contractState: reads.contractState,
@@ -86,7 +94,18 @@ export function createIndexer(options: IndexerOptions): Indexer {
           },
           timing,
         );
-        return poller.stop;
+        const unfollow =
+          wsUrl === undefined || webSocket === undefined
+            ? undefined
+            : followContractActions(webSocket, wsUrl, address, timing, {
+                onAction: poller.readNow,
+                // The events come from final blocks only, so a node read keeps the normal polling.
+                onLive: options.nodeUrl === undefined ? poller.setSlow : () => undefined,
+              });
+        return () => {
+          poller.stop();
+          unfollow?.();
+        };
       }),
     watchTransaction: (id) =>
       createStateSource((emit, fail) => {
