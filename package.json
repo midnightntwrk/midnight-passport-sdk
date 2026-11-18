@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsc -b tsconfig.build.json && tsc -p tsconfig.json",
     "test": "pnpm run build && node -e \"if(!fs.globSync('tests/**/*.test.mjs').length){console.error('no test files matched');process.exit(1)}\" && node --test \"tests/**/*.test.mjs\" && pnpm -r test",
-    "lint": "node scripts/lint-boundaries.mjs",
+    "lint": "node scripts/lint-boundaries.mjs && node scripts/check-single-copy.mjs pnpm-lock.yaml",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
