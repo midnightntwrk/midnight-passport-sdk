@@ -13,7 +13,9 @@ import {
 } from '@midnight-ntwrk/mn-passport-core';
 import { query } from './graphql.js';
 import { decodeHex } from './hex.js';
-import type { Data, Endpoint } from './transport.js';
+import { mergeState } from './merge.js';
+import { readNodeState } from './node.js';
+import { ownSignal, type Data, type Endpoint } from './transport.js';
 
 // Keep these in step with the indexer API of the pinned midnight-js version.
 const CONTRACT_STATE_QUERY = `query CONTRACT_STATE_QUERY($address: HexEncoded!) {
@@ -97,20 +99,67 @@ export async function readTransaction(
 export interface ReadOptions {
   /** The indexer's GraphQL endpoint over HTTP. */
   readonly indexerUrl: string;
+  /**
+   * The node's JSON-RPC endpoint over HTTP. Without it, state reads use the indexer only. A state
+   * from the indexer has the block where it last changed. A state from the node has the node's
+   * best block, and that block can still be reverted.
+   */
+  readonly nodeUrl?: string;
   readonly http: (request: HttpRequest) => Promise<HttpResponse>;
-  /** Default: 10,000. */
+  /** For each indexer request, and for the whole node read. Default: 10,000. */
   readonly requestTimeoutMs?: number;
 }
 
-export function createReads(options: ReadOptions): Pick<Indexer, 'contractState' | 'transaction'> {
-  const endpoint: Endpoint = {
-    url: options.indexerUrl,
-    http: options.http,
-    timeoutMs: options.requestTimeoutMs ?? 10_000,
-  };
+export interface StateRead {
+  readonly state: ContractState | undefined;
+  /** `true` when the state came from the node. */
+  readonly fromNode: boolean;
+  readonly indexerHead: BlockRef | undefined;
+  /** The block of the node's answer, also when the indexer's state wins. */
+  readonly nodeBlock: BlockRef | undefined;
+}
+
+export interface Reads extends Pick<Indexer, 'contractState' | 'transaction'> {
+  /** `contractState` with where the state came from. */
+  readState(address: ContractAddress, options?: CallOptions): Promise<StateRead>;
+}
+
+export function createReads(options: ReadOptions): Reads {
+  const timeoutMs = options.requestTimeoutMs ?? 10_000;
+  const indexer: Endpoint = { url: options.indexerUrl, http: options.http, timeoutMs };
+  const node: Endpoint | undefined =
+    options.nodeUrl === undefined
+      ? undefined
+      : { url: options.nodeUrl, http: options.http, timeoutMs };
+  async function readState(address: ContractAddress, call?: CallOptions): Promise<StateRead> {
+    if (node === undefined) {
+      const { head, state } = await readContractState(indexer, address, call);
+      return { state, fromNode: false, indexerHead: head, nodeBlock: undefined };
+    }
+    const nodeCall = ownSignal(call?.signal);
+    try {
+      const [fromIndexer, fromNode] = await Promise.all([
+        readContractState(indexer, address, call),
+        readNodeState(node, address, { signal: nodeCall.signal }),
+      ]);
+      const state = mergeState(address, fromIndexer, fromNode);
+      // The merge gives the indexer's own object unless the node wins.
+      const nodeWon = state !== undefined && state !== fromIndexer.state;
+      return {
+        state,
+        fromNode: nodeWon,
+        indexerHead: fromIndexer.head,
+        nodeBlock: fromNode?.block,
+      };
+    } finally {
+      // Also stops the node read when the indexer fails first.
+      nodeCall.abort();
+      nodeCall.dispose();
+    }
+  }
   return {
-    contractState: async (address, call) =>
-      (await readContractState(endpoint, address, call)).state,
-    transaction: (id, call) => readTransaction(endpoint, id, call),
+    readState,
+    contractState: async (address, call) => (await readState(address, call)).state,
+    transaction: (id, call) => readTransaction(indexer, id, call),
   };
 }
