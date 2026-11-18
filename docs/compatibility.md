@@ -1,6 +1,6 @@
 # Compatibility matrix
 
-> **Status:** live · reset 2026/10/19 (no package is scaffolded yet)
+> **Status:** live · updated 2026/11/17
 > **Owns:** the two version axes of the SDK, and the toolchain that each
 > binding uses.
 > **Maintained by:** `mn-passport-skills:deps`. A row changes only through a
@@ -40,6 +40,17 @@ keys"). Thus, the matrix records the revisions, not only the versions.
 
 | Component | Pin | Why |
 |---|---|---|
-| midnight-js | None yet | One version for the whole build, with the behavior it uses |
+| Compact toolchain | 0.36.1 | 0.36.1 fixes a key-generation crash for `JubjubScalar` and `JubjubPoint` |
+| `@midnight-ntwrk/compact-runtime` | 0.21.0 | The runtime of Compact 0.36. midnight-js 5.0.1 requires exactly 0.21.0 |
+| midnight-js (`@midnight-ntwrk/midnight-js`) | 5.0.1 | One version for the whole build, with the behavior it uses |
+| `@midnight-ntwrk/compact-js` | 3.0.2 | midnight-js 5.0.1 requires exactly 3.0.2 |
+| `@midnight-ntwrk/platform-js` | 3.0.0 | midnight-js 5.0.1 requires exactly 3.0.0 |
+| `@midnightntwrk/ledger-v9` | 1.0.2 | midnight-js 5.0.1 requires exactly 1.0.2. ledger-v9 1.0.0 prices some calls lower than the node does (error 138) |
+| Proof server | 9.0.2 | The prover must match the ledger version of the build (ledger 9.1.0.2) |
+| `effect` (Effect 4) | 4.1.3 | The SDK will bundle Effect 4. midnight-js keeps its own Effect 3 |
 | zkir crate | None yet | The prover must use the same revision to make the same keys |
 | midnight-zk crate | None yet | Same as zkir |
+
+Compact and the proof server are not npm packages. Their rows are not in the
+lockfile. The other npm rows are exact pins in the root `package.json`, except
+ledger-v9, which comes through midnight-js. The lockfile must agree.

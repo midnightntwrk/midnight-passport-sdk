@@ -12,3 +12,14 @@ trustPolicy: no-downgrade
 minimumReleaseAgeExclude:
   # Renovate security update: pnpm@10.34.4
   - pnpm@10.34.4
+  # midnight-js 5.0.1 and its pins are younger than 7 days, but they fix error 138.
+  # Remove these entries on 2026/11/25.
+  - '@midnight-ntwrk/midnight-js@5.0.1'
+  - '@midnight-ntwrk/midnight-js-contracts@5.0.1'
+  - '@midnight-ntwrk/midnight-js-protocol@5.0.1'
+  - '@midnight-ntwrk/midnight-js-types@5.0.1'
+  - '@midnight-ntwrk/midnight-js-utils@5.0.1'
+  - '@midnight-ntwrk/compact-js@3.0.2'
+  - '@midnightntwrk/ledger-v9@1.0.2'
+  - '@midnightntwrk/onchain-runtime-v4@4.0.2'
+  - '@midnightntwrk/wallet-sdk-address-format@4.0.1'
