@@ -4,6 +4,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
+import { EFFECT3_EXPORTS } from './effect3-exports.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
@@ -20,20 +21,6 @@ const BANNED_SPECIFIERS = [
   /^@midnight-ntwrk\/(compact-js|platform-js)(\/|$)/,
   /^@midnight-ntwrk\/midnight-js-/,
 ];
-
-// Values with an Effect 3 type, on midnight-js 5.0.1.
-/** @type {Record<string, string[]>} */
-const EFFECT3_EXPORTS = {
-  '@midnight-ntwrk/midnight-js': ['contracts', 'types'],
-  '@midnight-ntwrk/midnight-js/contracts': ['Ledger9ContractLog'],
-  '@midnight-ntwrk/midnight-js/protocol/v9': ['CompiledContract', 'ContractExecutable'],
-  '@midnight-ntwrk/midnight-js/types': [
-    'asContractAddress',
-    'asEffectOption',
-    'exitResultOrError',
-    'makeLedger9ContractExecutableRuntime',
-  ],
-};
 
 /**
  * Returns one message for each forbidden import in a workspace file.

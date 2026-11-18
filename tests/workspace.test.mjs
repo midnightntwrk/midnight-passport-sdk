@@ -4,6 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
+import { BUNDLED } from '../scripts/bundle-packages.mjs';
 
 /** @param {string} path */
 const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
@@ -79,11 +80,14 @@ test('package shape', async () => {
       { '.': { types: './dist/index.d.ts', default: './dist/index.js' } },
       `${dir}: one exports entry`,
     );
-    assert.deepEqual(
-      manifest.files,
-      ['dist', '!dist/.tsbuildinfo'],
-      `${dir}: only the build ships`,
-    );
+    // The bundle test checks what a bundled package ships.
+    if (!BUNDLED.includes(`packages/${dir}`)) {
+      assert.deepEqual(
+        manifest.files,
+        ['dist', '!dist/.tsbuildinfo'],
+        `${dir}: only the build ships`,
+      );
+    }
     const tests = await readdir(new URL(`../packages/${dir}/test`, import.meta.url));
     assert.ok(
       tests.some((file) => file.endsWith('.test.ts')),

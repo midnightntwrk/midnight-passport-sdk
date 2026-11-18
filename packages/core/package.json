@@ -12,11 +12,12 @@
     }
   },
   "files": [
-    "dist",
-    "!dist/.tsbuildinfo"
+    "dist/index.js",
+    "dist/index.js.map",
+    "dist/**/*.d.ts"
   ],
   "scripts": {
-    "build": "tsc -b tsconfig.test.json",
+    "build": "tsc -b tsconfig.test.json && node ../../scripts/bundle-packages.mjs",
     "test": "node --test \"dist-test/**/*.test.js\""
   },
   "dependencies": {
