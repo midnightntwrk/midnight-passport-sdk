@@ -21,8 +21,9 @@
 - **`connect` and `mn-passport-agent` never link `owner`.** Code that more than
   one entry library needs goes into `mn-passport-core`.
 - Most seams live in `mn-passport-core`, so that the three entry libraries
-  share one prover, one broadcast client, one key-provider interface, and one
-  WPP client. Recovery and DID stay behind `owner`.
+  share one prover, one broadcast client, one indexer client, one
+  key-provider interface, and one WPP client. Recovery and DID stay behind
+  `owner`.
 - **The WPP account key stays in `owner`.** The WPP client in
   `mn-passport-core` works with one package key that it was given, and never
   with the account key. Each storage backend is its own `adapter-wpp-<backend>`
@@ -89,14 +90,17 @@ All packages publish under the `@midnight-ntwrk/` scope.
 
 A seam is an interface with interchangeable adapters. A seam that more than one
 entry library uses lives in the foundation.
+[ADR 0011](./adr/0011-seam-list-and-indexer-seam.md) records the list. A
+transaction crosses a seam as serialized bytes: unproven, proven, or paid.
 
 | Seam | Shape (indicative) | Defined in | Used by | Implemented by |
 |---|---|---|---|---|
 | Key provider | `scheme`, `envelope`, `publicKey()`, `sign(challenge)` | `core` | All three | The key providers below |
 | Prover | `prove(unprovenTx, circuitIds) → provenTx` | `core` | All three | `adapter-prover-remote` |
-| Broadcast | `broadcast(provenTx)`, then monitor until final | `core` | All three | `adapter-broadcast` |
-| Fees | A sponsor pays, or a Capacity Exchange swap | `core` | All three | `adapter-broadcast` (sponsor), `adapter-fee-capacity-exchange` |
-| Platform | Network, WASM load order, WebAuthn or its Node.js equivalent | `core` | All three | `adapter-browser`, `adapter-nodejs` |
+| Fees | `pay(provenTx) → paidTx`: a sponsor pays, or a Capacity Exchange swap | `core` | All three | `adapter-broadcast` (sponsor), `adapter-fee-capacity-exchange` |
+| Broadcast | `submit(paidTx, until)`, with `until` as `in-block` or `final`, and a bounded wait | `core` | All three | `adapter-broadcast` |
+| Indexer | Contract state and transaction status, once or as a `StateSource` | `core` | All three | `adapter-indexer` |
+| Platform | HTTP, random bytes, WASM load order, a local store with a wipe, WebAuthn or its absence | `core` | All three | `adapter-browser`, `adapter-nodejs` |
 | Private state | An SDK-owned interface that matches the midnight-js `PrivateStateProvider` | `core` | `connect` (agents: open) | The WPP client in `core`, over the WPP package of the dApp |
 | Account metadata | Namespaced, versioned entries; read, merge, write, read back | `core` | `owner` | `adapter-waas` |
 | Registry | Get dApp artifacts by content hash, and verify them | `contract` | `mn-passport-agent` | The registry adapter |
@@ -162,7 +166,8 @@ foundation, never from `owner`.
 | Adapter | Seam | Note |
 |---|---|---|
 | `adapter-prover-remote` | Prover | Transaction in, proof out. The prover holds the proving keys, or makes them again from the ZKIR and the on-chain verifier key. |
-| `adapter-broadcast` | Broadcast, fees | Gives the proven transaction to the sponsor, which pays the fees and broadcasts it. Monitors until final, with bounded waits and resubmission. |
+| `adapter-broadcast` | Broadcast, fees | Gives the proven transaction to the sponsor, which pays the fees and returns the paid transaction. Submits it, and waits to the level that the caller asks for, with bounded waits and resubmission. |
+| `adapter-indexer` | Indexer | Reads from the indexer, and from the node for a block that the indexer has not reached yet. "Not found" is a value; an unreachable source is an error. |
 | `adapter-fee-capacity-exchange` | Fees | The other fee route: a swap through the Capacity Exchange. Planned for later. |
 | `adapter-browser` | Platform | The browser runtime: passkeys with PRF and the two WASM runtimes in the correct order. |
 | `adapter-nodejs` | Platform | The Node.js runtime for backends, `mn-passport-agent` included. |
