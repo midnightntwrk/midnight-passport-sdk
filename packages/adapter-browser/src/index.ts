@@ -2,6 +2,9 @@ import type { Platform } from '@midnight-ntwrk/mn-passport-core';
 import { fetchHttp } from './http.js';
 import { loadRuntimes } from './runtimes.js';
 import { indexedDbStore } from './store.js';
+import { browserWebAuthn } from './webauthn.js';
+
+export { WebAuthnError } from './webauthn.js';
 
 export interface BrowserPlatformOptions {
   /** The name of the IndexedDB database. */
@@ -35,6 +38,6 @@ export function browserPlatform(options: BrowserPlatformOptions = {}): Platform 
       return loading;
     },
     store: indexedDbStore(namespace),
-    webauthn: undefined,
+    webauthn: typeof PublicKeyCredential === 'function' ? browserWebAuthn : undefined,
   };
 }

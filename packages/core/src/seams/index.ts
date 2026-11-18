@@ -39,5 +39,6 @@ export type {
   WebAuthnCreated,
   WebAuthnCreateOptions,
   WebAuthnGetOptions,
+  WebAuthnPrfValues,
 } from './platform.js';
 export type { AccountMetadata, MetadataEntry } from './account-metadata.js';
