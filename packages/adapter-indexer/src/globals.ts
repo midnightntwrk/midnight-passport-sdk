@@ -1,5 +1,8 @@
+import type { WebSocketConstructorLike } from './subscription.js';
+
 // The package compiles with no platform types. Every supported runtime has these globals.
 interface Globals {
+  WebSocket?: WebSocketConstructorLike;
   setTimeout(callback: () => void, ms: number): unknown;
   clearTimeout(handle: unknown): void;
   TextDecoder: new (
@@ -18,3 +21,5 @@ export const clearTimer = (handle: unknown): void => platform.clearTimeout(handl
 /** Throws on bytes that are not UTF-8. */
 export const decodeUtf8 = (bytes: Uint8Array): string =>
   new platform.TextDecoder('utf-8', { fatal: true }).decode(bytes);
+
+export const globalWebSocket = (): WebSocketConstructorLike | undefined => platform.WebSocket;

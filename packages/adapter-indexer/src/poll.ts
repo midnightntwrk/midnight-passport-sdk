@@ -12,6 +12,10 @@ export interface Timing {
 }
 
 export interface Poller {
+  /** Reads at once. During a read, it reads once more after it. During an outage, it does nothing. */
+  readNow(): void;
+  /** While `slow`, the polling interval is `maxBackoffMs`. */
+  setSlow(slow: boolean): void;
   stop(): void;
 }
 
@@ -29,16 +33,24 @@ export function startPolling<A>(
   let failures = 0;
   let timer: unknown;
   let running: OwnSignal | undefined;
+  let again = false;
+  let slow = false;
+  const interval = (): number => (slow ? timing.maxBackoffMs : timing.pollMs);
 
   const next = (ms: number): void => {
     // A listener can unsubscribe inside `onValue` or `onError`.
     if (stopped) return;
     clearTimer(timer);
-    timer = setTimer(tick, ms);
+    timer = setTimer(tick, again ? 0 : ms);
+    again = false;
   };
 
   function tick(): void {
     if (stopped) return;
+    if (running) {
+      again = true;
+      return;
+    }
     const call = ownSignal();
     running = call;
     read({ signal: call.signal }).then(
@@ -46,7 +58,7 @@ export function startPolling<A>(
         if (stopped) return;
         running = undefined;
         failures = 0;
-        if (onValue(value)) next(timing.pollMs);
+        if (onValue(value)) next(interval());
         else stopped = true;
       },
       (error: unknown) => {
@@ -57,6 +69,8 @@ export function startPolling<A>(
           onError(error instanceof PassportError ? error : new IndexerUnreachableError('response'));
         }
         failures++;
+        // An event must not make a read go out before the backoff ends.
+        again = false;
         next(Math.min(timing.pollMs * 2 ** failures, timing.maxBackoffMs));
       },
     );
@@ -64,6 +78,15 @@ export function startPolling<A>(
 
   tick();
   return {
+    readNow() {
+      if (stopped || failures > 0) return;
+      if (running) again = true;
+      else next(0);
+    },
+    setSlow(value) {
+      slow = value;
+      if (!slow && !stopped && !running && failures === 0) next(timing.pollMs);
+    },
     stop() {
       stopped = true;
       clearTimer(timer);
