@@ -13,6 +13,11 @@ export interface WebSocketLike {
 
 export type WebSocketConstructorLike = new (url: string, protocols: string) => WebSocketLike;
 
+export interface SubscriptionTiming extends Timing {
+  /** After this quiet time the client sends a ping. With no message in 1.5 times it, the socket is dead. */
+  readonly keepAliveMs: number;
+}
+
 export interface ActionHandlers {
   readonly onAction: () => void;
   /** `true` while the subscription is acknowledged, `false` when its socket ends. */
@@ -28,7 +33,7 @@ const CONTRACT_ACTIONS_SUB = `subscription CONTRACT_ACTIONS_SUB($address: HexEnc
   contractActions(address: $address) { address }
 }`;
 
-function parse(data: unknown): { readonly type?: unknown } | undefined {
+function parse(data: unknown): { readonly type?: unknown; readonly payload?: unknown } | undefined {
   if (typeof data !== 'string' || data.length > MAX_FRAME_CHARS) return undefined;
   try {
     const message: unknown = JSON.parse(data);
@@ -38,6 +43,13 @@ function parse(data: unknown): { readonly type?: unknown } | undefined {
   }
 }
 
+const hasErrors = (payload: unknown): boolean =>
+  typeof payload === 'object' &&
+  payload !== null &&
+  'errors' in payload &&
+  payload.errors !== undefined &&
+  payload.errors !== null;
+
 /**
  * Calls `onAction` for each contract action at `address`. A closed or bad socket reconnects
  * with backoff, and reports nothing: the polling reports an indexer outage.
@@ -46,7 +58,7 @@ export function followContractActions(
   Socket: WebSocketConstructorLike,
   url: string,
   address: ContractAddress,
-  timing: Timing,
+  timing: SubscriptionTiming,
   { onAction, onLive }: ActionHandlers,
 ): () => void {
   let stopped = false;
@@ -75,9 +87,26 @@ export function followContractActions(
     socket = mine;
     let closed = false;
     let live = false;
+    // A socket that opens and never acknowledges must not stay open in silence.
+    const ackDeadline = setTimer(() => drop(), timing.maxBackoffMs);
+    let pingTimer: unknown;
+    let idleDeadline: unknown;
+    let stable: unknown;
+    // The indexer sends no keep-alive of its own and only answers a ping. Any message proves
+    // that the socket is alive. A socket can die with no close event.
+    const heard = (): void => {
+      clearTimer(pingTimer);
+      clearTimer(idleDeadline);
+      pingTimer = setTimer(() => send({ type: 'ping' }), timing.keepAliveMs);
+      idleDeadline = setTimer(() => drop(), timing.keepAliveMs * 1.5);
+    };
     const drop = (): void => {
       if (closed) return;
       closed = true;
+      clearTimer(ackDeadline);
+      clearTimer(pingTimer);
+      clearTimer(idleDeadline);
+      clearTimer(stable);
       mine.close();
       if (live) onLive(false);
       if (socket === mine) reconnect();
@@ -91,8 +120,18 @@ export function followContractActions(
       // An injected socket can still deliver a frame after the close.
       if (closed) return;
       const message = parse(event.data);
+      if (live) heard();
       switch (message?.type) {
         case 'connection_ack':
+          // A second ack is a protocol error. It would also set a second backoff timer.
+          if (live) {
+            drop();
+            return;
+          }
+          clearTimer(ackDeadline);
+          heard();
+          // Only a socket that stays up resets the backoff. A server can ack, send one event, and end.
+          stable = setTimer(() => (failures = 0), timing.maxBackoffMs);
           live = true;
           onLive(true);
           send({
@@ -107,6 +146,10 @@ export function followContractActions(
         case 'pong':
           return;
         case 'next':
+          if (hasErrors(message.payload)) {
+            drop();
+            return;
+          }
           onAction();
           return;
         default:

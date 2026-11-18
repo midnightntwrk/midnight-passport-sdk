@@ -33,6 +33,8 @@ export interface IndexerOptions {
   readonly pollMs?: number;
   /** Default: 30,000. */
   readonly maxBackoffMs?: number;
+  /** The quiet time before the subscription sends a ping. Default: 10,000. */
+  readonly keepAliveMs?: number;
 }
 
 // A block change alone does not emit: a state from the node has a new block at each block.
@@ -60,6 +62,7 @@ export function createIndexer(options: IndexerOptions): Indexer {
     pollMs: options.pollMs ?? 2_000,
     maxBackoffMs: options.maxBackoffMs ?? 30_000,
   };
+  const socketTiming = { ...timing, keepAliveMs: options.keepAliveMs ?? 10_000 };
   const webSocket = options.webSocket ?? globalWebSocket();
   const wsUrl = options.indexerWsUrl;
 
@@ -97,7 +100,7 @@ export function createIndexer(options: IndexerOptions): Indexer {
         const unfollow =
           wsUrl === undefined || webSocket === undefined
             ? undefined
-            : followContractActions(webSocket, wsUrl, address, timing, {
+            : followContractActions(webSocket, wsUrl, address, socketTiming, {
                 onAction: poller.readNow,
                 // The events come from final blocks only, so a node read keeps the normal polling.
                 onLive: options.nodeUrl === undefined ? poller.setSlow : () => undefined,

@@ -394,6 +394,8 @@ test('each subscription event reads the state, and a closed socket reconnects', 
 const endings: readonly (readonly [string, string])[] = [
   ['a bad frame', '{not json'],
   ['a frame over 16 MiB', JSON.stringify({ ...event, pad: ' '.repeat(16 * 1024 * 1024) })],
+  ['a next with errors', JSON.stringify({ ...event, payload: { errors: [{ message: 'x' }] } })],
+  ['a second acknowledgement', JSON.stringify({ type: 'connection_ack' })],
 ];
 
 for (const [name, frame] of endings) {
@@ -439,19 +441,29 @@ test('an event during a read starts one more read after it', async (t) => {
   assert.deepEqual(bytesOf(watch.values[1]), [2]);
 });
 
-test('a stop during a reconnect wait leaves no timer and opens no socket', async () => {
-  const before = timers();
-  const watch = socketWatch(async () => stateAnswer('01'), { pollMs: 60_000, maxBackoffMs: 20 });
-  await opened(0);
-  FakeSocket.all[0]?.close();
-  await flush();
-  // A socket timer is live beside the poll timer, so the check after the stop can fail.
-  assert.ok(timers() > before + 1);
-  watch.stop();
-  assert.equal(timers(), before);
-  await new Promise((resolve) => setTimeout(resolve, 40));
-  assert.equal(FakeSocket.all.length, 1);
-});
+const stopsDuring: readonly (readonly [string, (socket: FakeSocket) => void])[] = [
+  ['a reconnect wait', (socket) => socket.close()],
+  ['the wait for the acknowledgement', () => {}],
+  ['a live subscription', (socket) => socket.server({ type: 'connection_ack' })],
+];
+
+for (const [name, setUp] of stopsDuring) {
+  test(`a stop during ${name} leaves no timer and opens no socket`, async () => {
+    const before = timers();
+    const watch = socketWatch(async () => stateAnswer('01'), { pollMs: 60_000, maxBackoffMs: 20 });
+    await opened(0);
+    const socket = FakeSocket.all[0];
+    assert.ok(socket);
+    setUp(socket);
+    await flush();
+    // A socket timer is live beside the poll timer, so the check after the stop can fail.
+    assert.ok(timers() > before + 1);
+    watch.stop();
+    assert.equal(timers(), before);
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    assert.equal(FakeSocket.all.length, 1);
+  });
+}
 
 for (const node of [false, true]) {
   const name = node
@@ -507,4 +519,94 @@ test('an event during a read that fails does not end the backoff', async (t) => 
   pending[0]?.(down);
   await wait(30);
   assert.equal(pending.length, 1, 'a read went out before the backoff ended');
+});
+
+test('a socket with no acknowledgement ends after maxBackoffMs', async (t) => {
+  fakeTime(t);
+  const start = Date.now();
+  socketWatch(async () => stateAnswer('01'), { pollMs: 60_000, maxBackoffMs: 20 });
+  await until(() => FakeSocket.all[0]?.closed === true);
+  assert.equal(Date.now() - start, 20);
+});
+
+const pingsOf = (socket: FakeSocket) => socket.sent.filter((m) => m.type === 'ping').length;
+
+test('a silent socket gets a ping, and ends 1.5 times keepAliveMs after its last message', async (t) => {
+  fakeTime(t);
+  socketWatch(async () => stateAnswer('01'), { pollMs: 5, maxBackoffMs: 1_000, keepAliveMs: 20 });
+  const socket = await acked(0);
+  const ackAt = Date.now();
+  await wait(5);
+  assert.equal(pingsOf(socket), 0, 'a ping went out before the quiet time');
+  await until(() => pingsOf(socket) > 0);
+  await until(() => socket.closed);
+  assert.equal(Date.now() - ackAt, 30);
+  await until(() => FakeSocket.all.length === 2);
+  const pingsAtClose = pingsOf(socket);
+  socket.server({ type: 'pong' });
+  await wait(50);
+  assert.equal(pingsOf(socket), pingsAtClose, 'a closed socket sent a ping');
+});
+
+const keepAlive: readonly (readonly [
+  string,
+  (socket: FakeSocket) => () => void,
+  number,
+  readonly [number, number],
+])[] = [
+  [
+    'a socket that answers each ping',
+    (socket) => {
+      let answered = 0;
+      return () => {
+        if (pingsOf(socket) === answered) return;
+        answered = pingsOf(socket);
+        socket.server({ type: 'pong' });
+      };
+    },
+    2,
+    // About one ping for each 10 ms of quiet.
+    [3, 12],
+  ],
+  ['a socket with any message and no pong', (socket) => () => socket.server(event), 4, [0, 0]],
+];
+
+for (const [name, server, everyMs, [least, most]] of keepAlive) {
+  test(`${name} stays live`, async (t) => {
+    fakeTime(t);
+    socketWatch(async () => stateAnswer('01'), {
+      pollMs: 60_000,
+      maxBackoffMs: 1_000,
+      keepAliveMs: 10,
+    });
+    const socket = await acked(0);
+    const timer = setInterval(server(socket), everyMs);
+    // Six times the idle limit of 15 ms.
+    await wait(90);
+    clearInterval(timer);
+    assert.equal(socket.closed, false);
+    assert.equal(FakeSocket.all.length, 1);
+    assert.ok(pingsOf(socket) >= least && pingsOf(socket) <= most, `${pingsOf(socket)} pings`);
+  });
+}
+
+test('the backoff grows while each socket ends soon after its ack, and resets after a stable one', async (t) => {
+  fakeTime(t);
+  socketWatch(async () => stateAnswer('01'), { pollMs: 5, maxBackoffMs: 40 });
+  const at: number[] = [];
+  for (let n = 0; n < 5; n++) {
+    const socket = await acked(n);
+    at.push(Date.now());
+    if (n < 4) {
+      // A server can ack, send one event, and end.
+      socket.server(event);
+      socket.server({ id: '1', type: 'error', payload: [] });
+    } else {
+      await wait(41);
+      socket.close();
+    }
+  }
+  await opened(5);
+  at.push(Date.now());
+  assert.deepEqual(gaps(at), [10, 20, 40, 40, 51]);
 });
