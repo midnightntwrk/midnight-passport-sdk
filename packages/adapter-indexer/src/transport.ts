@@ -63,7 +63,8 @@ function readJson(response: HttpResponse): Data {
 
 /**
  * A caller abort rejects with `CancelledError`, also after the request started. Every other
- * failure rejects with `IndexerUnreachableError`.
+ * failure rejects with `IndexerUnreachableError`. The node read catches this error and does not
+ * pass it on.
  */
 export function postJson(endpoint: Endpoint, body: Data, options?: CallOptions): Promise<Data> {
   const caller = options?.signal;
