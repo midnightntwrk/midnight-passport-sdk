@@ -51,6 +51,20 @@ export async function bundle(contents, plugins = [passportWasm()], options = {})
   return { outdir, outputs: Object.keys(result.metafile.outputs) };
 }
 
+const root = fileURLToPath(new URL('..', import.meta.url));
+/** The esbuild settings of a dApp that depends on the packages: each name maps to its build. */
+export const appBuild = {
+  resolveDir: join(root, 'tests'),
+  alias: {
+    '@midnight-ntwrk/mn-passport-owner': join(root, 'packages/owner/dist/index.js'),
+    '@midnight-ntwrk/mn-passport-adapter-browser': join(
+      root,
+      'packages/adapter-browser/dist/index.js',
+    ),
+  },
+  nodePaths: [join(root, 'packages/adapter-browser/node_modules')],
+};
+
 // The servers, and the pages of a test that times out, close when the test ends.
 /** @type {Set<() => Promise<void>>} */
 const open = new Set();
@@ -62,9 +76,10 @@ const TYPES = { '.js': 'text/javascript', '.wasm': 'application/wasm' };
  * Serves the bundle and counts the WASM requests. A request to a route waits for it, then gets 204.
  * @param {string} outdir
  * @param {(url: string, wasmRequests: () => number) => Promise<void>} run
- * @param {{ routes: Record<string, () => Promise<void>>, host: string }} options
+ * @param {{ files: Record<string, Uint8Array>, routes: Record<string, () => Promise<void>>,
+ *   host: string }} options
  */
-async function serve(outdir, run, { routes, host }) {
+async function serve(outdir, run, { files, routes, host }) {
   let wasm = 0;
   /** @type {Error | undefined} */
   let failure;
@@ -75,6 +90,8 @@ async function serve(outdir, run, { routes, host }) {
       response.writeHead(200, { 'content-type': 'text/html' });
       return response.end('<script type="module" src="/page.js"></script>');
     }
+    const file = files[path];
+    if (file) return response.writeHead(200).end(file);
     const route = routes[path];
     if (route) return route().then(() => response.writeHead(204).end());
     if (contractRoutes(request, response)) return;
@@ -106,10 +123,11 @@ async function serve(outdir, run, { routes, host }) {
  * @param {string} bin
  * @param {string} contents
  * @param {{ expression?: string, before?: (page: Page) => Promise<void>,
+ *   build?: Parameters<typeof bundle>[2], files?: Record<string, Uint8Array>,
  *   routes?: Record<string, (page: Page) => Promise<void>>, host?: string }} [options]
  */
 export async function runPage(bin, contents, options = {}) {
-  const { expression = 'window.result', before, host = 'localhost' } = options;
+  const { expression = 'window.result', before, files = {}, host = 'localhost' } = options;
   /** @type {Page | undefined} */
   let opened;
   const routes = Object.fromEntries(
@@ -121,7 +139,7 @@ export async function runPage(bin, contents, options = {}) {
       },
     ]),
   );
-  const { outdir } = await bundle(contents);
+  const { outdir } = await bundle(contents, [passportWasm()], options.build);
   /** @type {{ value: unknown, errors: string[], wasmRequests: number }} */
   let out = { value: undefined, errors: [], wasmRequests: 0 };
   await serve(
@@ -145,7 +163,7 @@ export async function runPage(bin, contents, options = {}) {
         await page.close();
       }
     },
-    { routes, host },
+    { files, routes, host },
   );
   return out;
 }

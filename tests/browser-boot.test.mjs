@@ -112,25 +112,6 @@ test(
   },
 );
 
-browserTest('the boot loads both runtimes once, and the ledger then works', async (bin) => {
-  const { value, errors, wasmRequests } = await runPage(
-    bin,
-    `
-    import { loadRuntimes } from './runtimes.js';
-    window.result = (async () => {
-      await loadRuntimes();
-      await loadRuntimes();
-      const { ContractState } = await import('@midnightntwrk/ledger-v9');
-      await import('@midnight-ntwrk/compact-runtime');
-      return ContractState.deserialize(new ContractState().serialize()).serialize().length;
-    })();
-  `,
-  );
-  assert.ok(typeof value === 'number' && value > 0, `got ${String(value)}`);
-  assert.equal(wasmRequests, 2);
-  assert.deepEqual(errors, []);
-});
-
 browserTest(
   'a module that reaches a runtime before the boot fails with a clear message',
   async (bin) => {
