@@ -4,7 +4,17 @@ import type { PassportError } from '@midnight-ntwrk/mn-passport-core';
 import { sponsorFees } from '@midnight-ntwrk/mn-passport-adapter-broadcast';
 import { createStubPlatform } from '@midnight-ntwrk/mn-passport-dev';
 import { REFUSALS } from './fixtures/sponsor-answers.js';
-import { bind, hex, lastId, never, offline, provenTx, respond } from './support.js';
+import {
+  bind,
+  feeIntent,
+  hex,
+  never,
+  offline,
+  paymentId,
+  provenTx,
+  respond,
+  sponsorPays,
+} from './support.js';
 
 const URL = 'https://sponsor.example/api/midnight/sponsor';
 
@@ -26,9 +36,9 @@ async function rejection(run: () => Promise<unknown>): Promise<Refusal> {
   assert.fail('expected a rejection');
 }
 
-test('pay posts the proven bytes and returns the sponsor bytes with their last identifier', async () => {
+test('pay posts the proven bytes and returns the sponsor bytes with the fee identifier', async () => {
   const { platform, fees, tx } = await setup();
-  const paid = bind(tx.bytes);
+  const paid = await sponsorPays(tx.bytes);
   platform.answer(async () => respond(200, JSON.stringify({ tx: hex(paid) })));
   const before = Date.now();
   const result = await fees.pay(tx);
@@ -41,9 +51,87 @@ test('pay posts the proven bytes and returns the sponsor bytes with their last i
   assert.deepEqual(JSON.parse(String(request?.body)), { provenTx: hex(tx.bytes) });
   assert.equal(result.stage, 'paid');
   assert.deepEqual(result.bytes, paid);
-  assert.equal(result.id, lastId(paid));
+  assert.equal(result.id, paymentId(paid, tx.bytes));
   assert.ok(result.submitBy !== undefined);
   assert.ok(result.submitBy >= before + 50_000 && result.submitBy <= after + 50_000);
+});
+
+test('the id is the fee identifier, also when the last identifier is the proof one, and the fee ttl caps submitBy', async () => {
+  const { platform, fees, tx } = await setup();
+  const { Transaction } = await import('@midnightntwrk/ledger-v9');
+  const proofIds = Transaction.deserialize(
+    'signature',
+    'proof',
+    'pre-binding',
+    tx.bytes,
+  ).identifiers();
+  const lastIsProof = (bytes: Uint8Array) => {
+    const last = Transaction.deserialize('signature', 'proof', 'binding', bytes)
+      .identifiers()
+      .at(-1);
+    return last !== undefined && proofIds.includes(last);
+  };
+  // The merge order puts the proof's identifier last in about one payment of seven.
+  let paid = await sponsorPays(tx.bytes, 10_000);
+  for (let i = 0; i < 80 && !lastIsProof(paid); i++) paid = await sponsorPays(tx.bytes, 10_000);
+  assert.ok(lastIsProof(paid));
+  platform.answer(async () => respond(200, JSON.stringify({ tx: hex(paid) })));
+  const result = await fees.pay(tx);
+  assert.equal(result.id, paymentId(paid, tx.bytes));
+  assert.ok(!proofIds.includes(result.id));
+  assert.ok(result.submitBy !== undefined && result.submitBy <= Date.now() + 10_000);
+});
+
+test('the sponsor may add one fee intent, but not change, drop, or add a call', async () => {
+  const { platform, fees } = await setup();
+  const tx = await provenTx({ deploy: true });
+  const fee = await feeIntent();
+  const other = (await provenTx({ deploy: true })).bytes;
+  const added = (await provenTx({ deploy: true, randomSegment: true })).bytes;
+  const unshielded = async (kind: 'guaranteed' | 'fallible') =>
+    (await provenTx({ randomSegment: true, ttlMs: 60_000, unshielded: kind })).bytes;
+  const answer = (bytes: Uint8Array) => async () =>
+    respond(200, JSON.stringify({ tx: hex(bytes) }));
+
+  platform.answer(answer(bind(tx.bytes, fee)));
+  assert.equal((await fees.pay(tx)).stage, 'paid');
+  for (const [name, bytes] of [
+    ['a swapped call', bind(other, fee)],
+    ['an added call', bind(tx.bytes, added)],
+    ['a dropped intent', bind(fee)],
+    ['two fee intents', bind(tx.bytes, fee, await feeIntent())],
+    ['a guaranteed unshielded offer', bind(tx.bytes, await unshielded('guaranteed'))],
+    ['a fallible unshielded offer', bind(tx.bytes, await unshielded('fallible'))],
+  ] as const) {
+    platform.answer(answer(bytes));
+    const error = await rejection(() => fees.pay(tx));
+    assert.equal(error._tag, 'SponsorAlteredError', name);
+    assert.equal(error.action, 'stop');
+  }
+});
+
+test('the offer checks refuse an added, a dropped, or a changed shielded offer', async () => {
+  const { keepsProven } = await import('../dist/sponsor-fees.js');
+  const L = await import('@midnightntwrk/ledger-v9');
+  const intent = L.Intent.new(new Date(Date.now() + 600_000)).addDeploy(
+    new L.ContractDeploy(new L.ContractState()),
+  );
+  const coin = L.createShieldedCoinInfo(L.sampleRawTokenType(), 5n);
+  const output = () =>
+    L.ZswapOutput.new(coin, 0, L.sampleCoinPublicKey(), L.sampleEncryptionPublicKey());
+  const offer = () => L.ZswapOffer.fromOutput(output(), coin.type, coin.value);
+  const make = (guaranteed?: ReturnType<typeof offer>, fallible?: ReturnType<typeof offer>) =>
+    L.Transaction.fromParts('undeployed', guaranteed, fallible, intent).mockProve();
+  // A shielded output needs a real proof, so bound transactions stand in for the proven one.
+  const check = keepsProven as unknown as (a: unknown, b: unknown) => boolean;
+  const plain = make();
+  assert.equal(check(plain, make()), true);
+  assert.equal(check(plain, make(offer())), false);
+  assert.equal(check(plain, make(undefined, offer())), false);
+  assert.equal(check(make(offer()), plain), false);
+  // Same count, other content: each sample key pair makes a different output.
+  assert.equal(check(make(offer()), make(offer())), false);
+  assert.equal(check(make(undefined, offer()), make(undefined, offer())), false);
 });
 
 for (const [answer, expected] of REFUSALS) {
@@ -104,11 +192,14 @@ test('an unproven transaction throws TypeError before any request', async () => 
   assert.equal(platform.requests.length, 0);
 });
 
-test('a runtime that fails to load sends no request', async () => {
-  const { platform, fees, tx } = await setup();
-  platform.loadFails(new Error('no WASM'));
-  assert.equal((await rejection(() => fees.pay(tx)))._tag, 'UpstreamError');
-  assert.equal(platform.requests.length, 0);
+test('a runtime that fails or never loads sends no request', async () => {
+  for (const broken of ['loadFails', 'loadHangs'] as const) {
+    const { platform, fees, tx } = await setup({ requestTimeoutMs: 20 });
+    if (broken === 'loadFails') platform.loadFails(new Error('no WASM'));
+    else platform.loadHangs();
+    assert.equal((await rejection(() => fees.pay(tx)))._tag, 'UpstreamError');
+    assert.equal(platform.requests.length, 0);
+  }
 });
 
 // The fees contract checks the CancelledError; this checks what reaches the network.

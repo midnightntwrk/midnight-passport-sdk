@@ -1,1 +1,1 @@
-export { sponsorFees, type SponsorFeesOptions } from './sponsor-fees.js';
+export { SponsorAlteredError, sponsorFees, type SponsorFeesOptions } from './sponsor-fees.js';

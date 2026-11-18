@@ -1,16 +1,23 @@
+import type {
+  Binding,
+  Intent,
+  PreBinding,
+  Proof,
+  SignatureEnabled,
+  Transaction,
+} from '@midnightntwrk/ledger-v9';
 import {
   CancelledError,
+  RefusalError,
   SponsorUnavailableError,
-  UpstreamError,
   sponsorRefusal,
-  type AbortSignalLike,
   type Fees,
   type HttpResponse,
-  type PaidTransaction,
   type Platform,
   type SponsorAnswer,
 } from '@midnight-ntwrk/mn-passport-core';
 import { checkMs, checkUrl } from './host.js';
+import { earliestTtl, loadLedger, type Ledger } from './ledger.js';
 import { field, fromHex, header, json, send, toHex } from './request.js';
 
 export interface SponsorFeesOptions {
@@ -28,7 +35,20 @@ const DEFAULT_PAYMENT_TTL_MS = 50_000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 const ID = /^(?:[0-9a-f]{2})+$/;
 
-type Ledger = typeof import('@midnightntwrk/ledger-v9');
+/** The sponsor's answer dropped or changed a part of the proven transaction. */
+export class SponsorAlteredError extends RefusalError {
+  static {
+    this.prototype.name = 'SponsorAlteredError';
+  }
+
+  readonly _tag = 'SponsorAlteredError' as const;
+  readonly code = 'SPONSOR_ALTERED' as const;
+  readonly action = 'stop' as const;
+
+  constructor() {
+    super('The sponsor changed the transaction.');
+  }
+}
 
 /**
  * Each call asks the sponsor once. `pay` throws `TypeError` for bytes that are
@@ -49,8 +69,8 @@ export function sponsorFees(options: SponsorFeesOptions): Fees {
       const signal = callOptions?.signal;
       if (signal?.aborted) throw new CancelledError('caller');
       // The ledger loads before the request, so a load failure locks no fee coin.
-      const ledger = await loadLedger(platform, signal);
-      requireProven(ledger, tx.bytes);
+      const ledger = await loadLedger(platform, signal, requestTimeoutMs);
+      const proven = requireProven(ledger, tx.bytes);
       const startedAt = Date.now();
       const answer = await send(
         platform,
@@ -68,32 +88,24 @@ export function sponsorFees(options: SponsorFeesOptions): Fees {
       const body = json(answer.response.body);
       const refusal = sponsorRefusal(sponsorAnswer(answer.response, body));
       if (refusal) throw refusal;
-      const paid = readPaid(ledger, body);
+      const paid = readPaid(ledger, body, new Set(proven.identifiers()));
       if (!paid) throw new SponsorUnavailableError('stop', answer.response.status);
-      return { stage: 'paid', ...paid, submitBy: startedAt + paymentTtlMs };
+      if (!keepsProven(proven, paid.tx)) throw new SponsorAlteredError();
+      // The sponsor's fee intent expires with its coin lock, so its ttl can come first.
+      const ttl = earliestTtl(paid.tx.intents);
+      const submitBy = Math.min(startedAt + paymentTtlMs, ttl ?? Number.POSITIVE_INFINITY);
+      return { stage: 'paid', bytes: paid.bytes, id: paid.id, submitBy };
     },
   };
 }
 
-// An abort ends the wait at once, and a load failure keeps no upstream text.
-function loadLedger(platform: Platform, signal: AbortSignalLike | undefined): Promise<Ledger> {
-  const fail = (sourceTag: string) => () => {
-    throw new UpstreamError({ sourceTag });
-  };
-  const load = platform
-    .loadRuntimes()
-    .then(() => import('@midnightntwrk/ledger-v9').catch(fail('ledger-v9')), fail('loadRuntimes'));
-  return new Promise<Ledger>((resolve, reject) => {
-    const onAbort = (): void => reject(new CancelledError('caller'));
-    signal?.addEventListener('abort', onAbort);
-    load.then(resolve, reject).finally(() => signal?.removeEventListener('abort', onAbort));
-  });
-}
-
 // An unproven transaction shows its private inputs to the sponsor.
-function requireProven(ledger: Ledger, bytes: Uint8Array): void {
+function requireProven(
+  ledger: Ledger,
+  bytes: Uint8Array,
+): Transaction<SignatureEnabled, Proof, PreBinding> {
   try {
-    ledger.Transaction.deserialize('signature', 'proof', 'pre-binding', bytes);
+    return ledger.Transaction.deserialize('signature', 'proof', 'pre-binding', bytes);
   } catch {
     throw new TypeError('The transaction is not a proven, unbound transaction.');
   }
@@ -118,19 +130,47 @@ function retryAfter(value: string | undefined): number | undefined {
   return Number.isNaN(at) ? undefined : Math.max(0, at - Date.now());
 }
 
-function readPaid(
-  ledger: Ledger,
-  body: unknown,
-): Pick<PaidTransaction, 'bytes' | 'id'> | undefined {
+// Every payment of one proof keeps the proof's identifiers, so the payment's
+// own identifier is the one that the sponsor's fee intent adds.
+function readPaid(ledger: Ledger, body: unknown, proven: ReadonlySet<string>) {
   const hex = field(body, 'tx');
   const bytes = typeof hex === 'string' ? fromHex(hex) : undefined;
   if (!bytes) return undefined;
-  let ids: readonly string[];
+  let tx: Transaction<SignatureEnabled, Proof, Binding>;
   try {
-    ids = ledger.Transaction.deserialize('signature', 'proof', 'binding', bytes).identifiers();
+    tx = ledger.Transaction.deserialize('signature', 'proof', 'binding', bytes);
   } catch {
     return undefined;
   }
-  const id = ids.at(-1);
-  return id !== undefined && ID.test(id) ? { bytes, id } : undefined;
+  const id = tx.identifiers().find((each) => !proven.has(each));
+  return id !== undefined && ID.test(id) ? { bytes, id, tx } : undefined;
+}
+
+const sameOffer = (a: { serialize(): Uint8Array } | undefined, b: typeof a): boolean =>
+  (a && toHex(a.serialize())) === (b && toHex(b.serialize()));
+
+// An intent hash does not change with the binding. It is exported for a test: a shielded
+// offer needs a real proof, so a test cannot reach this check through `pay`.
+export function keepsProven(
+  proven: Transaction<SignatureEnabled, Proof, PreBinding>,
+  paid: Transaction<SignatureEnabled, Proof, Binding>,
+): boolean {
+  const mine = proven.intents ?? new Map<number, Intent<SignatureEnabled, Proof, PreBinding>>();
+  for (const [segment, intent] of mine) {
+    if (paid.intents?.get(segment)?.intentHash(segment) !== intent.intentHash(segment))
+      return false;
+  }
+  // The policy lets the sponsor add one DUST-only intent, and nothing else.
+  const added = [...(paid.intents ?? [])].filter(([segment]) => !mine.has(segment));
+  const feeOnly = ([, intent]: (typeof added)[number]): boolean =>
+    intent.actions.length === 0 &&
+    !intent.guaranteedUnshieldedOffer &&
+    !intent.fallibleUnshieldedOffer;
+  if (added.length > 1 || !added.every(feeOnly)) return false;
+  const fallible = [...(proven.fallibleOffer ?? [])];
+  return (
+    sameOffer(proven.guaranteedOffer, paid.guaranteedOffer) &&
+    fallible.length === (paid.fallibleOffer?.size ?? 0) &&
+    fallible.every(([segment, offer]) => sameOffer(offer, paid.fallibleOffer?.get(segment)))
+  );
 }
