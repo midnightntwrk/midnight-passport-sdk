@@ -1,3 +1,5 @@
+import { NetworkError } from '@midnight-ntwrk/mn-passport-core';
+
 type Glue = Record<string, Record<string, (...args: unknown[]) => unknown>>;
 
 /** The plugin's generated modules read this registry. */
@@ -13,7 +15,9 @@ function globalMap<V>(name: string): Map<string, V> {
 }
 
 async function compile(url: string): Promise<WebAssembly.Module> {
-  const response = await fetch(url);
+  const response = await fetch(url).catch(() => {
+    throw new NetworkError();
+  });
   if (!response.ok) throw new Error(`A runtime WASM file answered ${response.status}.`);
   if (response.headers.get('content-type') === 'application/wasm') {
     return WebAssembly.compileStreaming(response);

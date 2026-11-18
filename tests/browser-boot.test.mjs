@@ -95,10 +95,12 @@ test(
   { timeout: 10_000 },
   async (t) => {
     await flakyWasm(t, async (url, requests) => {
-      const page = "export { loadRuntimes } from './runtimes.js';";
-      const { loadRuntimes } = /** @type {{ loadRuntimes: () => Promise<void> }} */ (
-        await importStubbed(page, url)
-      );
+      const page = "export { browserPlatform } from './index.js';";
+      const stubbed =
+        /** @type {{ browserPlatform: () => { loadRuntimes: () => Promise<void> } }} */ (
+          await importStubbed(page, url)
+        );
+      const { loadRuntimes } = stubbed.browserPlatform();
       /** @type {string[]} */
       const order = [];
       Reflect.set(globalThis, 'mnPassportOrder', order);
