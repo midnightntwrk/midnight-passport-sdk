@@ -24,7 +24,8 @@ test('the repo is a private pnpm workspace over packages/*', async () => {
 
 test('the Node baseline agrees across manifest, .nvmrc, and the CI gate', async () => {
   assert.ok(root.engines, 'root manifest must declare engines');
-  assert.equal(root.engines.node, '>=22.1');
+  // The tests use `module.registerHooks`, which came in 22.15.
+  assert.equal(root.engines.node, '>=22.15');
   assert.equal((await read('../.nvmrc')).trim(), '22');
   const workflow = await read('../.github/workflows/pr-checks.yml');
   const pins = [...workflow.matchAll(/node-version(?:-file)?:\s*(.+)/g)].map((m) =>
