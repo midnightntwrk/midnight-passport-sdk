@@ -1,2 +1,1 @@
-// @midnight-ntwrk/mn-passport-adapter-indexer: empty until its first story lands.
-export {};
+export { createIndexer, type IndexerOptions } from './indexer.js';

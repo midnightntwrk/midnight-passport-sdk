@@ -4,17 +4,20 @@ import type {
   AbortSignalLike,
   HttpRequest,
   HttpResponse,
+  Lookup,
   PassportError,
   StateSource,
 } from '@midnight-ntwrk/mn-passport-core';
-import { createIndexer } from '../dist/indexer.js';
-import { INDEXER_URL, ok } from './fakes.js';
+import { createIndexer } from '@midnight-ntwrk/mn-passport-adapter-indexer';
+import { INDEXER_URL, NODE_URL, block, nodeWith, ok, route, stateAnswer } from './fakes.js';
 
 const id = 'cd'.repeat(32);
 
 const down: HttpResponse = { status: 503, headers: {}, body: new Uint8Array() };
-const block = (height: number) => ({ height, hash: height.toString(16).padStart(64, '0') });
 const none = ok({ data: { transactions: [] } });
+const address = 'ab'.repeat(32);
+const bytesOf = (lookup: Lookup<{ readonly bytes: Uint8Array }> | undefined) =>
+  lookup?.found ? [...lookup.value.bytes] : undefined;
 
 let clock: TestContext['mock']['timers'] | undefined;
 /** Each test runs on fake time, so a busy machine cannot change what it sees. */
@@ -72,7 +75,10 @@ function counting(answer: (n: number) => HttpResponse) {
 
 type Http = (request: HttpRequest) => Promise<HttpResponse>;
 const outages: readonly (readonly [string, (http: Http) => StateSource<unknown>, HttpResponse])[] =
-  [['transaction', (http) => indexer(http).watchTransaction(id), none]];
+  [
+    ['transaction', (http) => indexer(http).watchTransaction(id), none],
+    ['contract', (http) => indexer(http).watchContract(address), stateAnswer('01')],
+  ];
 
 for (const [name, watchOf, answer] of outages) {
   test(`after an outage the same ${name} value emits again, and each outage is reported`, async (t) => {
@@ -187,4 +193,103 @@ test('a transaction watch stops polling at final, and a new subscriber gets fina
   await until(() => second.values.length > 0);
   second.stop();
   assert.equal(second.values[0]?.found && second.values[0].value.level, 'final');
+});
+
+test('a watch emits only when "found" or the bytes change, and stops polling after the unsubscribe', async (t) => {
+  fakeTime(t);
+  const answers = [
+    stateAnswer(null),
+    stateAnswer('01', 5),
+    stateAnswer('01', 6),
+    stateAnswer('02'),
+  ];
+  const fake = counting((n) => answers[Math.min(n, answers.length - 1)] ?? down);
+  const watch = record(indexer(fake.http).watchContract(address));
+  await until(() => fake.calls > answers.length);
+  watch.stop();
+  const stoppedAt = fake.calls;
+  assert.deepEqual(
+    watch.values.map((v) => (v.found ? [...v.value.bytes] : 'none')),
+    ['none', [1], [2]],
+  );
+  await wait(30);
+  assert.equal(fake.calls, stoppedAt);
+});
+
+/** For each indexer read, its answer, and the node's state and block or `fail` for a network error. */
+function chain(
+  steps: readonly {
+    readonly indexer: HttpResponse;
+    readonly node: 'fail' | readonly [string, number];
+  }[],
+): Http {
+  let read = -1;
+  const step = () => steps[Math.min(read, steps.length - 1)];
+  const node = nodeWith(undefined, 0);
+  node.on('midnight_contractState', () => {
+    const now = step()?.node;
+    return { result: typeof now === 'object' ? now[0] : undefined };
+  });
+  return route(
+    async () => {
+      read++;
+      return step()?.indexer ?? down;
+    },
+    async (request) => {
+      const now = step()?.node ?? 'fail';
+      if (now === 'fail') throw new Error('ECONNREFUSED');
+      while (node.best().height < now[1]) node.addBlock();
+      return node.http(request);
+    },
+  );
+}
+
+test('a node failure never makes a contract from the node read as missing', async (t) => {
+  fakeTime(t);
+  const http = chain([
+    { indexer: stateAnswer(null, 5, 10), node: ['aa', 12] },
+    { indexer: stateAnswer(null, 5, 10), node: 'fail' },
+    { indexer: stateAnswer(null, 5, 11), node: 'fail' },
+    { indexer: stateAnswer('aa', 12, 12), node: 'fail' },
+  ]);
+  const watch = record(indexer(http, { nodeUrl: NODE_URL }).watchContract(address));
+  await wait(40);
+  watch.stop();
+  assert.deepEqual(
+    watch.values.map((v) => (v.found ? [...v.value.bytes] : 'none')),
+    [[0xaa]],
+  );
+});
+
+test('the bytes do not go back before the indexer reaches the node block', async (t) => {
+  fakeTime(t);
+  const http = chain([
+    { indexer: stateAnswer('0a', 5, 10), node: ['0b', 12] },
+    { indexer: stateAnswer('0a', 5, 10), node: 'fail' },
+    { indexer: stateAnswer('0a', 5, 11), node: ['0b', 13] },
+    { indexer: stateAnswer('0a', 5, 13), node: 'fail' },
+  ]);
+  const watch = record(indexer(http, { nodeUrl: NODE_URL }).watchContract(address));
+  await wait(40);
+  watch.stop();
+  // The indexer at block 13 still has 0a, so the node's 0b was reverted.
+  assert.deepEqual(
+    watch.values.map((v) => bytesOf(v)),
+    [[0x0b], [0x0a]],
+  );
+});
+
+test('after a reorg, a node answer past the held block replaces the held bytes', async (t) => {
+  fakeTime(t);
+  const http = chain([
+    { indexer: stateAnswer('aa', 5, 10), node: ['bb', 12] },
+    { indexer: stateAnswer('aa', 5, 10), node: ['aa', 13] },
+  ]);
+  const watch = record(indexer(http, { nodeUrl: NODE_URL }).watchContract(address));
+  await wait(20);
+  watch.stop();
+  assert.deepEqual(
+    watch.values.map((v) => bytesOf(v)),
+    [[0xbb], [0xaa]],
+  );
 });
