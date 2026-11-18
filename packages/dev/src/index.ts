@@ -14,3 +14,14 @@ export {
 export { createStubProver, type StubProver } from './stubs/prover.js';
 export { keyProviderContract, type KeyProviderHarness } from './contracts/key-provider.js';
 export { proverContract, type ProverHarness } from './contracts/prover.js';
+export { createStubFees, type StubFees } from './stubs/fees.js';
+export {
+  createStubNode,
+  type RpcAnswer,
+  type RpcMethod,
+  type StubNode,
+} from './stubs/node.js';
+export { createStubChain, type StubChain } from './stubs/chain.js';
+export { createStubBroadcast } from './stubs/broadcast.js';
+export { feesContract, type FeesHarness } from './contracts/fees.js';
+export { broadcastContract, type BroadcastHarness } from './contracts/broadcast.js';
