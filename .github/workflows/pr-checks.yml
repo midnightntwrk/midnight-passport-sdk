@@ -22,6 +22,7 @@ jobs:
       - name: Check net changed lines against the budget
         env:
           BASE_REF: ${{ github.base_ref }}
+          PR_BODY: ${{ github.event.pull_request.body }}
         run: bash mn-passport-skills/scripts/check-diff-size.sh "origin/$BASE_REF" --ci
 
   dep-cooldown:
