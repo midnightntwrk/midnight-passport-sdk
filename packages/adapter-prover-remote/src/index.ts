@@ -1,2 +1,8 @@
-// @midnight-ntwrk/mn-passport-adapter-prover-remote: empty until its first story lands.
-export {};
+export {
+  ProverBusyError,
+  ProverRejectedError,
+  ProverUnauthorizedError,
+  ProverUnavailableError,
+  type ProverRejectedReason,
+} from './errors.js';
+export type { KeyLocation } from './key-location.js';
