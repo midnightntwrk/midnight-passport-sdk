@@ -1,6 +1,6 @@
 # Midnight Passport SDK architecture
 
-> **Status:** draft · 2026/11/17
+> **Status:** draft · 2026/11/18
 > **Owns:** the packages, the seams, the adapters, and the dependency rules of
 > the SDK.
 > **Companions:** [`sdk-requirements.md`](./sdk-requirements.md) (what the SDK
@@ -97,7 +97,7 @@ entry library uses lives in the foundation.
 | Broadcast | `broadcast(provenTx)`, then monitor until final | `core` | All three | `adapter-broadcast` |
 | Fees | A sponsor pays, or a Capacity Exchange swap | `core` | All three | `adapter-broadcast` (sponsor), `adapter-fee-capacity-exchange` |
 | Platform | Network, WASM load order, WebAuthn or its Node.js equivalent | `core` | All three | `adapter-browser`, `adapter-nodejs` |
-| Private state | The midnight-js `PrivateStateProvider` | `core` | `connect` (agents: open) | The WPP client in `core`, over the WPP package of the dApp |
+| Private state | An SDK-owned interface that matches the midnight-js `PrivateStateProvider` | `core` | `connect` (agents: open) | The WPP client in `core`, over the WPP package of the dApp |
 | Account metadata | Namespaced, versioned entries; read, merge, write, read back | `core` | `owner` | `adapter-waas` |
 | Registry | Get dApp artifacts by content hash, and verify them | `contract` | `mn-passport-agent` | The registry adapter |
 | Multi-chain | Submit an authorized intent for a different chain, then report its settlement or its failure | `core` | All three | `adapter-multi-chain` |
@@ -139,10 +139,20 @@ The EVM wallet needs a new k256 envelope for EIP-191, and the Solana wallet
 needs an Ed25519 arm. The contract team adds these arms. Then the key-provider
 interface gets the new scheme or envelope.
 
+## Implementation library and public shapes
+
+Only `mn-passport-core` uses Effect 4, and it bundles Effect 4 into its dist.
+One adapter file in `core` meets the Effect 3 of midnight-js. The public API is
+Promises and plain types. Errors from `core`, the entry libraries, and the
+adapters extend `PassportError`, and an observable read is a `StateSource<A>`. [ADR 0010](./adr/0010-effect-4-bundled-inside-core.md)
+has the rules.
+
 ## Adapters
 
 Each adapter implements one seam. It depends only on the package that defines
-the seam and on its own provider SDK.
+the seam and on its own provider SDK. When midnight-js is its provider SDK, the
+adapter uses its Promise APIs and returns Promises. `core` wraps each seam call
+that it makes in Effect 4.
 
 ### Shared adapters
 
