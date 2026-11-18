@@ -5,7 +5,7 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { bundle } from './chromium.mjs';
+import { browserTest, bundle, runPage } from './chromium.mjs';
 import { listen } from './server.mjs';
 
 const EMPTY_WASM = new Uint8Array([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]);
@@ -107,5 +107,33 @@ test(
       assert.equal(requests(), 2);
       assert.deepEqual(order, ['@midnight-ntwrk/compact-runtime', '@midnightntwrk/ledger-v9']);
     });
+  },
+);
+
+browserTest('the boot loads both runtimes once, and the ledger then works', async (bin) => {
+  const { value, errors, wasmRequests } = await runPage(
+    bin,
+    `
+    import { loadRuntimes } from './runtimes.js';
+    window.result = (async () => {
+      await loadRuntimes();
+      await loadRuntimes();
+      const { ContractState } = await import('@midnightntwrk/ledger-v9');
+      await import('@midnight-ntwrk/compact-runtime');
+      return ContractState.deserialize(new ContractState().serialize()).serialize().length;
+    })();
+  `,
+  );
+  assert.ok(typeof value === 'number' && value > 0, `got ${String(value)}`);
+  assert.equal(wasmRequests, 2);
+  assert.deepEqual(errors, []);
+});
+
+browserTest(
+  'a module that reaches a runtime before the boot fails with a clear message',
+  async (bin) => {
+    const page = "import { ContractState } from '@midnightntwrk/ledger-v9'; ContractState;";
+    const { errors } = await runPage(bin, page);
+    assert.match(errors.join('\n'), /Call loadRuntimes\(\) before you import a module/);
   },
 );
