@@ -65,8 +65,9 @@ compatibility matrix) and `mn-passport-skills:devenv`.
   registry config (`@midnight-ntwrk/*` are on public npm).
 - **Registers gitignored** (`.mn-passport-skills/`); **`STATE.md` committed**.
 - **Tranche budget** ≤ 400 net changed lines soft, 600 hard — enforced in
-  the loop (plan estimates and `pr-open` split); CI reports it as advisory
-  warnings, and merging an exceptional over-budget PR is a human decision.
+  the loop (plan estimates and `pr-open` split). CI warns at 400 and fails
+  above 600. A `Budget-override: <reason>` line in the PR body turns an
+  above-600 failure into a warning that passes.
 
 ## Normative MUSTs (`conformance` checks these)
 

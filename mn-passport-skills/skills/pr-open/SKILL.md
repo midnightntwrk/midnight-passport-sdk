@@ -18,9 +18,12 @@ bash mn-passport-skills/scripts/check-diff-size.sh   # same script and numbers a
 ```
 
 - **> 600** net changed lines (lockfiles/generated/fixtures/experiments excluded):
-  stop and split. Propose a split along reviewable concerns — by layer
-  (foundation / core / adapter), by flow, or by file group — such that each
-  part builds and tests green on its own.
+  CI fails. Split along reviewable concerns: by layer (foundation / core /
+  adapter), by flow, or by file group. Each part must build and test green on
+  its own. If the diff cannot split, such as a migration, add a
+  `Budget-override: <reason>` line to the PR body. CI then warns and passes.
+  The local check reads no PR body, so it always fails above 600. To confirm
+  the override, run it with `PR_BODY='Budget-override: <reason>'` set.
 - **> 400**: warn and suggest a split; proceeding is allowed only with a
   one-line justification recorded in the PR description's Size section.
 
