@@ -48,19 +48,26 @@ export interface Call {
   readonly deadlineAt: number;
   /** The error that ended the call, once it ended. */
   ended(): PassportError | undefined;
+  /** Ends the call with `error`, unless it already ended. */
+  fail(error: PassportError): void;
   /** Call it once the call settles. Work still in flight then rejects with `CancelledError`. */
   close(): void;
 }
 
 /** Throws `RangeError` unless `timeoutMs` is an integer from 0 to 2 147 483 647. */
+export function checkTimeout(timeoutMs: number): void {
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 0 || timeoutMs > MAX_TIMEOUT_MS) {
+    throw new RangeError(`The timeout must be an integer from 0 to ${MAX_TIMEOUT_MS} ms.`);
+  }
+}
+
+/** Throws as `checkTimeout` does. */
 export function openCall(
   signal: AbortSignalLike | undefined,
   timeoutMs: number,
   clock: Clock = hostClock,
 ): Call {
-  if (!Number.isInteger(timeoutMs) || timeoutMs < 0 || timeoutMs > MAX_TIMEOUT_MS) {
-    throw new RangeError(`The timeout must be an integer from 0 to ${MAX_TIMEOUT_MS} ms.`);
-  }
+  checkTimeout(timeoutMs);
   const controller = new host.AbortController();
   let reason: PassportError | undefined;
   const end = (error: PassportError): void => {
@@ -76,6 +83,7 @@ export function openCall(
     signal: controller.signal,
     deadlineAt: clock.now() + timeoutMs,
     ended: () => reason,
+    fail: end,
     close() {
       clock.clearTimeout(timer);
       signal?.removeEventListener('abort', onAbort);
@@ -86,7 +94,7 @@ export function openCall(
 
 // Starts no work on an ended call. Rejects with the call's error once the call
 // ends, even if the work never settles, and also when the work settles after it.
-function untilEnded<A>(call: Call, start: () => Promise<A>): Promise<A> {
+export function untilEnded<A>(call: Call, start: () => Promise<A>): Promise<A> {
   return new Promise<A>((resolve, reject) => {
     const ended = call.ended();
     if (ended !== undefined) return reject(ended);

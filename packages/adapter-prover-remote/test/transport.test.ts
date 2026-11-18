@@ -3,12 +3,19 @@ import assert from 'node:assert/strict';
 import { setImmediate } from 'node:timers';
 import { inspect } from 'node:util';
 import {
+  CancelledError,
   NetworkError,
   PassportError,
   type HttpRequest,
   type HttpResponse,
 } from '@midnight-ntwrk/mn-passport-core';
-import { createTransport, openCall, serviceUrl, type Clock } from '../dist/transport.js';
+import {
+  createTransport,
+  openCall,
+  serviceUrl,
+  untilEnded,
+  type Clock,
+} from '../dist/transport.js';
 
 // Virtual time: when the process is idle, the earliest timer fires and the clock jumps to it.
 function virtualClock(
@@ -235,6 +242,13 @@ test('close clears the deadline timer and the caller listener', async () => {
   assert.equal(listeners, 0);
   assert.equal(clock.pending(), 0);
   assert.equal(call.signal.aborted, true);
+});
+
+test('close rejects work still in flight with CancelledError, never with undefined', async () => {
+  const call = openCall(undefined, 1000, virtualClock());
+  const pending = untilEnded(call, () => new Promise<never>(() => {}));
+  call.close();
+  await assert.rejects(pending, (error) => error instanceof CancelledError);
 });
 
 test('a timeout that a host timer cannot hold throws RangeError', () => {
