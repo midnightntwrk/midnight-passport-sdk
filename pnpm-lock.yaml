@@ -77,6 +77,9 @@ importers:
       '@midnight-ntwrk/mn-passport-core':
         specifier: workspace:*
         version: link:../core
+      '@midnightntwrk/ledger-v9':
+        specifier: 1.0.2
+        version: 1.0.2
 
   packages/agent:
     dependencies:
