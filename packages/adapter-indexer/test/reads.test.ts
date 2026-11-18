@@ -34,6 +34,7 @@ function replay(name: string): (request: HttpRequest) => Promise<HttpResponse> {
 }
 
 const address = 'ab'.repeat(32);
+const id = 'cd'.repeat(32);
 const reads = (http: (request: HttpRequest) => Promise<HttpResponse>, requestTimeoutMs = 1_000) =>
   createReads({ indexerUrl: INDEXER_URL, http, requestTimeoutMs });
 
@@ -46,11 +47,21 @@ test('a found contract has its bytes and the block where the state last changed'
   });
 });
 
-test('an unknown contract reads as undefined', async () => {
+test('an unknown contract and an unknown transaction read as undefined', async () => {
   assert.equal(await reads(replay('contract-not-found')).contractState(address), undefined);
+  assert.equal(await reads(replay('transaction-not-found')).transaction(id), undefined);
 });
 
-// Valid "not found" data, so only the check under test can reject it.
+test('a found transaction is final, with its block and result', async () => {
+  assert.deepEqual(await reads(replay('transaction-final')).transaction(id), {
+    id,
+    level: 'final',
+    block: { height: 1040, hash: '2d'.repeat(32) },
+    result: 'partly-failed',
+  });
+});
+
+// Valid "not found" data for both reads, so only the check under test can reject it.
 const notFound = '{"data":{"block":null,"contract":null,"transactions":[]}}';
 
 type Reason = IndexerUnreachableError['reason'];
@@ -107,6 +118,7 @@ for (const [name, reason, http] of failures) {
       return http();
     }, 20);
     await rejectsUnreachable(() => indexer.contractState(address), reason);
+    await rejectsUnreachable(() => indexer.transaction(id), reason);
     // A request that timed out must not stay open.
     if (reason === 'timeout') assert.ok(signals.every((s) => s?.aborted));
   });
@@ -118,6 +130,30 @@ for (const state of ['xyz', 'abc', '']) {
     const body = { data: { block: null, contract } };
     const indexer = reads(async () => ok(body));
     await rejectsUnreachable(() => indexer.contractState(address), 'response');
+  });
+}
+
+for (const status of ['MAYBE', 'constructor', '__proto__']) {
+  test(`the result status "${status}" is IndexerUnreachableError`, async () => {
+    const tx = { __typename: 'RegularTransaction', block: { height: 1, hash: 'aa'.repeat(32) } };
+    const body = { data: { transactions: [{ ...tx, transactionResult: { status } }] } };
+    const indexer = reads(async () => ok(body));
+    await rejectsUnreachable(() => indexer.transaction(id), 'response');
+  });
+}
+
+test('a list with only system transactions reads as not found', async () => {
+  const system = { __typename: 'SystemTransaction', block: { height: 1, hash: 'aa'.repeat(32) } };
+  const indexer = reads(async () => ok({ data: { transactions: [system] } }));
+  assert.equal(await indexer.transaction(id), undefined);
+});
+
+for (const entry of ['{}', '{"__typename":7}', 'null']) {
+  test(`a transaction entry ${entry} is IndexerUnreachableError, never "not found"`, async () => {
+    const indexer = reads(async () =>
+      response(200, encode(`{"data":{"transactions":[${entry}]}}`)),
+    );
+    await rejectsUnreachable(() => indexer.transaction(id), 'response');
   });
 }
 
@@ -138,6 +174,7 @@ test('an abort before the read sends nothing and rejects with CancelledError', a
     () => indexer.contractState(address, { signal: aborted }),
     'CancelledError',
   );
+  await expectRejection(() => indexer.transaction(id, { signal: aborted }), 'CancelledError');
   assert.equal(sent, 0);
 });
 

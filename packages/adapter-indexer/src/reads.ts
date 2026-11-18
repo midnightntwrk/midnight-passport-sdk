@@ -7,16 +7,34 @@ import {
   type HttpRequest,
   type HttpResponse,
   type Indexer,
+  type TransactionId,
+  type TransactionResult,
+  type TransactionStatus,
 } from '@midnight-ntwrk/mn-passport-core';
 import { query } from './graphql.js';
 import { decodeHex } from './hex.js';
 import type { Data, Endpoint } from './transport.js';
 
-// Keep this in step with the indexer API of the pinned midnight-js version.
+// Keep these in step with the indexer API of the pinned midnight-js version.
 const CONTRACT_STATE_QUERY = `query CONTRACT_STATE_QUERY($address: HexEncoded!) {
   block { height hash }
   contract(address: $address) { state stateAt { height hash } }
 }`;
+
+const TX_ID_QUERY = `query TX_ID_QUERY($offset: TransactionOffset!) {
+  transactions(offset: $offset) {
+    __typename
+    block { height hash }
+    ... on RegularTransaction { transactionResult { status } }
+  }
+}`;
+
+// A `Map`, so a status such as "constructor" finds nothing on the prototype.
+const RESULTS: ReadonlyMap<unknown, TransactionResult> = new Map<unknown, TransactionResult>([
+  ['SUCCESS', 'succeeded'],
+  ['PARTIAL_SUCCESS', 'partly-failed'],
+  ['FAILURE', 'failed'],
+]);
 
 const HASH = /^[0-9a-fA-F]{64}$/;
 
@@ -56,6 +74,26 @@ export async function readContractState(
   return { head, state: { address, bytes, block: blockRef(field(data.contract, 'stateAt')) } };
 }
 
+/** The indexer holds final blocks only, so a found transaction is `final`. */
+export async function readTransaction(
+  endpoint: Endpoint,
+  id: TransactionId,
+  options?: CallOptions,
+): Promise<TransactionStatus | undefined> {
+  const data = await query(endpoint, TX_ID_QUERY, { offset: { identifier: id } }, options);
+  const found = data.transactions;
+  if (!Array.isArray(found)) return malformed();
+  // Only a regular transaction has identifiers. The first one is the match.
+  const kinds = found.map((tx) => field(tx, '__typename'));
+  if (kinds.some((kind) => typeof kind !== 'string')) return malformed();
+  const match: unknown = found[kinds.indexOf('RegularTransaction')];
+  if (match === undefined) return undefined;
+  const status = field(field(match, 'transactionResult'), 'status');
+  const result = RESULTS.get(status);
+  if (result === undefined) return malformed();
+  return { id, level: 'final', block: blockRef(field(match, 'block')), result };
+}
+
 export interface ReadOptions {
   /** The indexer's GraphQL endpoint over HTTP. */
   readonly indexerUrl: string;
@@ -64,7 +102,7 @@ export interface ReadOptions {
   readonly requestTimeoutMs?: number;
 }
 
-export function createReads(options: ReadOptions): Pick<Indexer, 'contractState'> {
+export function createReads(options: ReadOptions): Pick<Indexer, 'contractState' | 'transaction'> {
   const endpoint: Endpoint = {
     url: options.indexerUrl,
     http: options.http,
@@ -73,5 +111,6 @@ export function createReads(options: ReadOptions): Pick<Indexer, 'contractState'
   return {
     contractState: async (address, call) =>
       (await readContractState(endpoint, address, call)).state,
+    transaction: (id, call) => readTransaction(endpoint, id, call),
   };
 }
