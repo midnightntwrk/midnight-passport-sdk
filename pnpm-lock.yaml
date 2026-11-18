@@ -65,6 +65,10 @@ importers:
       '@midnight-ntwrk/mn-passport-core':
         specifier: workspace:*
         version: link:../core
+    devDependencies:
+      '@midnight-ntwrk/mn-passport-dev':
+        specifier: workspace:*
+        version: link:../dev
 
   packages/adapter-nodejs:
     dependencies:
