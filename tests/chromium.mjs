@@ -75,6 +75,8 @@ async function serve(outdir, run) {
       return response.end('<script type="module" src="/page.js"></script>');
     }
     if (contractRoutes(request, response)) return;
+    if (path === '/cookie') return response.writeHead(200).end(request.headers.cookie ?? '');
+    if (path === '/referer') return response.writeHead(200).end(request.headers.referer ?? '');
     if (path.endsWith('.wasm')) wasm += 1;
     try {
       const body = await readFile(join(outdir, path));

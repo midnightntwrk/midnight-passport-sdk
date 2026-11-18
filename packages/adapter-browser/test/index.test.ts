@@ -1,9 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-test('the entry imports in Node.js and exports nothing yet', async () => {
-  const entry = await import('@midnight-ntwrk/mn-passport-adapter-browser');
-  assert.deepEqual(Object.keys(entry), []);
+// A server-side render imports the entry, and Node.js has no IndexedDB.
+test('browserPlatform builds in Node.js', async () => {
+  const { browserPlatform } = await import('@midnight-ntwrk/mn-passport-adapter-browser');
+  assert.doesNotThrow(() => browserPlatform());
 });
 
 test('the esbuild subpath gives the plugin', async () => {
