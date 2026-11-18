@@ -1,11 +1,13 @@
 import {
   CancelledError,
+  PaymentExpiredError,
   TimeoutError,
   type AbortSignalLike,
   type BlockRef,
   type Broadcast,
   type Indexer,
   type NodeRefusedError,
+  type PaidTransaction,
   type PassportError,
   type Platform,
   type TransactionId,
@@ -13,6 +15,7 @@ import {
 } from '@midnight-ntwrk/mn-passport-core';
 import { checkCallIndex, extrinsicHex, type CallIndex } from './extrinsic.js';
 import { checkMs, checkUrl, clearTimer, newAbortController, setTimer } from './host.js';
+import { earliestTtl, loadLedger } from './ledger.js';
 import { createNodeClient, submitOnce, type NodeClient } from './node.js';
 import { field } from './request.js';
 
@@ -28,6 +31,11 @@ export interface NodeBroadcastOptions {
   readonly pollMs?: number;
   /** Default: 10,000. */
   readonly requestTimeoutMs?: number;
+  /**
+   * How long past the earliest intent ttl a payment can still show in a block.
+   * It also covers a client clock that runs fast. Default: 150,000.
+   */
+  readonly expiryMarginMs?: number;
 }
 
 const DEFAULT_CALL_INDEX: CallIndex = [0x05, 0x00];
@@ -39,8 +47,9 @@ const HASH = /^0x[0-9a-fA-F]{64}$/;
 
 /**
  * "In a block" comes from the node, and "final" from `indexer`. The status at
- * `in-block` can still be undone by a reorg. A bad option throws `TypeError` or
- * `RangeError`.
+ * `in-block` can still be undone by a reorg. The status can name another
+ * payment of the same proof: the one that landed. A bad option throws
+ * `TypeError` or `RangeError`.
  */
 export function nodeBroadcast(options: NodeBroadcastOptions): Broadcast {
   const url = checkUrl('url', options.url);
@@ -51,7 +60,9 @@ export function nodeBroadcast(options: NodeBroadcastOptions): Broadcast {
     url,
     checkMs('requestTimeoutMs', options.requestTimeoutMs ?? 10_000),
   );
-  const { indexer } = options;
+  const { indexer, platform } = options;
+  const expiryMarginMs = checkMs('expiryMarginMs', options.expiryMarginMs ?? 150_000);
+  const loadTimeoutMs = checkMs('requestTimeoutMs', options.requestTimeoutMs ?? 10_000);
   // Keyed by extrinsic, because two payments of one proof can share an id.
   const kept = new Map<string, Kept>();
   const keep = (hex: string, entry: Kept): void => {
@@ -67,34 +78,54 @@ export function nodeBroadcast(options: NodeBroadcastOptions): Broadcast {
       if (signal?.aborted) throw new CancelledError('caller');
       const hex = extrinsicHex(tx.bytes, callIndex);
       const earlier = kept.get(hex);
+      const due = (): boolean => tx.submitBy !== undefined && Date.now() >= tx.submitBy;
+      if (!earlier && due()) throw new PaymentExpiredError(false);
       const call = openCall(signal, timeoutMs);
       let stopWatch = (): void => undefined;
       try {
+        const facts = await call.guard(readFacts(platform, tx, call.signal, loadTimeoutMs));
         const scan = createScan(node, hex, call.signal);
         let final: TransactionStatus | undefined;
+        if (earlier) scan.from(earlier.start);
+        let start = earlier?.start;
+        let attempted = earlier !== undefined;
+        let sent = earlier?.sent ?? false;
+        let block = earlier?.block;
+        let landed = earlier?.landed ?? tx.id;
+        let refusal: NodeRefusedError | undefined;
+        let watched: TransactionId | undefined;
         // Only a wait for `final` watches the indexer, so `in-block` keeps its level.
-        if (until === 'final') {
-          stopWatch = indexer.watchTransaction(tx.id).subscribe((lookup) => {
+        // The watch follows `landed`, because another payment of the same proof can land.
+        const watch = (): void => {
+          if (until !== 'final' || watched === landed) return;
+          stopWatch();
+          watched = landed;
+          stopWatch = indexer.watchTransaction(landed).subscribe((lookup) => {
             if (lookup.found && lookup.value.level === 'final') {
               final = lookup.value;
               call.wake();
             }
           });
-        }
-        if (earlier) scan.from(earlier.start);
-        let start = earlier?.start;
-        let sent = earlier !== undefined;
-        let block = earlier?.block;
-        let refusal: NodeRefusedError | undefined;
+        };
+        watch();
         const remember = (): void => {
-          if (start !== undefined) keep(hex, { start, ...(block ? { block } : {}) });
+          if (start !== undefined)
+            keep(hex, { start, sent: sent || attempted, landed, ...(block ? { block } : {}) });
         };
 
+        // A payment that reached no node can be sent until `submitBy`, and never after.
         const send = async (): Promise<void> => {
           start ??= await bestHeight(node, call.signal);
+          // The clock is read with no wait before the send, so no send starts late.
+          if (due()) {
+            if (!attempted) throw new PaymentExpiredError(false);
+            sent = true;
+            return;
+          }
           if (start === undefined) return;
           scan.from(start);
           // Kept before the send: the node can hold the bytes even when the call ends first.
+          attempted = true;
           remember();
           const outcome = await submitOnce(node, tx, callIndex, call.signal);
           if (outcome.kind === 'failed') return;
@@ -105,8 +136,8 @@ export function nodeBroadcast(options: NodeBroadcastOptions): Broadcast {
           }
         };
 
-        // A refused send can already be in a block. Only a full walk and an indexer
-        // answer can say that it is not; a failed read means "check again".
+        // Any identifier of the bytes counts, so another payment of the same proof
+        // is found too. Only a full walk and an indexer answer can say "absent".
         const onChain = async (): Promise<'found' | 'absent' | 'unknown'> => {
           const found = await scan.find();
           if (found === 'failed') return 'unknown';
@@ -114,27 +145,35 @@ export function nodeBroadcast(options: NodeBroadcastOptions): Broadcast {
             block = found;
             return 'found';
           }
-          let status: TransactionStatus | undefined;
-          try {
-            status = await indexer.transaction(tx.id, { signal: call.signal });
-          } catch {
-            if (call.signal.aborted) throw new CancelledError('caller');
-            return 'unknown';
+          for (const id of facts.ids) {
+            let status: TransactionStatus | undefined;
+            try {
+              status = await indexer.transaction(id, { signal: call.signal });
+            } catch {
+              if (call.signal.aborted) throw new CancelledError('caller');
+              return 'unknown';
+            }
+            if (!status) continue;
+            landed = status.id;
+            watch();
+            if (status.level === 'final' && until === 'final') final = status;
+            else block = status.block;
+            return 'found';
           }
-          if (!status) return 'absent';
-          if (status.level === 'final' && until === 'final') final = status;
-          else block = status.block;
-          return 'found';
+          return 'absent';
         };
+
+        const expired = (): boolean =>
+          facts.expiresAt !== undefined && Date.now() >= facts.expiresAt + expiryMarginMs;
 
         for (;;) {
           if (final) return final;
-          if (block && until === 'in-block') return inBlock(tx.id, block);
-          if (refusal) {
+          if (block && until === 'in-block') return inBlock(landed, block);
+          if (refusal || (attempted && !block && expired())) {
             const verdict = await call.guard(onChain());
             if (verdict === 'absent') {
               kept.delete(hex);
-              throw refusal;
+              throw refusal ?? new PaymentExpiredError(true);
             }
             if (verdict === 'found') refusal = undefined;
           } else if (!sent) {
@@ -157,7 +196,32 @@ export function nodeBroadcast(options: NodeBroadcastOptions): Broadcast {
 
 interface Kept {
   readonly start: number;
+  /** A send was made, or may have reached the node. */
+  readonly sent: boolean;
+  /** The id of the payment that a block holds: this one, or another of the same proof. */
+  readonly landed: TransactionId;
   readonly block?: BlockRef;
+}
+
+// Bytes that do not parse, such as stub bytes, give no expiry: they are never
+// called expired after a send.
+async function readFacts(
+  platform: Platform,
+  tx: PaidTransaction,
+  signal: AbortSignalLike,
+  timeoutMs: number,
+): Promise<{ readonly ids: readonly TransactionId[]; readonly expiresAt: number | undefined }> {
+  try {
+    const ledger = await loadLedger(platform, signal, timeoutMs);
+    const paid = ledger.Transaction.deserialize('signature', 'proof', 'binding', tx.bytes);
+    return {
+      ids: [tx.id, ...paid.identifiers().filter((id) => id !== tx.id)],
+      expiresAt: earliestTtl(paid.intents),
+    };
+  } catch {
+    if (signal.aborted) throw new CancelledError('caller');
+    return { ids: [tx.id], expiresAt: undefined };
+  }
 }
 
 const inBlock = (id: TransactionId, block: BlockRef): TransactionStatus => ({
