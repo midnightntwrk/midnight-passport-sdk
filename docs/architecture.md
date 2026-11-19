@@ -1,6 +1,6 @@
 # Midnight Passport SDK architecture
 
-> **Status:** draft · 2026/11/05
+> **Status:** draft · 2026/11/17
 > **Owns:** the packages, the seams, the adapters, and the dependency rules of
 > the SDK.
 > **Companions:** [`sdk-requirements.md`](./sdk-requirements.md) (what the SDK
@@ -675,7 +675,7 @@ against its types, so they cannot drift apart.
 
 ```ts
 // @midnight-ntwrk/mn-passport-protocol: types and constants only
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = { major: 2, minor: 0 };
 
 export type Binding =
   | { profile: 'browser'; origin: string; possessionProof: PossessionProof }
