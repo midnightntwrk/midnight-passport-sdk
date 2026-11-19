@@ -8,7 +8,9 @@ import { tmpdir } from 'node:os';
 import { delimiter, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
+import { build as viteBuild } from 'vite';
 import { passportWasm } from '../packages/adapter-browser/dist/esbuild.js';
+import { passportWasm as passportWasmVite } from '../packages/adapter-browser/dist/vite.js';
 import { contractRoutes, listen } from './server.mjs';
 
 /**
@@ -64,6 +66,39 @@ export const appBuild = {
   },
   nodePaths: [join(root, 'packages/adapter-browser/node_modules')],
 };
+
+/**
+ * Builds the file `entry` with Vite and the same names as `appBuild`, into `page.js`.
+ * @param {string} entry
+ */
+export async function viteBundle(entry) {
+  const work = await mkdtemp(join(tmpdir(), 'mn-passport-vite-'));
+  dirs.push(work);
+  const outdir = join(work, 'out');
+  /** @type {import('vite').Plugin} */
+  const plugin = passportWasmVite();
+  await viteBuild({
+    configFile: false,
+    root: join(root, 'tests'),
+    cacheDir: join(work, 'cache'),
+    publicDir: false,
+    logLevel: 'silent',
+    plugins: [plugin],
+    resolve: {
+      alias: {
+        ...appBuild.alias,
+        '@midnightntwrk/ledger-v9': join(appBuild.nodePaths[0] ?? '', '@midnightntwrk/ledger-v9'),
+      },
+    },
+    build: {
+      outDir: outdir,
+      target: 'es2022',
+      modulePreload: false,
+      rolldownOptions: { input: entry, output: { entryFileNames: 'page.js' } },
+    },
+  });
+  return { outdir };
+}
 
 // The servers, and the pages of a test that times out, close when the test ends.
 /** @type {Set<() => Promise<void>>} */
@@ -123,7 +158,7 @@ async function serve(outdir, run, { files, routes, host }) {
  * @param {string} bin
  * @param {string} contents
  * @param {{ expression?: string, before?: (page: Page) => Promise<void>,
- *   build?: Parameters<typeof bundle>[2], files?: Record<string, Uint8Array>,
+ *   build?: Parameters<typeof bundle>[2], outdir?: string, files?: Record<string, Uint8Array>,
  *   routes?: Record<string, (page: Page) => Promise<void>>, host?: string }} [options]
  */
 export async function runPage(bin, contents, options = {}) {
@@ -139,7 +174,9 @@ export async function runPage(bin, contents, options = {}) {
       },
     ]),
   );
-  const { outdir } = await bundle(contents, [passportWasm()], options.build);
+  const { outdir } = options.outdir
+    ? { outdir: options.outdir }
+    : await bundle(contents, [passportWasm()], options.build);
   /** @type {{ value: unknown, errors: string[], wasmRequests: number }} */
   let out = { value: undefined, errors: [], wasmRequests: 0 };
   await serve(

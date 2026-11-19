@@ -13,7 +13,7 @@
       "path": "./tsconfig.json"
     },
     {
-      "path": "./tsconfig.esbuild.json"
+      "path": "./tsconfig.plugins.json"
     }
   ]
 }

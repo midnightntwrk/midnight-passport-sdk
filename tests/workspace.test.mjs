@@ -69,7 +69,7 @@ const packageDirs = (await readdir(new URL('../packages', import.meta.url))).sor
 
 // The browser adapter also ships its bundler plugins. Every other package has one entry.
 /** @type {Record<string, string[]>} */
-const SUBPATHS = { 'adapter-browser': ['esbuild'] };
+const SUBPATHS = { 'adapter-browser': ['esbuild', 'vite'] };
 
 test('package shape', async () => {
   assert.ok(packageDirs.length > 0, 'packages/ must hold the scaffolded packages');

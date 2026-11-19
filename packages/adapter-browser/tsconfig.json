@@ -13,5 +13,5 @@
       "path": "../core"
     }
   ],
-  "exclude": ["src/esbuild.ts"]
+  "exclude": ["src/esbuild.ts", "src/vite.ts", "src/bundler.ts"]
 }
