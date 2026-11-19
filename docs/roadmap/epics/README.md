@@ -1,11 +1,11 @@
 # Epics
 
 One file per epic, in roadmap order. Each epic is also a GitHub issue with the
-`epic` label and its own `epic:Exx` label. Epics have no milestone: their
+`epic` label only; its `epic:Exx` label goes on its stories. Epics have no milestone: their
 stories carry the milestone, so a milestone's progress counts stories only.
 
 File names sort in roadmap order: `M<milestone>-<epic>-<slug>.md`. The epic
-codes (E01 to E24) replace the codes of the roadmap sheet; each file names its
+codes (E01 to E25) replace the codes of the roadmap sheet; each file names its
 sheet code. Steps are dependency depth (a story starts once the stories it
 depends on are done), not time.
 
@@ -23,15 +23,16 @@ depends on are done), not time.
 | [E10](./M3-E10-scoped-grants-ceremony.md) | Scoped grants ceremony | 3 Control | [#53](https://github.com/midnightntwrk/midnight-passport-sdk/issues/53) |
 | [E11](./M3-E11-grant-ceremony-clients.md) | Grant ceremony clients | 3 Control | [#54](https://github.com/midnightntwrk/midnight-passport-sdk/issues/54) |
 | [E12](./M3-E12-passport-app-grants.md) | Passport app: grants | 3 Control | [#55](https://github.com/midnightntwrk/midnight-passport-sdk/issues/55) |
-| [E13](./M4-E13-private-data-and-backup.md) | Private data and backup | 4 Private data and sync | [#56](https://github.com/midnightntwrk/midnight-passport-sdk/issues/56) |
-| [E14](./M4-E14-devices-and-multi-device-sync.md) | Devices and multi-device sync | 4 Private data and sync | [#57](https://github.com/midnightntwrk/midnight-passport-sdk/issues/57) |
-| [E15](./M4-E15-passport-app-backup-and-devices.md) | Passport app: backup and devices | 4 Private data and sync | [#58](https://github.com/midnightntwrk/midnight-passport-sdk/issues/58) |
-| [E16](./M5-E16-guardian-recovery.md) | Guardian recovery | 5 Account recovery | [#59](https://github.com/midnightntwrk/midnight-passport-sdk/issues/59) |
-| [E17](./M5-E17-read-access-lifecycle.md) | Read-access lifecycle | 5 Account recovery | [#60](https://github.com/midnightntwrk/midnight-passport-sdk/issues/60) |
-| [E18](./M5-E18-passport-app-recovery.md) | Passport app: recovery | 5 Account recovery | [#61](https://github.com/midnightntwrk/midnight-passport-sdk/issues/61) |
-| [E19](./M6-E19-connect-for-dapps.md) | Connect for dApps | 6 Integrations | [#62](https://github.com/midnightntwrk/midnight-passport-sdk/issues/62) |
-| [E20](./M6-E20-agents.md) | Agents | 6 Integrations | [#63](https://github.com/midnightntwrk/midnight-passport-sdk/issues/63) |
-| [E21](./M7-E21-execution-under-a-grant-key.md) | Execution under a grant key | 7 Execution | [#64](https://github.com/midnightntwrk/midnight-passport-sdk/issues/64) |
-| [E22](./M7-E22-integration-hardening.md) | Integration hardening | 7 Execution | [#65](https://github.com/midnightntwrk/midnight-passport-sdk/issues/65) |
-| [E23](./M8-E23-identity-and-credentials.md) | Identity and credentials | 8 Use Cases | [#66](https://github.com/midnightntwrk/midnight-passport-sdk/issues/66) |
-| [E24](./M8-E24-cross-chain-assets.md) | Cross-chain assets | 8 Use Cases | [#67](https://github.com/midnightntwrk/midnight-passport-sdk/issues/67) |
+| [E13](./M4-E13-connect-for-dapps.md) | Connect for dApps | 4 Integrations | [#62](https://github.com/midnightntwrk/midnight-passport-sdk/issues/62) |
+| [E14](./M4-E14-agents.md) | Agents | 4 Integrations | [#63](https://github.com/midnightntwrk/midnight-passport-sdk/issues/63) |
+| [E15](./M5-E15-execution-under-a-grant-key.md) | Execution under a grant key | 5 Execution | [#64](https://github.com/midnightntwrk/midnight-passport-sdk/issues/64) |
+| [E16](./M5-E16-integration-hardening.md) | Integration hardening | 5 Execution | [#65](https://github.com/midnightntwrk/midnight-passport-sdk/issues/65) |
+| [E17](./M6-E17-private-data-and-backup.md) | Private data and backup | 6 Private data and sync | [#56](https://github.com/midnightntwrk/midnight-passport-sdk/issues/56) |
+| [E18](./M6-E18-private-data-in-connect-and-agent.md) | Private data in connect and agent | 6 Private data and sync | [#69](https://github.com/midnightntwrk/midnight-passport-sdk/issues/69) |
+| [E19](./M6-E19-devices-and-multi-device-sync.md) | Devices and multi-device sync | 6 Private data and sync | [#57](https://github.com/midnightntwrk/midnight-passport-sdk/issues/57) |
+| [E20](./M6-E20-passport-app-backup-and-devices.md) | Passport app: backup and devices | 6 Private data and sync | [#58](https://github.com/midnightntwrk/midnight-passport-sdk/issues/58) |
+| [E21](./M7-E21-guardian-recovery.md) | Guardian recovery | 7 Account recovery | [#59](https://github.com/midnightntwrk/midnight-passport-sdk/issues/59) |
+| [E22](./M7-E22-read-access-lifecycle.md) | Read-access lifecycle | 7 Account recovery | [#60](https://github.com/midnightntwrk/midnight-passport-sdk/issues/60) |
+| [E23](./M7-E23-passport-app-recovery.md) | Passport app: recovery | 7 Account recovery | [#61](https://github.com/midnightntwrk/midnight-passport-sdk/issues/61) |
+| [E24](./M8-E24-identity-and-credentials.md) | Identity and credentials | 8 Use Cases | [#66](https://github.com/midnightntwrk/midnight-passport-sdk/issues/66) |
+| [E25](./M8-E25-cross-chain-assets.md) | Cross-chain assets | 8 Use Cases | [#67](https://github.com/midnightntwrk/midnight-passport-sdk/issues/67) |

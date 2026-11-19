@@ -18,7 +18,7 @@
 
 ## Milestones
 
-The work is split into 9 milestones, 24 epics, and 128 stories. Each epic is in
+The work is split into 9 milestones, 25 epics, and 134 stories. Each epic is in
 [`epics/`](./epics/README.md) and each story in
 [`stories/`](./stories/README.md), in roadmap order. The milestones are GitHub
 milestones; the stories carry them, and the epics group the stories as
@@ -30,12 +30,15 @@ sub-issues.
 | 1 Foundation | E02 to E06 |
 | 2 Account management and core actions | E07, E08 |
 | 3 Control | E09 to E12 |
-| 4 Private data and sync | E13 to E15 |
-| 5 Account recovery | E16 to E18 |
-| 6 Integrations | E19, E20 |
-| 7 Execution | E21, E22 |
-| 8 Use Cases | E23, E24 |
+| 4 Integrations | E13, E14 |
+| 5 Execution | E15, E16 |
+| 6 Private data and sync | E17 to E20 |
+| 7 Account recovery | E21 to E23 |
+| 8 Use Cases | E24, E25 |
 
+Integrations and Execution come before private data and recovery, so partners
+can integrate sooner; E18 Private data in connect and agent then brings it to
+those clients.
 The milestones overlap: many stories can start long before their milestone,
 as soon as the stories they depend on are done. Each story names its step, the
 depth of its dependencies.
