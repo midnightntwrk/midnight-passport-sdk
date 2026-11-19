@@ -14,8 +14,7 @@ while accepting a change within the same major.
 
 E03.05 (issue #79) builds the first wire-axis types and the accept-or-refuse
 helper. Its acceptance tests three cases: equal, a lower minor, and a higher
-major. A lower minor and a higher major cannot both be expressed against a
-single number.
+major. One number cannot express both a lower minor and a higher major.
 
 ## Decision
 
@@ -32,18 +31,16 @@ parts. The constant is frozen, so no caller can change the shared value.
 The helper refuses only a higher major for now and accepts every other case.
 The full rule for a higher minor and a lower major is E09.04.
 
-Two shapes were weighed and rejected: a single string such as `"2.0"` (it needs
-parsing before every comparison), and a bare major number with a separate minor
-constant (two names for one version, easy to use only one).
+We rejected two shapes. A single string such as `"2.0"` needs parsing before
+every comparison. A bare major number with a separate minor constant gives one
+version two names, and a caller can easily use only one.
 
 ## Consequences
 
 - E09 message types inherit the `{ major, minor }` shape. The grant request,
   the possession proof, and the sign-in message carry it.
-- E09.04 extends the helper's rule and its refusal reasons; the shape does not
+- E09.04 extends the helper's rule and its refusal reasons. The shape does not
   change again.
-- `docs/architecture.md` Example 7 is updated. The status date is bumped.
-- Two further divergences for `protocol` stay open as doc-sync candidates: the
-  "types and constants only, no logic" wording (C5), and the binding-axis
-  summary wording in `docs/compatibility.md` (C6). This ADR does not touch
-  them.
+- Two more divergences for `protocol` stay open as doc-sync candidates: the
+  "types and constants only, no logic" wording, and the binding-axis summary
+  wording in `docs/compatibility.md`.
