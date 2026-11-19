@@ -66,11 +66,12 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: .nvmrc
-      - name: Install, then lint, format, build, and test
+      - name: Install, then format, build, lint, and test
         run: |
           corepack enable
           pnpm install --frozen-lockfile
-          pnpm run lint
           pnpm run format:check
           pnpm run build
+          # Type-aware lint reads the built declarations of the workspace packages.
+          pnpm run lint
           pnpm test
