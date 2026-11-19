@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { remoteProver } from '@midnight-ntwrk/mn-passport-adapter-prover-remote';
+import { consent } from './consent.js';
 import { nodePlatform } from './node-platform.js';
 import { startProxy } from './proxy.js';
 
@@ -35,6 +36,7 @@ async function proveAll(url: string, credential?: string): Promise<void> {
       verifierKey: async ({ circuitId }) =>
         new Uint8Array(await readFile(join(fixture, 'keys', `${circuitId}.verifier`))),
       ...(credential ? { credential: async () => credential } : {}),
+      consent: consent(),
     });
     const bytes = new Uint8Array(await readFile(join(fixture, call.tx)));
     const proven = await prover.prove({ stage: 'unproven', bytes }, call.circuitIds);

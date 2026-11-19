@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import { createStubPlatform, proverContract } from '../packages/dev/dist/index.js';
 import { remoteProver } from '../packages/adapter-prover-remote/dist/index.js';
+import { consent } from '../packages/adapter-prover-remote/dist-test/consent.js';
 import {
   fakeService,
   oneCall,
@@ -21,6 +22,7 @@ const cases = proverContract(async () => {
       platform,
       verifierKey: async () => verifierKey,
       defaultTimeoutMs: 1000,
+      consent: consent(),
     }),
     tx: { stage: 'unproven', bytes: oneCall().bytes },
     circuitIds: ['owner_call'],

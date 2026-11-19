@@ -1,15 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  proverDisclosure,
-  storeConsentRecord,
-  withProverConsent,
-} from '../packages/core/dist/index.js';
-import {
-  createStubPlatform,
-  createStubProver,
-  proverContract,
-} from '../packages/dev/dist/index.js';
+import { proverDisclosure, storeConsentRecord } from '../packages/core/dist/index.js';
+import { createStubPlatform } from '../packages/dev/dist/index.js';
 import { remoteProver } from '../packages/adapter-prover-remote/dist/index.js';
 import {
   fakeService,
@@ -25,7 +17,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 100));
 /** @typedef {import('../packages/core/dist/index.js').ConsentAnswer} ConsentAnswer */
 
 /** @param {(url: string) => void} onRequest */
-function remoteGate(onRequest) {
+function gatedRemote(onRequest) {
   /** @type {(answer: ConsentAnswer) => void} */
   let answer = () => {};
   const platform = createStubPlatform({
@@ -34,15 +26,15 @@ function remoteGate(onRequest) {
       return fakeService(request);
     },
   });
-  const prover = withProverConsent({
-    prover: remoteProver({
-      url: 'https://prover.example',
-      platform,
-      verifierKey: async () => verifierKey,
-    }),
-    disclosure,
-    ask: () => new Promise((resolve) => (answer = resolve)),
-    record: storeConsentRecord(platform.store, 'prover-consent'),
+  const prover = remoteProver({
+    url: 'https://prover.example',
+    platform,
+    verifierKey: async () => verifierKey,
+    consent: {
+      disclosure,
+      ask: () => new Promise((resolve) => (answer = resolve)),
+      record: storeConsentRecord(platform.store, 'prover-consent'),
+    },
   });
   return { prover, answer: (/** @type {ConsentAnswer} */ a) => answer(a) };
 }
@@ -53,7 +45,7 @@ const unproven = () => ({ stage: 'unproven', bytes: oneCall().bytes });
 test('no proof request leaves the client before consent, or after a decline', T, async () => {
   /** @type {string[]} */
   const sent = [];
-  const { prover, answer } = remoteGate((url) => sent.push(url));
+  const { prover, answer } = gatedRemote((url) => sent.push(url));
 
   const declined = prover.prove(unproven(), ['owner_call']);
   await settle();
@@ -97,20 +89,3 @@ test(
     assert.equal(await record.read(), undefined);
   },
 );
-
-const cases = proverContract(async () => {
-  const platform = createStubPlatform();
-  const inner = createStubProver();
-  return {
-    prover: withProverConsent({
-      prover: inner,
-      disclosure,
-      ask: async () => 'accepted',
-      record: storeConsentRecord(platform.store, 'prover-consent'),
-    }),
-    tx: { stage: 'unproven', bytes: new Uint8Array([1, 2, 3]) },
-    circuitIds: [],
-    hold: () => inner.holdNext(),
-  };
-});
-for (const c of cases) test(`prover consent gate: ${c.name}`, T, () => c.run());

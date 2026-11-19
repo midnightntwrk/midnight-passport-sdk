@@ -2,8 +2,10 @@ import {
   CancelledError,
   PassportError,
   UpstreamError,
+  withProverConsent,
   type Platform,
   type Prover,
+  type ProverConsentOptions,
 } from '@midnight-ntwrk/mn-passport-core';
 import { ProverRejectedError } from './errors.js';
 import type { KeyLocation } from './key-location.js';
@@ -20,6 +22,8 @@ export interface RemoteProverOptions {
   readonly credential?: () => Promise<string>;
   /** The deadline of each `prove` call when the caller gives no `timeoutMs`. */
   readonly defaultTimeoutMs?: number;
+  /** No request leaves before the user accepts `consent.disclosure`. */
+  readonly consent: Omit<ProverConsentOptions, 'prover'>;
 }
 
 const DEFAULT_TIMEOUT_MS = 300_000;
@@ -34,7 +38,9 @@ const upstream = (sourceTag: string) => (error: unknown) => {
  * A rejection of `verifierKey` or `credential` rejects `prove` with the same error.
  */
 export function remoteProver(options: RemoteProverOptions): Prover {
-  const { platform, verifierKey } = options;
+  const { platform, verifierKey, consent } = options;
+  // A JavaScript caller can leave it out. Fail here, not at the first proof.
+  if (typeof consent?.ask !== 'function') throw new TypeError('remoteProver needs consent.');
   const defaultTimeoutMs = options.defaultTimeoutMs ?? DEFAULT_TIMEOUT_MS;
   checkTimeout(defaultTimeoutMs);
   const transport = createTransport({
@@ -42,7 +48,7 @@ export function remoteProver(options: RemoteProverOptions): Prover {
     platform,
     ...(options.credential ? { credential: options.credential } : {}),
   });
-  return {
+  const prover: Prover = {
     async prove(tx, circuitIds, callOptions) {
       if (callOptions?.signal?.aborted) throw new CancelledError('caller');
       const call = openCall(callOptions?.signal, callOptions?.timeoutMs ?? defaultTimeoutMs);
@@ -95,4 +101,5 @@ export function remoteProver(options: RemoteProverOptions): Prover {
       }
     },
   };
+  return withProverConsent({ prover, ...consent });
 }
