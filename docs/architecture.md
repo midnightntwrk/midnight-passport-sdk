@@ -544,7 +544,8 @@ const platform = browserPlatform();
 const app = await PassportApp.create({
   platform, storage: driveStorage(), broadcast: sponsoredBroadcast({ url: sponsorUrl }),
   // verifierKey reads the contract artifacts; credential gives a short-lived token.
-  prover: remoteProver({ url: proverUrl, platform, verifierKey, credential }),
+  // consent holds the disclosure, the hook, and the record. No proof starts before it.
+  prover: remoteProver({ url: proverUrl, platform, verifierKey, credential, consent }),
 });
 
 const account = await app.onboard({ device: passkeyKeyProvider(), name: 'alice' });
