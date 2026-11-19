@@ -175,7 +175,7 @@ foundation, never from `owner`.
 | `adapter-wpp-<backend>` | Storage | One package per WPP storage backend, so that an app loads only the backend it uses. Each stores ciphertext only. The first is `adapter-wpp-drive`, on Google Drive. |
 | Registry adapter (name open) | Registry | Content-addressed fetch, verification, and a local cache. It makes the verifier key again from the ZKIR and the SRS, and compares it with the key on chain. |
 | `adapter-multi-chain` | Multi-chain | **After V1.** It connects to a multi-chain signature network. The network signs for the ACC on other chains, after the ACC authorizes the intent. |
-| `adapter-prover-wasm` | Prover | **After V1.** ACC proving keys are 112–224 MB, and the zkir WASM package has no key generation. |
+| `adapter-prover-wasm` | Prover | **After V1.** The p256 circuits of the ACC have proving keys of 470 to 495 MB, and the zkir WASM package has no key generation. |
 
 ### Passport-app adapters
 
@@ -540,9 +540,11 @@ import { remoteProver } from '@midnight-ntwrk/mn-passport-adapter-prover-remote'
 import { sponsoredBroadcast } from '@midnight-ntwrk/mn-passport-adapter-broadcast';
 import { driveStorage } from '@midnight-ntwrk/mn-passport-adapter-wpp-drive';
 
+const platform = browserPlatform();
 const app = await PassportApp.create({
-  platform: browserPlatform(), storage: driveStorage(),
-  prover: remoteProver({ url: proverUrl }), broadcast: sponsoredBroadcast({ url: sponsorUrl }),
+  platform, storage: driveStorage(), broadcast: sponsoredBroadcast({ url: sponsorUrl }),
+  // verifierKey reads the contract artifacts; credential gives a short-lived token.
+  prover: remoteProver({ url: proverUrl, platform, verifierKey, credential }),
 });
 
 const account = await app.onboard({ device: passkeyKeyProvider(), name: 'alice' });
