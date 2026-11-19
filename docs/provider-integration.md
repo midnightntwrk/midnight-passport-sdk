@@ -18,7 +18,8 @@
   transaction. It holds or makes again the proving keys. In V1, it sees the
   private inputs of each proof, for example the coin and the amount. The user
   is told.
-- **The sponsor** pays the fees and broadcasts. A user never holds DUST. The
+- **The sponsor** pays the fees and returns the paid transaction. The client
+  submits it to a node. A user never holds DUST. The
   **Capacity Exchange** is the second fee route, and it comes later.
 - If the user enables the backup key, the WaaS provider needs the most trust.
   The account is only as safe as the signing security of the provider.
@@ -31,7 +32,8 @@ Each service sits behind a seam, and each one is replaceable.
 |---|---|---|---|
 | WaaS provider (optional) | Holds the backup owner key of the user, signs ACC challenges, and keeps account metadata | It holds a full-authority key, isolated to the Passport app. It reads the public metadata. | `adapter-waas` |
 | Prover | Turns an unproven transaction into a proven transaction | The private inputs of each proof, for example the coin and the amount | `adapter-prover-remote` |
-| Sponsor | Pays the fees and broadcasts the proven transaction | The proven transaction | `adapter-broadcast` |
+| Sponsor | Pays the fees of the proven transaction, and returns the paid transaction | The proven transaction | `adapter-broadcast` |
+| Node | Takes the paid transaction, and puts it in a block | The paid transaction | `adapter-broadcast` |
 | Capacity Exchange | Sells DUST capacity for a token that the user holds | The amount class and the payment token of a quote | `adapter-fee-capacity-exchange` |
 
 ```mermaid
@@ -39,8 +41,9 @@ flowchart LR
   W["WaaS provider"] -->|"signature over H(c)"| C["Client"]
   C -->|"unproven transaction"| P["Prover<br/>sees the private inputs"]
   P -->|"proven transaction"| C
-  C -->|"proven transaction"| S["Sponsor<br/>pays fees, broadcasts"]
-  S --> N[("Midnight network")]
+  C -->|"proven transaction"| S["Sponsor<br/>pays fees"]
+  S -->|"paid transaction"| C
+  C -->|"paid transaction"| N[("Midnight network")]
   N -.->|"status from the indexer"| C
 ```
 
@@ -263,9 +266,12 @@ trusted-hardware prover exists. Until then, the disclosure applies.
 
 ### The sponsor
 
-A user never holds or pays with DUST. The broadcast seam in `mn-passport-core` takes the proven transaction.
-`adapter-broadcast` gives it to the sponsor. The sponsor adds the fee payment
-and broadcasts the transaction. The sponsor also pays the fees of account
+A user never holds or pays with DUST. The fees seam in `mn-passport-core` takes
+the proven transaction. `adapter-broadcast` gives it to the sponsor, which adds
+the fee payment and returns the paid transaction. The broadcast seam then
+submits it to a node, with JSON-RPC over HTTP. The send loop in
+`mn-passport-core` pays just before each submit, and acts on each refusal. The
+sponsor also pays the fees of account
 creation and the opening balance. [`sponsor-policy.md`](./sponsor-policy.md)
 owns what it pays, its limits, and the client's action after each refusal.
 
@@ -275,11 +281,16 @@ The client monitors each transaction until it is final. A chain subscription
 can stop without an error, for example after a network change. Thus, these
 rules apply:
 
-- **Bounded waits.** Each wait on the chain has a limit. At the limit, the
-  client asks the indexer, and it stops waiting for an event.
-- **Resubmission.** When a transaction does not arrive, the client submits the
-  same transaction again. A node answer that it already holds the
-  transaction is not a failure.
+- **Bounded waits.** Each wait on the chain has a limit. A failed read or a
+  dropped connection is not an error, and the client reads again until the
+  limit.
+- **A new payment, not the same bytes.** After a refusal whose action is
+  rebuild, the client gets a new payment. When a transaction does not arrive,
+  the client gets a new payment only when the transaction can no longer land:
+  past its earliest intent ttl, in no block, and with no indexer record for
+  any of its identifiers. Otherwise the client stops and tells the caller. So
+  one proven transaction never has two live payments. A node answer that it
+  already holds the transaction is not a failure.
 - **The indexer decides.** The client knows the transaction identifier before
   it submits. It reads the result from the indexer.
 
@@ -308,8 +319,9 @@ DUST, so this route matters for funds in the ACC.
    entry is also open: recovery must check it without the passkey.
 5. **A proof server that makes keys from ZKIR.** No proof server has this mode.
    Nobody tested if a proof server accepts keys made from ZKIR only.
-6. **The resubmission path.** Does the client resubmit through the sponsor, or
-   directly to a node?
+6. **The resubmission path.** _Closed 2026/11/18._ The client submits directly
+   to a node. After a refusal or a lost transaction, it gets a new payment
+   (see [`sponsor-policy.md`](./sponsor-policy.md), "Client rules").
 7. **Sponsor policy.** _Closed 2026/11/18._ The sponsor pays account deploys,
    ACC maintenance updates that install ACC verifier keys, and ACC calls, with
    a fee cap and a limit per caller. See [`sponsor-policy.md`](./sponsor-policy.md).
@@ -327,5 +339,5 @@ DUST, so this route matters for funds in the ACC.
   (`experiments/proving-key-regeneration/`), PR #180 (signing digests), and
   `contract/contracts/account.compact` (`envelope_digest`).
 - midnight-ledger PR #770 (keys from disk); servicedesk issue #203 (key sizes).
-- Bounded waits and resubmission: the reference demo (`chainWait.ts`).
+- Bounded waits: the reference demo (`chainWait.ts`).
 - Capacity Exchange: the upstream sponsor design (pre-launch).
