@@ -1,6 +1,7 @@
 import { PassportError } from './passport-error.js';
 import type { AbortSignalLike } from './seams/common.js';
 import { CancelledError } from './seams/errors.js';
+import type { LocalStore } from './seams/platform.js';
 import type { Prover } from './seams/prover.js';
 
 export interface ProverDisclosure {
@@ -103,5 +104,41 @@ export function withProverConsent(options: ProverConsentOptions): Prover {
       await untilAbort(shared(), proveOptions?.signal);
       return prover.prove(tx, circuitIds, proveOptions);
     },
+  };
+}
+
+// Percent-encoded, so the bytes are ASCII: `core` has no `TextEncoder` type.
+function encode(accepted: AcceptedDisclosure): Uint8Array {
+  const json = JSON.stringify({ version: accepted.version, operator: accepted.operator });
+  return Uint8Array.from(encodeURIComponent(json), (c) => c.charCodeAt(0));
+}
+
+function decode(bytes: Uint8Array): AcceptedDisclosure | undefined {
+  try {
+    const value: unknown = JSON.parse(decodeURIComponent(String.fromCharCode(...bytes)));
+    if (
+      typeof value === 'object' &&
+      value !== null &&
+      'version' in value &&
+      'operator' in value &&
+      typeof value.version === 'string' &&
+      typeof value.operator === 'string'
+    ) {
+      return { version: value.version, operator: value.operator };
+    }
+  } catch {
+    // A damaged entry counts as no consent.
+  }
+  return undefined;
+}
+
+/** One `store` entry under `key`. A damaged entry reads as `undefined`. */
+export function storeConsentRecord(store: LocalStore, key: string): ConsentRecord {
+  return {
+    read: async () => {
+      const bytes = await store.get(key);
+      return bytes === undefined ? undefined : decode(bytes);
+    },
+    write: (accepted) => store.set(key, encode(accepted)),
   };
 }
