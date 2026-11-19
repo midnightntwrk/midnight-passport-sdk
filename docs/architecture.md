@@ -148,8 +148,10 @@ interface gets the new scheme or envelope.
 Only `mn-passport-core` uses Effect 4, and it bundles Effect 4 into its dist.
 One adapter file in `core` meets the Effect 3 of midnight-js. The public API is
 Promises and plain types. Errors from `core`, the entry libraries, and the
-adapters extend `PassportError`, and an observable read is a `StateSource<A>`. [ADR 0010](./adr/0010-effect-4-bundled-inside-core.md)
-has the rules.
+adapters extend `PassportError`. An observable read is a `StateSource<A>`. A
+caller's misuse, such as a bad option or an unproven transaction where a proven
+one must go, throws `TypeError` or `RangeError`.
+[ADR 0010](./adr/0010-effect-4-bundled-inside-core.md) has the rules.
 
 ## Adapters
 
@@ -166,7 +168,7 @@ foundation, never from `owner`.
 | Adapter | Seam | Note |
 |---|---|---|
 | `adapter-prover-remote` | Prover | Transaction in, proof out. The prover holds the proving keys, or makes them again from the ZKIR and the on-chain verifier key. |
-| `adapter-broadcast` | Broadcast, fees | Gives the proven transaction to the sponsor, which pays the fees and returns the paid transaction. Submits it, and waits to the level that the caller asks for, with bounded waits and resubmission. |
+| `adapter-broadcast` | Broadcast, fees | Gives the proven transaction to the sponsor, which pays the fees and returns the paid transaction. Submits it to a node over JSON-RPC, and waits to the level that the caller asks for: "in a block" from the node, "final" from the indexer seam. Each call makes one attempt; the send loop in `core` (`createSender`) owns the retries, the new payments, and one send at a time for each account. |
 | `adapter-indexer` | Indexer | Reads from the indexer, and from the node for a block that the indexer has not reached yet. "Not found" is a value; an unreachable source is an error. |
 | `adapter-fee-capacity-exchange` | Fees | The other fee route: a swap through the Capacity Exchange. Planned for later. |
 | `adapter-browser` | Platform | The browser runtime: passkeys with PRF and the two WASM runtimes in the correct order (the contract runtime first). |
@@ -321,7 +323,8 @@ flowchart TB
   end
   subgraph EXT["External services"]
     PROVER["Prover<br/>sees the private inputs"]
-    SPONSOR["Sponsor<br/>pays fees, broadcasts"]
+    SPONSOR["Sponsor<br/>pays fees, returns the paid transaction"]
+    NODE["Node<br/>sees the paid transaction"]
     WAAS["WaaS provider (optional)<br/>backup owner key, isolated to the Passport app,<br/>no readable viewing key"]
     WPP["WPP storage<br/>ciphertext only"]
     IDX["Indexer<br/>sees what the viewing key opens"]
@@ -339,7 +342,9 @@ flowchart TB
   DAPP --> PROVER
   AGENT --> PROVER
   PROVER --> SPONSOR
-  SPONSOR --> ACC
+  DAPP --> NODE
+  AGENT --> NODE
+  NODE --> ACC
   WAAS -->|"signs as a backup owner"| ACC
 ```
 
@@ -537,15 +542,19 @@ secrets. It does not stop a compromised client from reaching a quorum.
 import { PassportApp, passkeyKeyProvider } from '@midnight-ntwrk/mn-passport-owner';
 import { browserPlatform } from '@midnight-ntwrk/mn-passport-adapter-browser';
 import { remoteProver } from '@midnight-ntwrk/mn-passport-adapter-prover-remote';
-import { sponsoredBroadcast } from '@midnight-ntwrk/mn-passport-adapter-broadcast';
+import { nodeBroadcast, sponsorFees } from '@midnight-ntwrk/mn-passport-adapter-broadcast';
+import { createIndexer } from '@midnight-ntwrk/mn-passport-adapter-indexer';
 import { driveStorage } from '@midnight-ntwrk/mn-passport-adapter-wpp-drive';
 
 const platform = browserPlatform();
+const indexer = createIndexer({ indexerUrl, http: platform.http });
 const app = await PassportApp.create({
-  platform, storage: driveStorage(), broadcast: sponsoredBroadcast({ url: sponsorUrl }),
+  platform, storage: driveStorage(), indexer,
   // verifierKey reads the contract artifacts; credential gives a short-lived token.
   // consent holds the disclosure, the hook, and the record. No proof starts before it.
   prover: remoteProver({ url: proverUrl, platform, verifierKey, credential, consent }),
+  fees: sponsorFees({ url: sponsorUrl, platform }),
+  broadcast: nodeBroadcast({ url: nodeUrl, platform, indexer }),
 });
 
 const account = await app.onboard({ device: passkeyKeyProvider(), name: 'alice' });
@@ -554,7 +563,8 @@ const account = await app.onboard({ device: passkeyKeyProvider(), name: 'alice' 
 `owner` deploys the ACC in waves. The deploy planner packs the circuits within
 the 15,000-byte verifier budget, so the wave count comes from the artifacts.
 Then `owner` activates the passkey as the first device and claims the name. The
-prover proves each wave, and `adapter-broadcast` gives it to the sponsor.
+prover proves each wave, the sponsor pays for it, and `adapter-broadcast`
+submits it to a node.
 
 The user can then opt in to a backup owner key: the embedded wallet of a WaaS
 provider. This key has the same authority as the passkey, and it works alone.

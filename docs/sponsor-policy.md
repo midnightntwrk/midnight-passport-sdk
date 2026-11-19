@@ -95,6 +95,18 @@ applies it to the sponsor's configuration.
    Preview sponsor's limit is 60 seconds after the call.
 4. Hold at most one paid, unsent transaction for each account.
 5. After a refusal, never submit the same paid bytes again. Get a new payment.
+6. Never send the paid bytes after `submitBy`. When a transaction does not
+   arrive, get a new payment only when it can no longer land: past its
+   earliest intent ttl plus a margin, with no block that holds it and no
+   indexer record for any of its identifiers. When that cannot be shown,
+   stop and tell the caller. One proven transaction never has two live
+   payments.
+7. Check what the sponsor added. The sponsor may add exactly one intent, in
+   a segment of its own. That intent holds only DUST actions: no contract
+   call and no unshielded offer. The sponsor then binds the transaction. It
+   changes no intent and no shielded offer of the proven transaction. If the
+   paid transaction differs in any other way, do not submit it, and stop. A
+   change to what the sponsor adds is a change to this policy.
 
 ## Refusals and actions
 
@@ -157,6 +169,9 @@ These changes are on the sponsor service, outside this repo:
   pays".
 - Apply the fee caps and the limit per caller, with the two proposed answers.
 - Release a coin lock when the sponsor call fails.
+- Refuse a second open payment for the same account. The client sends one
+  transaction at a time for each account only inside one running SDK, so
+  two tabs or two devices can still send at once.
 - Keep no IP address after the limit window.
 
 ## Open questions
