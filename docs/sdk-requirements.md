@@ -166,8 +166,9 @@ each dApp circuit. Encryption of the proving input to an enclave becomes
 mandatory when a trusted-hardware prover exists. The SDK does not do remote
 attestation.
 
-**No proofs in the tab in V1.** The ACC circuits are at k=15 to 17, with
-proving keys of 112 to 224 MB. The zkir WASM package has no key generation.
+**No proofs in the tab in V1.** The ACC circuits are at k=15 to 17. The p256
+circuits have proving keys of 470 to 495 MB. The zkir WASM package has no key
+generation.
 
 ### Fees and broadcast
 

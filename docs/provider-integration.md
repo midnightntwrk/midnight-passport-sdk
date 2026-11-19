@@ -186,8 +186,37 @@ The prover seam is `prove(unprovenTx, circuitIds) → provenTx`. It lives in
 `mn-passport-core`, and `adapter-prover-remote` implements it. The Passport
 app, dApps, and agents use the same seam.
 
-The client never uploads a proving key. It loads only the compiled module, the ledger decoder, and the manifest,
-about 1 MB for each contract.
+The client never uploads or fetches a proving key. It loads only the compiled
+module, the ledger decoder, the manifest, and the verifier keys, about 1 MB for
+each contract.
+
+### The request
+
+`adapter-prover-remote` sends each proof preimage with its key location
+([ADR 0012](./adr/0012-remote-prover-service-contract.md)):
+
+- `POST <url>/check?key=<location>` and
+  `POST <url>/prove?key=<location>&binding=<decimal>`. The body is the
+  serialized preimage, `application/octet-stream`. `key` is percent-encoded.
+  `binding` is left out when the call has none. A built-in proof, such as a
+  zswap spend, comes to `/prove` with a `midnight/…` location and no binding.
+- The ledger proves the calls of one transaction at the same time, so one
+  transaction can send several requests at once.
+- The key location is `contract:<address>/<circuit>?vk=<sha-256 of the
+  verifier key>`. The service finds the prover key and the ZKIR by the `vk`
+  hash. It must not log the query, because it names the contract and the
+  circuit.
+- Each request has `Authorization: Bearer <token>`. The app gives a
+  short-lived token for each user or dApp origin.
+- 200 is a success. 400, 404 (no key for this `vk`), 413, and 422 are final
+  rejections. 401 and 403 are final. The adapter retries 429, 500, 502, 503,
+  and 504, and waits for `Retry-After`, in seconds, if the service sends it.
+  It retries a network failure at most twice. Any other status is final.
+- The adapter also sends built-in zswap and dust preimages, which hold the
+  user's coin data.
+
+The self-host path is a stock proof server behind a proxy that holds the keys
+and builds the stock body.
 
 ### Proving keys
 
@@ -203,7 +232,8 @@ Measured on a 30-circuit build of the reference account (2026/09/23):
 | 16 | 112 MB | 0.33 to 0.47 s |
 | 17 | 224 MB | 0.72 to 1.35 s |
 
-All proving keys of that account total 3.5 GB, against 928 KB of ZKIR. The
+All proving keys of that account total 3.5 GB, against 928 KB of ZKIR. On the
+final build (2026/11/09), the p256 circuits have keys of 470 to 495 MB. The
 prover still needs the SRS to prove: 25 MB at k=17.
 
 **Key identity.** A proving key depends on the exact zkir and midnight-zk crate
