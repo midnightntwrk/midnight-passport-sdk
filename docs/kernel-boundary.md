@@ -13,9 +13,9 @@ signature, a public key, ciphertext, or an opaque handle. The kernel has one
 public entry. No module outside the kernel imports its internals.
 
 A kernel is a `Kernel` object, one per account, not a module-global. A process
-can hold several accounts without their secrets colliding. A `dispose` call
-zeros every secret the kernel still holds, which gives one teardown point, for
-example on lock or logout.
+can hold several accounts without their secrets colliding. `dispose` zeros
+every secret the kernel still holds. It is the one teardown point, for example
+on lock or logout.
 
 ## The secrets the kernel may hold
 
@@ -69,11 +69,11 @@ lifecycle (E17).
 
 - A kernel function that takes a secret buffer zeros it with `fill(0)` before it
   returns, and on a throw.
-- A kernel error carries no key bytes. A secret never reaches a log or an error.
+- A kernel error carries no key bytes, and a secret never reaches a log or an error.
 - The kernel keeps the only reference to a retained secret, in a private field,
   keyed by its handle. A handle exposes no byte accessor. The kernel zeros the
   retained copy when it releases the handle, and `dispose` zeros every copy the
   kernel still holds.
 
-The error taxonomy and its redaction test arrive in the second tranche, once the
-`core` SDK error base types exist (E03.03).
+`releaseSecret` with an unknown handle throws `UnknownHandleError`, a `core`
+`PassportError` (E03.03). It carries no secret, so no serialization reveals one.
