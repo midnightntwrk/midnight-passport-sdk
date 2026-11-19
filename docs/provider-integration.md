@@ -250,6 +250,12 @@ proves the circuits of dApps. Their witnesses can hold other sensitive data of
 the user. The SDK must tell the user that the prover sees these inputs, for the
 ACC and for each dApp circuit.
 
+Thus, a gate in `mn-passport-core` wraps the prover. Before the first proof of
+an account, it asks the app's consent hook. No proof request leaves the client
+until the hook answers "accepted". The gate stores the accepted text version
+and operator, and asks again only when one of them changes. Each SDK prove path
+must wrap its prover with this gate.
+
 Encryption of the proving input to an enclave becomes mandatory when a
 trusted-hardware prover exists. Until then, the disclosure applies.
 
