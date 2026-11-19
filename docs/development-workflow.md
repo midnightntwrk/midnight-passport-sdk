@@ -300,6 +300,7 @@ and a PR. Nobody deletes it.
 | Tranche budget | CI and `check-diff-size.sh` | Counts net changed lines. Lockfiles, generated code, test fixtures, and `experiments/` do not count. In CI, 400 and 600 are warnings. Locally, the script fails past 600. |
 | 7-day dependency cooldown | CI and `check-dep-cooldown.mjs` | Rejects a lockfile with a version less than 7 days old, unless the PR has a `Cooldown-override: <reason>` line. Fails closed: a version of unknown age fails, and the override does not cover it. |
 | Cooldown at install | `pnpm-workspace.yaml`, `.npmrc` | pnpm and npm refuse versions less than 7 days old. Exact pins and no install scripts. |
+| One copy of each Midnight package | `pnpm run lint` and `check-single-copy.mjs` | Fails when the lockfile has two versions of ledger-v9, `compact-js`, `compact-runtime`, or Effect 3 (`docs/compatibility.md`). |
 | Registers never tracked | CI | Fails if a path under `.mn-passport-skills/` is tracked or no longer gitignored. |
 | Lint, format, build, and test | CI | All must pass. |
 
