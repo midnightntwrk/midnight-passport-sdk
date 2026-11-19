@@ -65,7 +65,7 @@ test('releaseSecret invalidates the handle and rejects a stale handle', () => {
   const handle = kernel.holdSecret(Uint8Array.from([9, 9, 9, 9]));
 
   kernel.releaseSecret(handle);
-  assert.throws(() => kernel.releaseSecret(handle), /already released or was not issued/);
+  assert.throws(() => kernel.releaseSecret(handle), { code: 'UNKNOWN_HANDLE' });
 
   kernel.dispose();
 });
@@ -77,8 +77,8 @@ test('dispose invalidates every handle the kernel still holds', () => {
 
   kernel.dispose();
 
-  assert.throws(() => kernel.releaseSecret(first), /already released or was not issued/);
-  assert.throws(() => kernel.releaseSecret(second), /already released or was not issued/);
+  assert.throws(() => kernel.releaseSecret(first), { code: 'UNKNOWN_HANDLE' });
+  assert.throws(() => kernel.releaseSecret(second), { code: 'UNKNOWN_HANDLE' });
 });
 
 test('a secret handled by one kernel is unknown to another', () => {
@@ -86,7 +86,7 @@ test('a secret handled by one kernel is unknown to another', () => {
   const second = new Kernel();
   const handle = first.holdSecret(Uint8Array.from([3, 3, 3]));
 
-  assert.throws(() => second.releaseSecret(handle), /already released or was not issued/);
+  assert.throws(() => second.releaseSecret(handle), { code: 'UNKNOWN_HANDLE' });
 
   first.releaseSecret(handle);
   first.dispose();
