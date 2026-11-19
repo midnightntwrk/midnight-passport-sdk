@@ -4,6 +4,7 @@
     "composite": false,
     "noEmit": true,
     "declaration": false,
+    "isolatedDeclarations": false,
     "declarationMap": false,
     "sourceMap": false,
     "allowJs": true,
