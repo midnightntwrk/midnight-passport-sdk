@@ -5,7 +5,7 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { browserTest, bundle, runPage } from './chromium.mjs';
+import { browserTest, bundle, runPage, viteBundle } from './chromium.mjs';
 import { listen } from './server.mjs';
 
 const EMPTY_WASM = new Uint8Array([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]);
@@ -63,6 +63,7 @@ async function importStubbed(page, url) {
 /** @type {Record<string, (entry: string) => Promise<unknown>>} */
 const bundlers = {
   esbuild: (entry) => bundle(`import ${JSON.stringify(entry)};`),
+  Vite: viteBundle,
 };
 for (const [name, build] of Object.entries(bundlers)) {
   test(`${name}: a Node.js built-in fails the build, unless the app has a package of that name`, async (t) => {

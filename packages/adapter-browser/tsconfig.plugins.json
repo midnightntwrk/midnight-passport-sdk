@@ -3,9 +3,9 @@
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist",
-    "tsBuildInfoFile": "esbuild.tsbuildinfo",
+    "tsBuildInfoFile": "plugins.tsbuildinfo",
     "types": ["node"],
     "lib": ["ES2022", "DOM"]
   },
-  "files": ["src/esbuild.ts"]
+  "files": ["src/bundler.ts", "src/esbuild.ts", "src/vite.ts"]
 }

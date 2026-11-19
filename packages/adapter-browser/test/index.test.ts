@@ -7,7 +7,10 @@ test('browserPlatform builds in Node.js, with no WebAuthn there', async () => {
   assert.equal(browserPlatform().webauthn, undefined);
 });
 
-test('the esbuild subpath gives the plugin', async () => {
-  const { passportWasm } = await import('@midnight-ntwrk/mn-passport-adapter-browser/esbuild');
-  assert.equal(passportWasm().name, 'mn-passport-wasm');
+test('the esbuild and vite subpaths each give the plugin', async () => {
+  const plugins = [
+    await import('@midnight-ntwrk/mn-passport-adapter-browser/esbuild'),
+    await import('@midnight-ntwrk/mn-passport-adapter-browser/vite'),
+  ];
+  for (const { passportWasm } of plugins) assert.equal(passportWasm().name, 'mn-passport-wasm');
 });

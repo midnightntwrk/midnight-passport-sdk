@@ -13,6 +13,10 @@
     "./esbuild": {
       "types": "./dist/esbuild.d.ts",
       "default": "./dist/esbuild.js"
+    },
+    "./vite": {
+      "types": "./dist/vite.d.ts",
+      "default": "./dist/vite.js"
     }
   },
   "files": [
