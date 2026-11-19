@@ -169,7 +169,7 @@ foundation, never from `owner`.
 | `adapter-broadcast` | Broadcast, fees | Gives the proven transaction to the sponsor, which pays the fees and returns the paid transaction. Submits it, and waits to the level that the caller asks for, with bounded waits and resubmission. |
 | `adapter-indexer` | Indexer | Reads from the indexer, and from the node for a block that the indexer has not reached yet. "Not found" is a value; an unreachable source is an error. |
 | `adapter-fee-capacity-exchange` | Fees | The other fee route: a swap through the Capacity Exchange. Planned for later. |
-| `adapter-browser` | Platform | The browser runtime: passkeys with PRF and the two WASM runtimes in the correct order. |
+| `adapter-browser` | Platform | The browser runtime: passkeys with PRF and the two WASM runtimes in the correct order (the contract runtime first). |
 | `adapter-nodejs` | Platform | The Node.js runtime for backends, `mn-passport-agent` included. |
 | `adapter-waas` | Key provider, account metadata | The embedded key of a WaaS provider (k256, envelope 0) and the metadata on it. It names no vendor. Only `owner` uses it, because this key is an optional backup owner key with full authority. It enrolls the key only when the provider isolates it to the Passport app. It never writes the viewing key or the WPP account key in readable form (the kernel invariant). |
 | `adapter-wpp-<backend>` | Storage | One package per WPP storage backend, so that an app loads only the backend it uses. Each stores ciphertext only. The first is `adapter-wpp-drive`, on Google Drive. |
@@ -638,7 +638,7 @@ import { nodePlatform } from '@midnight-ntwrk/mn-passport-adapter-nodejs';
 import { registry } from '@midnight-ntwrk/mn-passport-adapter-registry'; // name open
 
 const agent = PassportAgent.create({
-  key: owsKeyProvider(owsWallet), platform: nodePlatform(), registry: registry(), prover, broadcast,
+  key: owsKeyProvider(owsWallet), platform: nodePlatform({ storeDir }), registry: registry(), prover, broadcast,
 });
 
 const request = await agent.requestGrant({ label: 'Rebalancer', scope }); // show as a QR code or a link
