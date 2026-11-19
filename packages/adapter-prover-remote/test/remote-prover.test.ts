@@ -1,8 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CostModel, Proof, Transaction } from '@midnightntwrk/ledger-v9';
-import { remoteProver } from '@midnight-ntwrk/mn-passport-adapter-prover-remote';
+import {
+  remoteProver,
+  type RemoteProverOptions,
+} from '@midnight-ntwrk/mn-passport-adapter-prover-remote';
 import { createStubPlatform, type HttpHandler } from '@midnight-ntwrk/mn-passport-dev';
+import { consent } from './consent.js';
 import { fakeService, oneCall, verifierKey } from './one-call.js';
 
 const prover = () =>
@@ -10,6 +14,7 @@ const prover = () =>
     url: 'https://prover.example',
     platform: createStubPlatform(),
     verifierKey: async () => verifierKey,
+    consent: consent(),
   });
 
 test('bytes that are not an unproven transaction reject as input', async () => {
@@ -26,11 +31,21 @@ test('the factory refuses a bad URL with TypeError and a bad default timeout wit
       url,
       platform: createStubPlatform(),
       verifierKey: async () => verifierKey,
+      consent: consent(),
       ...(defaultTimeoutMs === undefined ? {} : { defaultTimeoutMs }),
     });
   assert.throws(make('http://prover.example'), TypeError);
   assert.throws(make('https://prover.example', Infinity), RangeError);
   assert.doesNotThrow(make('https://prover.example', 1000));
+});
+
+test('the factory refuses a call without consent, so no unwrapped remote prover exists', () => {
+  const options = {
+    url: 'https://prover.example',
+    platform: createStubPlatform(),
+    verifierKey: async () => verifierKey,
+  };
+  assert.throws(() => remoteProver(options as unknown as RemoteProverOptions), TypeError);
 });
 
 function recorded(answer: HttpHandler = fakeService, key: Uint8Array = verifierKey) {
@@ -41,6 +56,7 @@ function recorded(answer: HttpHandler = fakeService, key: Uint8Array = verifierK
     platform,
     verifierKey: async () => (keyFetches++, key),
     credential: async () => 'token',
+    consent: consent(),
   });
   return { prover, requests: platform.requests, keyFetches: () => keyFetches };
 }
@@ -134,6 +150,7 @@ test('a rejection of the verifierKey callback reaches the caller unchanged', asy
     url: 'https://prover.example',
     platform: createStubPlatform({ http: fakeService }),
     verifierKey: () => Promise.reject(failure),
+    consent: consent(),
   });
   await assert.rejects(
     prover.prove({ stage: 'unproven', bytes: oneCall().bytes }, ['owner_call']),
