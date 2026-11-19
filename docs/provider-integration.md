@@ -230,7 +230,8 @@ trusted-hardware prover exists. Until then, the disclosure applies.
 A user never holds or pays with DUST. The broadcast seam in `mn-passport-core` takes the proven transaction.
 `adapter-broadcast` gives it to the sponsor. The sponsor adds the fee payment
 and broadcasts the transaction. The sponsor also pays the fees of account
-creation and the opening balance.
+creation and the opening balance. [`sponsor-policy.md`](./sponsor-policy.md)
+owns what it pays, its limits, and the client's action after each refusal.
 
 ### Monitoring until final
 
@@ -273,8 +274,9 @@ DUST, so this route matters for funds in the ACC.
    Nobody tested if a proof server accepts keys made from ZKIR only.
 6. **The resubmission path.** Does the client resubmit through the sponsor, or
    directly to a node?
-7. **Sponsor policy.** Which calls does the sponsor pay for, and which limits
-   stop abuse?
+7. **Sponsor policy.** _Closed 2026/11/18._ The sponsor pays account deploys,
+   ACC maintenance updates that install ACC verifier keys, and ACC calls, with
+   a fee cap and a limit per caller. See [`sponsor-policy.md`](./sponsor-policy.md).
 8. **The trusted-hardware prover.** Which encryption scheme does the client
    use, and how does it pin the key of the enclave?
 
