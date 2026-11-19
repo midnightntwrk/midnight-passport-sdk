@@ -75,3 +75,5 @@ jobs:
           # Type-aware lint reads the built declarations of the workspace packages.
           pnpm run lint
           pnpm test
+      - name: Check the packed packages with publint and attw
+        run: pnpm run check:pack
