@@ -5,8 +5,8 @@
 // - its directory is in the graph, and its name is the scoped package name;
 // - each @midnight-ntwrk/mn-passport-* dependency is a permitted edge;
 // - its tsconfig project references mirror those dependencies;
-// - `connect`, `agent`, and `ecosystems` reach no forbidden package, not even
-//   transitively.
+// - `connect`, `agent`, `ecosystems`, and `dev` reach no forbidden package,
+//   not even transitively.
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { ALLOWED, NEVER_REACHES, SCOPE } from './dependency-graph.mjs';

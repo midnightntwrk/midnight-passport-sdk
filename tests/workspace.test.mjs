@@ -57,3 +57,44 @@ test('every dependency in every workspace manifest is exact-pinned', async () =>
     }
   }
 });
+
+const packageDirs = (await readdir(new URL('../packages', import.meta.url))).sort();
+
+test('package shape', async () => {
+  assert.ok(packageDirs.length > 0, 'packages/ must hold the scaffolded packages');
+  for (const dir of packageDirs) {
+    const manifest =
+      /** @type {{ type?: string, sideEffects?: boolean, exports?: unknown, files?: string[], private?: boolean }} */ (
+        JSON.parse(await read(`../packages/${dir}/package.json`))
+      );
+    assert.equal(manifest.type, 'module', `${dir}: type`);
+    assert.equal(manifest.sideEffects, false, `${dir}: sideEffects`);
+    assert.deepEqual(
+      manifest.exports,
+      { '.': { types: './dist/index.d.ts', default: './dist/index.js' } },
+      `${dir}: one exports entry`,
+    );
+    assert.deepEqual(
+      manifest.files,
+      ['dist', '!dist/.tsbuildinfo'],
+      `${dir}: only the build ships`,
+    );
+    const tests = await readdir(new URL(`../packages/${dir}/test`, import.meta.url));
+    assert.ok(
+      tests.some((file) => file.endsWith('.test.ts')),
+      `${dir}: a test under test/`,
+    );
+    assert.equal(manifest.private, dir === 'dev' ? true : undefined, `${dir}: private flag`);
+  }
+});
+
+test('the root build references every package', async () => {
+  const solution = /** @type {{ references: { path: string }[] }} */ (
+    JSON.parse(await read('../tsconfig.build.json'))
+  );
+  const built = solution.references.map((ref) => ref.path);
+  assert.deepEqual(
+    built.sort(),
+    packageDirs.map((dir) => `packages/${dir}/tsconfig.test.json`),
+  );
+});

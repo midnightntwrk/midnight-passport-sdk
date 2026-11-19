@@ -28,9 +28,13 @@ export const ALLOWED = {
   'adapter-multi-chain': ['core'],
   'adapter-prover-wasm': ['core'],
   'adapter-wpp-drive': ['core'],
+  'adapter-indexer': ['core'],
+  'adapter-registry': ['contract'],
   // Passport-app adapters: seams from `owner`
   'adapter-recovery': ['owner'],
   'adapter-did': ['owner'],
+  // Private package of local stubs
+  dev: FOUNDATION,
 };
 
 // Packages that hold no platform code (`owner` and the foundation), plus the
@@ -54,6 +58,7 @@ export const PASSPORT_APP_ADAPTERS = Object.keys(ALLOWED).filter((pkg) =>
 export const NEVER_REACHES = {
   connect: ['owner', ...PASSPORT_APP_ADAPTERS],
   agent: ['owner', ...PASSPORT_APP_ADAPTERS],
+  dev: ['owner', ...PASSPORT_APP_ADAPTERS],
   ecosystems: [
     'owner',
     'core',

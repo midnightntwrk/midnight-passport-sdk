@@ -43,7 +43,7 @@ test('the repository workspace respects the dependency rules', () => {
   assert.deepEqual(checkWorkspace(fileURLToPath(new URL('..', import.meta.url))), []);
 });
 
-test('the graph itself keeps connect, agent, and ecosystems away from forbidden packages', () => {
+test('the graph itself keeps connect, agent, ecosystems, and dev away from forbidden packages', () => {
   const edges = new Map(Object.entries(ALLOWED).map(([pkg, deps]) => [pkg, new Set(deps)]));
   for (const [pkg, forbidden] of Object.entries(NEVER_REACHES)) {
     const reached = [...reachable(edges, pkg)].filter((target) => forbidden.includes(target));
