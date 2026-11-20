@@ -163,7 +163,8 @@ change makes a conformance check wrong, it updates that skill in the same PR.
 
 **`pr-open`** runs the size check with the same script and numbers as CI. Over
 400 net lines, it warns and needs a justification in the PR. Over 600, it
-stops and proposes a split. It prepares the branch, the commits, and the
+stops and proposes a split, or records a `Budget-override: <reason>` line in
+the PR body so CI passes. It prepares the branch, the commits, and the
 description. If the spec has an issue, the description carries `Refs #NN`, or
 `Closes #NN` on the last tranche. Then it stops and gives the human a
 pre-filled compare URL and a copy of the description.
@@ -297,14 +298,17 @@ and a PR. Nobody deletes it.
 | Check | Where | Behavior |
 |---|---|---|
 | Outward-action guard | Plugin hook | `git push`, `gh pr create`, `gh pr merge`, and `npm publish` from the agent need a human confirmation. |
-| Tranche budget | CI and `check-diff-size.sh` | Counts net changed lines. Lockfiles, generated code, test fixtures, and `experiments/` do not count. In CI, 400 and 600 are warnings. Locally, the script fails past 600. |
+| Tranche budget | CI and `check-diff-size.sh` | Counts net changed lines. Lockfiles, generated code, test fixtures, and `experiments/` do not count. In CI, 400 warns; above 600 fails, unless the PR body has a `Budget-override: <reason>` line, then it warns and passes. Any author may add the line; a reviewer grants it by approving. Locally, the script fails past 600 unless `PR_BODY` carries the override line. |
 | 7-day dependency cooldown | CI and `check-dep-cooldown.mjs` | Rejects a lockfile with a version less than 7 days old, unless the PR has a `Cooldown-override: <reason>` line. Fails closed: a version of unknown age fails, and the override does not cover it. |
 | Cooldown at install | `pnpm-workspace.yaml`, `.npmrc` | pnpm and npm refuse versions less than 7 days old. Exact pins and no install scripts. |
 | One copy of each Midnight package | `pnpm run lint` and `check-single-copy.mjs` | Fails when the lockfile has two versions of ledger-v9, `compact-js`, `compact-runtime`, or Effect 3 (`docs/compatibility.md`). |
 | Registers never tracked | CI | Fails if a path under `.mn-passport-skills/` is tracked or no longer gitignored. |
 | Lint, format, build, and test | CI | All must pass. |
 
-A human decides to merge an exceptional PR over budget, such as a migration.
+An above-600 PR passes CI with a `Budget-override: <reason>` line. Branch
+protection decides whether a failing size check also blocks the merge button.
+Keep that check non-required, so a maintainer can still merge an exceptional
+PR, such as a migration.
 
 ## Readability standard
 

@@ -61,9 +61,9 @@ export function readLockfile(lockText) {
   let importerKey = '';
   for (const line of lockText.split(/\r?\n/)) {
     if (/^\S/.test(line)) block = line.replace(/:.*$/, '');
-    const entry = line.match(/^ {2}([^\s-].*?):\s*(?:\{\})?$/);
-    const dependency = line.match(/^ {6}([^\s-].*?):\s*(.*)$/);
-    const version = line.match(/^ {8}version:\s*(.+)$/);
+    const entry = /^ {2}([^\s-].*?):\s*(?:\{\})?$/.exec(line);
+    const dependency = /^ {6}([^\s-].*?):\s*(.*)$/.exec(line);
+    const version = /^ {8}version:\s*(.+)$/.exec(line);
     if (block === 'packages' && entry) versions.add(unquote(entry[1] ?? '').split('(')[0] ?? '');
     else if (dependency && (block === 'snapshots' || block === 'importers')) {
       importerKey = unquote(dependency[1] ?? '');

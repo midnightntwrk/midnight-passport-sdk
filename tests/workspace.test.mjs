@@ -7,7 +7,11 @@ import { readFile, readdir } from 'node:fs/promises';
 
 /** @param {string} path */
 const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
-const root = JSON.parse(await read('../package.json'));
+/**
+ * @typedef {{ dependencies?: Record<string, string>, devDependencies?: Record<string, string>, peerDependencies?: Record<string, string> }} Pins
+ * @typedef {Pins & { private?: unknown, workspaces?: unknown, packageManager: string, engines?: { node?: unknown } }} RootManifest
+ */
+const root = /** @type {RootManifest} */ (JSON.parse(await read('../package.json')));
 
 test('the repo is a private pnpm workspace over packages/*', async () => {
   assert.equal(root.private, true);
@@ -19,7 +23,7 @@ test('the repo is a private pnpm workspace over packages/*', async () => {
 
 test('the Node baseline agrees across manifest, .nvmrc, and the CI gate', async () => {
   assert.ok(root.engines, 'root manifest must declare engines');
-  assert.equal(root.engines.node, '>=22');
+  assert.equal(root.engines.node, '>=22.1');
   assert.equal((await read('../.nvmrc')).trim(), '22');
   const workflow = await read('../.github/workflows/pr-checks.yml');
   const pins = [...workflow.matchAll(/node-version(?:-file)?:\s*(.+)/g)].map((m) =>
@@ -35,11 +39,12 @@ test('the Node baseline agrees across manifest, .nvmrc, and the CI gate', async 
 });
 
 test('every dependency in every workspace manifest is exact-pinned', async () => {
+  /** @type {[string, Pins][]} */
   const manifests = [['package.json', root]];
   const packages = await readdir(new URL('../packages', import.meta.url)).catch(() => []);
   for (const dir of packages) {
     const path = `../packages/${dir}/package.json`;
-    manifests.push([path, JSON.parse(await read(path))]);
+    manifests.push([path, /** @type {Pins} */ (JSON.parse(await read(path)))]);
   }
   for (const [path, manifest] of manifests) {
     const all = {

@@ -86,7 +86,7 @@ export function lintWorkspace(root) {
       if (PLATFORM_NEUTRAL.has(pkg)) {
         for (const match of text.matchAll(NODE_BUILTIN_RE)) {
           violations.push(
-            `${where}: "${pkg}" must not import "${match[1]}" — it ships to browser/PWA bundles (architecture, Dependency rules).`,
+            `${where}: "${pkg}" must not import "${match[1] ?? ''}" — it ships to browser/PWA bundles (architecture, Dependency rules).`,
           );
         }
         for (const match of text.matchAll(GLOBAL_DECLARATION_RE)) {

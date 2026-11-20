@@ -52,7 +52,7 @@ function cooldown({ add, shape = 'object', body = '' }) {
   chmodSync(join(bin, 'npm'), 0o755);
   const env = {
     ...process.env,
-    PATH: `${bin}${delimiter}${process.env.PATH}`,
+    PATH: `${bin}${delimiter}${process.env.PATH ?? ''}`,
     GIT_CONFIG_GLOBAL: '/dev/null',
     GIT_CONFIG_NOSYSTEM: '1',
     FAKE_NPM: JSON.stringify({ shape, days: { young: 2, old: 30 } }),

@@ -4,11 +4,12 @@
     "composite": false,
     "noEmit": true,
     "declaration": false,
+    "isolatedDeclarations": false,
     "declarationMap": false,
     "sourceMap": false,
     "allowJs": true,
     "checkJs": true,
     "types": ["node"]
   },
-  "include": ["tests/**/*.mjs", "scripts/**/*.mjs"]
+  "include": ["tests/**/*.mjs", "scripts/**/*.mjs", "scripts/json.d.ts"]
 }

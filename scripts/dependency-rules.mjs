@@ -51,7 +51,7 @@ export function checkWorkspace(root) {
     }
     const manifest = /** @type {Manifest} */ (readJson(manifestPath));
     if (manifest.name !== SCOPE + dir) {
-      violations.push(`"${dir}" must be named "${SCOPE}${dir}", got "${manifest.name}"`);
+      violations.push(`"${dir}" must be named "${SCOPE}${dir}", got "${String(manifest.name)}"`);
     }
     const deps = new Set(
       Object.keys({
@@ -67,6 +67,7 @@ export function checkWorkspace(root) {
     }
 
     const projectPath = join(packagesDir, dir, 'tsconfig.json');
+    /** @type {Set<string>} */
     const refs = new Set();
     if (existsSync(projectPath)) {
       const project = /** @type {ProjectConfig} */ (readJson(projectPath));
