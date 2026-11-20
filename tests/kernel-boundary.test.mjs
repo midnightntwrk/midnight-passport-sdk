@@ -39,7 +39,7 @@ function kernelBoundaryViolations(files) {
       if (isKernelInternal(resolved)) {
         violations.push(
           `${relative(repoRoot, path)}: imports kernel internal "${spec}" — a module outside ` +
-            `the kernel may import only the kernel public entry (E03.04, acceptance criterion 1).`,
+            `the kernel may import only the kernel public entry.`,
         );
       }
     }

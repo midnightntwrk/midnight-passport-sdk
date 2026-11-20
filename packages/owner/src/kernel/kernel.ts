@@ -1,3 +1,4 @@
+import { UnknownHandleError } from './errors.js';
 import { SecretHandle } from './handle.js';
 import { zeroize } from './zeroize.js';
 
@@ -25,9 +26,7 @@ export class Kernel {
   releaseSecret(handle: SecretHandle): void {
     const copy = this.#retained.get(handle);
     if (copy === undefined) {
-      throw new Error(
-        'releaseSecret: the handle was already released or was not issued by this kernel.',
-      );
+      throw new UnknownHandleError();
     }
     zeroize(copy);
     this.#retained.delete(handle);
