@@ -1,2 +1,3 @@
-// @midnight-ntwrk/mn-passport-core: empty until its first story lands.
-export {};
+export { PassportError } from './passport-error.js';
+export { UpstreamError } from './upstream-error.js';
+export { createStateSource, type StateSource } from './state-source.js';
