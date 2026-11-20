@@ -166,16 +166,19 @@ each dApp circuit. Encryption of the proving input to an enclave becomes
 mandatory when a trusted-hardware prover exists. The SDK does not do remote
 attestation.
 
-**No proofs in the tab in V1.** The ACC circuits are at k=15 to 17, with
-proving keys of 112 to 224 MB. The zkir WASM package has no key generation.
+**No proofs in the tab in V1.** The ACC circuits are at k=15 to 17. The p256
+circuits have proving keys of 470 to 495 MB. The zkir WASM package has no key
+generation.
 
 ### Fees and broadcast
 
 - **No user-held DUST.** No SDK path can assume that the user holds DUST.
 - **Broadcast.** The client gives the proven transaction to the sponsor, which
-  pays the fees and broadcasts it. The client monitors it until it is final.
-- **Bounded waits.** The broadcast client uses bounded waits, and submits again
-  when a transaction does not arrive.
+  pays the fees and returns the paid transaction. The client submits it to a
+  node, and monitors it until it is final.
+- **Bounded waits.** The broadcast client uses bounded waits. After a refusal,
+  or when a transaction does not arrive before its payment expires, it gets a
+  new payment. It never submits paid bytes again after a refusal.
 - **Onboarding.** A sponsor pays the fees of account creation and the opening
   balance.
 
@@ -198,7 +201,8 @@ Each service is replaceable behind a seam.
 | Process | Service | What it can see or do |
 |---|---|---|
 | Proving | The prover | The private inputs of each proof, for example the coin and the amount |
-| Fees and broadcast | The sponsor | The proven transaction |
+| Fees | The sponsor | The proven transaction |
+| Broadcast | A node | The paid transaction |
 | Fee swaps | The Capacity Exchange | The amount class and the payment token of a quote |
 | Backup owner key (optional) | The WaaS provider | It holds a full-authority key, isolated to the Passport app. It reads the public account metadata. |
 | Private-data storage | WPP storage | Ciphertext only |
@@ -374,7 +378,7 @@ server.
 **Execution.** The library gets the artifacts of a dApp from a registry, by
 content hash. It makes the verifier key again from the ZKIR and compares it
 with the key on chain. Then it runs the circuit. OWS signs, the prover proves,
-and the sponsor broadcasts, with the Passport app closed. In V1, the agent
+and the sponsor pays, with the Passport app closed. In V1, the agent
 verifies the client code against a hash that the dApp publishes.
 
 ## Private data
