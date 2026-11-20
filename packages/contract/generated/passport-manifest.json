@@ -1,0 +1,954 @@
+{
+  "schema": 1,
+  "source": {
+    "repository": "midnightntwrk/passport",
+    "commit": "6497e22de2d455a0c0d10768a51e796ce7404fc3",
+    "path": "contract/contracts/account.compact"
+  },
+  "toolchain": {
+    "compiler": "0.36.1",
+    "compilerCommit": "163cdfd3f53dc888448cacf4e935c78e19cafa29",
+    "language": "0.28.0",
+    "runtime": "0.21.0",
+    "zkir": "zkir-3.2.1 (7a51b3385bbf)"
+  },
+  "originLength": 21,
+  "circuits": {
+    "shared": [
+      "deposit_shielded",
+      "deposit_unshielded",
+      "recover_finalise",
+      "recover_submit"
+    ],
+    "jubjub": [
+      "activate_initial_device_with_jubjub",
+      "add_device_with_jubjub",
+      "append_inbox_with_jubjub",
+      "issue_grant_with_jubjub",
+      "publish_recovery_session_with_jubjub",
+      "recover_cancel_with_jubjub",
+      "remove_device_with_jubjub",
+      "revoke_all_grants_with_jubjub",
+      "revoke_grant_with_jubjub",
+      "rotate_enc_key_with_jubjub",
+      "withdraw_shielded_to_contract_with_grant_jubjub",
+      "withdraw_shielded_to_contract_with_jubjub",
+      "withdraw_shielded_with_grant_jubjub",
+      "withdraw_shielded_with_jubjub",
+      "withdraw_unshielded_with_grant_jubjub",
+      "withdraw_unshielded_with_jubjub"
+    ],
+    "k256": [
+      "activate_initial_device_with_k256",
+      "add_device_with_k256",
+      "append_inbox_with_k256",
+      "issue_grant_with_k256",
+      "publish_recovery_session_with_k256",
+      "recover_cancel_with_k256",
+      "remove_device_with_k256",
+      "revoke_all_grants_with_k256",
+      "revoke_grant_with_k256",
+      "rotate_enc_key_with_k256",
+      "withdraw_shielded_to_contract_with_grant_k256",
+      "withdraw_shielded_to_contract_with_k256",
+      "withdraw_shielded_with_grant_k256",
+      "withdraw_shielded_with_k256",
+      "withdraw_unshielded_with_grant_k256",
+      "withdraw_unshielded_with_k256"
+    ],
+    "p256": [
+      "activate_initial_device_with_p256",
+      "add_device_with_p256",
+      "append_inbox_with_p256",
+      "issue_grant_with_p256",
+      "publish_recovery_session_with_p256",
+      "recover_cancel_with_p256",
+      "remove_device_with_p256",
+      "revoke_all_grants_with_p256",
+      "revoke_grant_with_p256",
+      "rotate_enc_key_with_p256",
+      "withdraw_shielded_to_contract_with_grant_p256",
+      "withdraw_shielded_to_contract_with_p256",
+      "withdraw_shielded_with_grant_p256",
+      "withdraw_shielded_with_p256",
+      "withdraw_unshielded_with_grant_p256",
+      "withdraw_unshielded_with_p256"
+    ]
+  },
+  "waveOne": {
+    "jubjub": [
+      "deposit_unshielded",
+      "deposit_shielded",
+      "activate_initial_device_with_jubjub",
+      "withdraw_unshielded_with_jubjub",
+      "append_inbox_with_jubjub",
+      "withdraw_shielded_with_jubjub"
+    ],
+    "k256": [
+      "deposit_unshielded",
+      "deposit_shielded",
+      "activate_initial_device_with_k256",
+      "withdraw_unshielded_with_k256",
+      "append_inbox_with_k256",
+      "withdraw_shielded_with_k256"
+    ],
+    "p256": [
+      "deposit_unshielded",
+      "deposit_shielded",
+      "activate_initial_device_with_p256",
+      "withdraw_unshielded_with_p256",
+      "append_inbox_with_p256",
+      "withdraw_shielded_with_p256"
+    ]
+  },
+  "files": {
+    "compiler/contract-info.json": {
+      "size": 237826,
+      "sha256": "712d4f9214ced5cff4241f9199b78bae6e23125ea69df31e5bcd631a20c7e0a5"
+    },
+    "contract/index.d.ts": {
+      "size": 220567,
+      "sha256": "ea0bf0b5ef610b8410535fa01590abd814f77cdc7eaad7c4e2addb915542047b"
+    },
+    "contract/index.js": {
+      "size": 1710036,
+      "sha256": "b361de4c855d0d6fa7a82a685f6fb947c9f137c93f26d4c3644663b5aca0d3bd"
+    },
+    "contract/index.js.map": {
+      "size": 91663,
+      "sha256": "2defaa181ae2ab17dd04b1fb15786cfdd96e116c2643aeebc5a3d81c11f1f930"
+    },
+    "keys/activate_initial_device_with_jubjub.prover": {
+      "size": 24648297,
+      "sha256": "6b9571e641ff826dd381550d14e3c445f28efad59890c1cd8a50b27a9517995a"
+    },
+    "keys/activate_initial_device_with_jubjub.verifier": {
+      "size": 2313,
+      "sha256": "b33fa139d34231f6ba1144a4ac3e947b35e679e8e91d31b554d7ff916932931e"
+    },
+    "keys/activate_initial_device_with_k256.prover": {
+      "size": 29368305,
+      "sha256": "2edd2dc726595643bdb58ead28332c769045be9bc81db85492eb9623ecb2c3bb"
+    },
+    "keys/activate_initial_device_with_k256.verifier": {
+      "size": 2745,
+      "sha256": "6de7d8e483e89b8894b651cd0d860620771b4fa532206c0ba7c08295a5095395"
+    },
+    "keys/activate_initial_device_with_p256.prover": {
+      "size": 29368076,
+      "sha256": "c5f640112df733a15259a2e970d2d3cb157f7414d2cb2cb79e5d06b6d86f9926"
+    },
+    "keys/activate_initial_device_with_p256.verifier": {
+      "size": 2745,
+      "sha256": "e24d797882118f6d1e33c6e756e361fa7f0b405d658cbcaaa45b4602a19dde7e"
+    },
+    "keys/add_device_with_jubjub.prover": {
+      "size": 49291628,
+      "sha256": "ed2751985656838f6c626e0316e000e6eba33698763dc60f4e1a9793079faa06"
+    },
+    "keys/add_device_with_jubjub.verifier": {
+      "size": 2313,
+      "sha256": "f0233186ae0eb772cc40ef20f35cac0fc8984fcce5934b699f331af12a885a38"
+    },
+    "keys/add_device_with_k256.prover": {
+      "size": 234893509,
+      "sha256": "c79e44100b7aa2775897f21010e9a84910bdb8e51bb663dcba941257be33669b"
+    },
+    "keys/add_device_with_k256.verifier": {
+      "size": 2745,
+      "sha256": "f2bd6b0c7747d18aef84cf2209b65ca6eae9958d0375a2b99324ee7bc4db2f5d"
+    },
+    "keys/add_device_with_p256.prover": {
+      "size": 470043044,
+      "sha256": "7c4f4f06af7418503d2ad1364b1378b2a27e163771dac6e0de2bbdbcd8a1403a"
+    },
+    "keys/add_device_with_p256.verifier": {
+      "size": 2745,
+      "sha256": "7c3bb14805a1f2660bcb81f7987bf7f6e696534bb2ad5d40bcbd723a839f9492"
+    },
+    "keys/append_inbox_with_jubjub.prover": {
+      "size": 98574819,
+      "sha256": "c95e4062690f30d94a17c22f1359f6ec462663d9c7088a420d4f6e63c8db96ee"
+    },
+    "keys/append_inbox_with_jubjub.verifier": {
+      "size": 2313,
+      "sha256": "5f08b03fe48e8cbc718915cc4fff1b7f1e64196054afef2f9ea727e03de26016"
+    },
+    "keys/append_inbox_with_k256.prover": {
+      "size": 234893639,
+      "sha256": "93fae362b580935c95a1627a4297a91e1d01fe7b3abd0ff1f38d15dc1bbbe3dd"
+    },
+    "keys/append_inbox_with_k256.verifier": {
+      "size": 2745,
+      "sha256": "1ea3fd2fc1275ff49b78f91912b0b5ac9c2153d3b9e5986e122cba9828ec4a21"
+    },
+    "keys/append_inbox_with_p256.prover": {
+      "size": 470043278,
+      "sha256": "47ea8b07471667b2da064bb32fb7e0b914b650dd25175f5e537fbc1f658b7da4"
+    },
+    "keys/append_inbox_with_p256.verifier": {
+      "size": 2745,
+      "sha256": "cd81b166b89279f1679825abe14520f1556e644ea51565c628c325185f439fcc"
+    },
+    "keys/deposit_shielded.prover": {
+      "size": 11278212,
+      "sha256": "0c63768a2206101b86d8bfc49f7a55d3cdd230afa6a28f61964f160082a519cb"
+    },
+    "keys/deposit_shielded.verifier": {
+      "size": 2121,
+      "sha256": "18caf9ffc1ea3271c340f97ee5433598b796a64fadcc1fb7bb5c65868574d328"
+    },
+    "keys/deposit_unshielded.prover": {
+      "size": 446790,
+      "sha256": "d8409e37efa3f142a8c9fb44a7a4c25397312317f9cf28f1243c1bba887f56a3"
+    },
+    "keys/deposit_unshielded.verifier": {
+      "size": 1353,
+      "sha256": "bb4421a5909564377d15f0756299bef99740089b842e8d9796ad2d3d75831de9"
+    },
+    "keys/issue_grant_with_jubjub.prover": {
+      "size": 98581064,
+      "sha256": "56ce0cdd0e0df49156bf523842f3b4040f3d5de7df4d773df28d54570d74f54e"
+    },
+    "keys/issue_grant_with_jubjub.verifier": {
+      "size": 2313,
+      "sha256": "41982739ecf0f0df2ccda4b316bf9d5852fca0138802b44e80ce84bcd5f0faa6"
+    },
+    "keys/issue_grant_with_k256.prover": {
+      "size": 234899958,
+      "sha256": "24e4b7468e31a727e2ad7d6d483f04173a220353316950a1afcca6bd6f240e20"
+    },
+    "keys/issue_grant_with_k256.verifier": {
+      "size": 2745,
+      "sha256": "4384814c9d95b0d400fc2b7e798a96b862bf222523498204827dc5f6ac27fc0d"
+    },
+    "keys/issue_grant_with_p256.prover": {
+      "size": 470049878,
+      "sha256": "b9cd6c2f51cf4ba24396b0745d89ed500df63e8a8ad9a5ed4d5b7d441a7ed9ad"
+    },
+    "keys/issue_grant_with_p256.verifier": {
+      "size": 2745,
+      "sha256": "12869c5aab98ed4d5a33e55508d74a83a99537a71da03f18534a98730d5c475e"
+    },
+    "keys/publish_recovery_session_with_jubjub.prover": {
+      "size": 98577629,
+      "sha256": "cf89d635a2c3f6ac003a5ad66b79672650dea0046eddb0785beadab773bd955d"
+    },
+    "keys/publish_recovery_session_with_jubjub.verifier": {
+      "size": 2313,
+      "sha256": "7ccab5f6b494e5639d3abfca482fb99b2d5a9d23884b81930c57e78ded1c537d"
+    },
+    "keys/publish_recovery_session_with_k256.prover": {
+      "size": 247479764,
+      "sha256": "e9b8d8e702807227a875f59d4537de816e739cce93795569caad056cb34f4247"
+    },
+    "keys/publish_recovery_session_with_k256.verifier": {
+      "size": 2889,
+      "sha256": "439eed8aab0d9d13cd50e67caedcb085937ef07d4cff532793fa7ccd7c607244"
+    },
+    "keys/publish_recovery_session_with_p256.prover": {
+      "size": 495212399,
+      "sha256": "50b937bd774367e813d4e8bb41bb8ecc9e6063a0df814220589537df56401533"
+    },
+    "keys/publish_recovery_session_with_p256.verifier": {
+      "size": 2889,
+      "sha256": "0cc6f24fdfa0575cc11e3ee6617c4bab1f9c0a2cd0e98739c80fc9c5e0a53748"
+    },
+    "keys/recover_cancel_with_jubjub.prover": {
+      "size": 49292003,
+      "sha256": "aa49c352cd59bd5357e6cff155f7dac06c764b2a163c2f201df1e64cdd008262"
+    },
+    "keys/recover_cancel_with_jubjub.verifier": {
+      "size": 2313,
+      "sha256": "ef6f2193f9bc8125ee8603374f51d62ed685494c5c5bededfc21b3c027fe1d34"
+    },
+    "keys/recover_cancel_with_k256.prover": {
+      "size": 247477110,
+      "sha256": "12a5d3b93393f7d70c4450e314a0f54b64d65efeb104b3494875f1fe89241140"
+    },
+    "keys/recover_cancel_with_k256.verifier": {
+      "size": 2889,
+      "sha256": "5225477cf2899e4d6604f0926a480b9cf7dd2761c16ff621f66dc3bc746f349e"
+    },
+    "keys/recover_cancel_with_p256.prover": {
+      "size": 495208463,
+      "sha256": "b0abbee9bbe04448dfba0c08ed6a3e42efc9891263d823197393e4525adbe49d"
+    },
+    "keys/recover_cancel_with_p256.verifier": {
+      "size": 2889,
+      "sha256": "7cb3cae62ab4f98cfd877530ab995b1f1bf90e2ae1b28c19a8be1f844d7e6ab2"
+    },
+    "keys/recover_finalise.prover": {
+      "size": 4201843,
+      "sha256": "8ade38e6dfc57bf40311635cd77c412e18477240bb25599a336f80a9615f691b"
+    },
+    "keys/recover_finalise.verifier": {
+      "size": 1593,
+      "sha256": "ac5d09dead257d9b865eedffcae9bc3eae91f2ec874183972c81acb2ceaeb114"
+    },
+    "keys/recover_submit.prover": {
+      "size": 49293353,
+      "sha256": "6f068fb42f21697ed3ba5165e1325ea2ebd0271f06dd593fdc7d2cdae9e68549"
+    },
+    "keys/recover_submit.verifier": {
+      "size": 2313,
+      "sha256": "ae78e27b3cfdb4981279b4b24f14b533863d7e3b738a07ab6f72d68512478746"
+    },
+    "keys/remove_device_with_jubjub.prover": {
+      "size": 98575409,
+      "sha256": "ddd78ce3ab45be49f8df1523416f3d82289c8b7ebb72d13c1d9847ce88916aa4"
+    },
+    "keys/remove_device_with_jubjub.verifier": {
+      "size": 2313,
+      "sha256": "d1a6495369e5047c0c25dd928f4494566b91fbf905866e9214513eaa450b1120"
+    },
+    "keys/remove_device_with_k256.prover": {
+      "size": 234894405,
+      "sha256": "19be4dbf026346a2fc2f02878ca24f2867ae3da0abe1c006af1fdb64ebbb205c"
+    },
+    "keys/remove_device_with_k256.verifier": {
+      "size": 2745,
+      "sha256": "bff3d5f98b0a5b787dfc7f999a8137d9d2d79e7e7e1d8304097ea5ed590dbcf3"
+    },
+    "keys/remove_device_with_p256.prover": {
+      "size": 470044050,
+      "sha256": "96b53b98b520ba2d8d2009f7a2ec6c74c075bd578b529b30894f111a41c48be1"
+    },
+    "keys/remove_device_with_p256.verifier": {
+      "size": 2745,
+      "sha256": "6d905868ed42168c99a0cdae0b1c1e8da543d2c74b733dc5e0cfa7a01d107b19"
+    },
+    "keys/revoke_all_grants_with_jubjub.prover": {
+      "size": 49291293,
+      "sha256": "dadfcd35aada4ee8862afca05b7e958e60aeadc6adb1ad7453e167c0aed2f07d"
+    },
+    "keys/revoke_all_grants_with_jubjub.verifier": {
+      "size": 2313,
+      "sha256": "c0ea02c1aee94ace6281f2d7e36c4c028d8acad743b1dfe320bf98e0b2b68aca"
+    },
+    "keys/revoke_all_grants_with_k256.prover": {
+      "size": 234893165,
+      "sha256": "b3dcd2a35bfe12c276bd33f6d0e49a3b816d2ff52d763eda3f32764cce0ccdfa"
+    },
+    "keys/revoke_all_grants_with_k256.verifier": {
+      "size": 2745,
+      "sha256": "2b126817325d31e8fc18adaf0caa5572fb862516373888db08752e4e37adf908"
+    },
+    "keys/revoke_all_grants_with_p256.prover": {
+      "size": 470041596,
+      "sha256": "a3a101d97b726025be79c18d05d5b79b491136660530a1eb4aab8012684f33b0"
+    },
+    "keys/revoke_all_grants_with_p256.verifier": {
+      "size": 2745,
+      "sha256": "b6ce7a33154b14304aed0fbe5bbc3270dcaf6167e32e162c35b65bcb1aa9fe03"
+    },
+    "keys/revoke_grant_with_jubjub.prover": {
+      "size": 49292461,
+      "sha256": "8477f9f464bfddfd77d22749d9451405e04193670e87cd3f68e43c761e8448d7"
+    },
+    "keys/revoke_grant_with_jubjub.verifier": {
+      "size": 2313,
+      "sha256": "6e335c3a0da9eab85cc8c72a0337b8145ed9afbdcaa278582b5cd3e6b12b1628"
+    },
+    "keys/revoke_grant_with_k256.prover": {
+      "size": 234894410,
+      "sha256": "e92886def575b054d4e6108f35b30c58edc8b6280a878e202e305aded363cb24"
+    },
+    "keys/revoke_grant_with_k256.verifier": {
+      "size": 2745,
+      "sha256": "2dea5fbf3c80e651d64dd28837f1c72ac0cff30fa3fe31d92eadfb61fc077e20"
+    },
+    "keys/revoke_grant_with_p256.prover": {
+      "size": 470044053,
+      "sha256": "f616b128d36b9ae4b8f613abc122309c95a37006e745d6e3144bf5784f2504d5"
+    },
+    "keys/revoke_grant_with_p256.verifier": {
+      "size": 2745,
+      "sha256": "d0954732669b8832993836d21d0f5d65ed1d1242da235e6426f0b21cc71c55fa"
+    },
+    "keys/rotate_enc_key_with_jubjub.prover": {
+      "size": 49291116,
+      "sha256": "58296306704657577349863b22467a9f583e9571e7b2a43c5d64753a98d2fba1"
+    },
+    "keys/rotate_enc_key_with_jubjub.verifier": {
+      "size": 2313,
+      "sha256": "b6c2c439b3380e5098debce1d8adc628ff56b10647cf30f9c58768b8ec49e0ff"
+    },
+    "keys/rotate_enc_key_with_k256.prover": {
+      "size": 234892984,
+      "sha256": "8fe4a70808655e6854cb8c77f8792d4079a3190b0e6262a3fa21621a3d464e3a"
+    },
+    "keys/rotate_enc_key_with_k256.verifier": {
+      "size": 2745,
+      "sha256": "83a3f2225df981fb57c3119e818accadfce3a9b9370dd4300ecb05c2a3008619"
+    },
+    "keys/rotate_enc_key_with_p256.prover": {
+      "size": 470042514,
+      "sha256": "20d3ffb3c9b40836a5473b737fc1176b359fa0e4644a4751e3061443a89d6143"
+    },
+    "keys/rotate_enc_key_with_p256.verifier": {
+      "size": 2745,
+      "sha256": "82352d910f674ea7c2eceec184dfb03e2cfd2e3412c6433c9f54223b66c1d42e"
+    },
+    "keys/withdraw_shielded_to_contract_with_grant_jubjub.prover": {
+      "size": 197147931,
+      "sha256": "59d4ad8747800c5f826095cff8dfb884b8736a37473fbdb3c0ab507f0426950b"
+    },
+    "keys/withdraw_shielded_to_contract_with_grant_jubjub.verifier": {
+      "size": 2313,
+      "sha256": "34af72b618ce88f25aa6880af18fe79fe1e47edbc551ce595f332f35e0ab7f18"
+    },
+    "keys/withdraw_shielded_to_contract_with_grant_k256.prover": {
+      "size": 234900587,
+      "sha256": "7a061d36b4214a7265999925dd61a10229cf37845a2e8e64dc1b5702cec39a24"
+    },
+    "keys/withdraw_shielded_to_contract_with_grant_k256.verifier": {
+      "size": 2745,
+      "sha256": "d03efae858007baad9f4a5662da80d2a74cdddf8956fc66612d0eccb865e42bf"
+    },
+    "keys/withdraw_shielded_to_contract_with_grant_p256.prover": {
+      "size": 470051052,
+      "sha256": "ebb8d131adb96df225b6de028f6aa226b747043b6e4cf1744cfafd1f40c7d769"
+    },
+    "keys/withdraw_shielded_to_contract_with_grant_p256.verifier": {
+      "size": 2745,
+      "sha256": "a0e55261991b3ae2704f80e031541c3c2b9fd0d9ac9830054c8f0bf26133e919"
+    },
+    "keys/withdraw_shielded_to_contract_with_jubjub.prover": {
+      "size": 98576810,
+      "sha256": "ad4011ff928fe432cb32dfa7fe7c54d55ae0b1073572fe9dd847e8b3389b619c"
+    },
+    "keys/withdraw_shielded_to_contract_with_jubjub.verifier": {
+      "size": 2313,
+      "sha256": "ce412f6f580a8a1c00ec4d6f38ccc0738a89a75392eaf052fb30d0354231ba35"
+    },
+    "keys/withdraw_shielded_to_contract_with_k256.prover": {
+      "size": 234895726,
+      "sha256": "b93e48798cea50fdd2751a463510ee267857681f8ba8e8b9a84644902782bdd0"
+    },
+    "keys/withdraw_shielded_to_contract_with_k256.verifier": {
+      "size": 2745,
+      "sha256": "909e19c3b737a6c86e69f02c3dbbf28e95da064421b67489ead3bb718094c12a"
+    },
+    "keys/withdraw_shielded_to_contract_with_p256.prover": {
+      "size": 470045448,
+      "sha256": "4972795162398cf8471ec73fd76a475191858727d407642f96527207ae8c50a9"
+    },
+    "keys/withdraw_shielded_to_contract_with_p256.verifier": {
+      "size": 2745,
+      "sha256": "57fd7d2e47dea7c867727a5a7225a3c9f8bf70ef8fd510b997ebadcc326024d1"
+    },
+    "keys/withdraw_shielded_with_grant_jubjub.prover": {
+      "size": 197147411,
+      "sha256": "f3630af1d48b43d174ed88b12e5513b47cd35fc76ab65c44e8ce8e302ad53f75"
+    },
+    "keys/withdraw_shielded_with_grant_jubjub.verifier": {
+      "size": 2313,
+      "sha256": "ef5b5dc1849a48ed0a628f53eed5ba4d218ed59a53f61f6e9a5e2e413c88b3cc"
+    },
+    "keys/withdraw_shielded_with_grant_k256.prover": {
+      "size": 234900068,
+      "sha256": "538ecdf598f918d44b1926f36baa6f7b1666e1934d7debef941332fd8174b2a0"
+    },
+    "keys/withdraw_shielded_with_grant_k256.verifier": {
+      "size": 2745,
+      "sha256": "e86ff0c442b4dff27bd987781b65e39efb1b2a20da00eb6766625d84150a150e"
+    },
+    "keys/withdraw_shielded_with_grant_p256.prover": {
+      "size": 470050510,
+      "sha256": "539b6663fc0aa35bc9cd18141731dfe36859e3761a5a87814ebb15b3954669ff"
+    },
+    "keys/withdraw_shielded_with_grant_p256.verifier": {
+      "size": 2745,
+      "sha256": "85500cd0a4ae62fc26b7393c0e0f2275d246d93da9426efd12110a5c78f08302"
+    },
+    "keys/withdraw_shielded_with_jubjub.prover": {
+      "size": 98576303,
+      "sha256": "a630fdabe5e8153e6f5d84ff6a4eb5d1566f346d2953e7a53b55434f9122245e"
+    },
+    "keys/withdraw_shielded_with_jubjub.verifier": {
+      "size": 2313,
+      "sha256": "8119afbced2b7d1a53aca787b43fced064f131120bdc366202ee43e26fcf3a45"
+    },
+    "keys/withdraw_shielded_with_k256.prover": {
+      "size": 234895206,
+      "sha256": "a3287252e192e0fd5172c91c34e41ee703468b8ef393327235dd160ed75afd9e"
+    },
+    "keys/withdraw_shielded_with_k256.verifier": {
+      "size": 2745,
+      "sha256": "dbb6418ecdd1ab5bfab1aeecf34fa467c187baedbddda2d9112662584f435397"
+    },
+    "keys/withdraw_shielded_with_p256.prover": {
+      "size": 470044905,
+      "sha256": "39f28942dcdd73e0a8a4ffe0a4b9fbef1a0bfbb5f4a51947db10882a5d585aaa"
+    },
+    "keys/withdraw_shielded_with_p256.verifier": {
+      "size": 2745,
+      "sha256": "e7aba56584c66bf9c5cbeaa805fa585a5203adb0840dbd086c23346615e9c459"
+    },
+    "keys/withdraw_unshielded_with_grant_jubjub.prover": {
+      "size": 98578931,
+      "sha256": "d9bcfd0a31df6644d87c425a70b91fda418718ad677c88f08f5bc0c0e0db4a05"
+    },
+    "keys/withdraw_unshielded_with_grant_jubjub.verifier": {
+      "size": 2313,
+      "sha256": "8a77e12e64fea27a38bf192e1b2cd1287f9d468f4e0ad3988b9369b1e6cb6cc5"
+    },
+    "keys/withdraw_unshielded_with_grant_k256.prover": {
+      "size": 234897695,
+      "sha256": "8d0109903f6555e9f3546b229783220849c8d4ed9c2aadb0ddc86a253ba8f3a7"
+    },
+    "keys/withdraw_unshielded_with_grant_k256.verifier": {
+      "size": 2745,
+      "sha256": "4e1f0ff0d6468afac7d0867acfe6a14ec7beaad9da8a3168442f70368a111e18"
+    },
+    "keys/withdraw_unshielded_with_grant_p256.prover": {
+      "size": 470047975,
+      "sha256": "35cb978f9a7364d66f0f76b57fe4af52098ebb34fedc8dc843ab57b8e632cef4"
+    },
+    "keys/withdraw_unshielded_with_grant_p256.verifier": {
+      "size": 2745,
+      "sha256": "4f67e14fb0c4964d1652ba06102f9a5e70493fba4192d2721a701bd8fb6663ee"
+    },
+    "keys/withdraw_unshielded_with_jubjub.prover": {
+      "size": 49292614,
+      "sha256": "e4b273724feacdaacb4a842ac51ce4c0a9a51de96cc182fe67cc089fa05b33ab"
+    },
+    "keys/withdraw_unshielded_with_jubjub.verifier": {
+      "size": 2313,
+      "sha256": "0d379e75fc29bb44de21a263a1f3bd941658aed71ccaa41cf445b29b104715a4"
+    },
+    "keys/withdraw_unshielded_with_k256.prover": {
+      "size": 234894504,
+      "sha256": "a88e9da782049045f12791eb8006d789eba4949d2c700fc1c86465fccfbec914"
+    },
+    "keys/withdraw_unshielded_with_k256.verifier": {
+      "size": 2745,
+      "sha256": "1c2b2c30f62d3186b37f93ba32350761f09296e95da335a3dcab939ade943caa"
+    },
+    "keys/withdraw_unshielded_with_p256.prover": {
+      "size": 470044120,
+      "sha256": "9be4f47a151a0bbca5cc7a165f37cf453d12e0f8d24dbc18e76f76239056d6fe"
+    },
+    "keys/withdraw_unshielded_with_p256.verifier": {
+      "size": 2745,
+      "sha256": "4e78d65d19c34db8f44ef8d5b74d7ddc07ae8ddc38ba46607db809432bf43002"
+    },
+    "zkir/activate_initial_device_with_jubjub.bzkir": {
+      "size": 1993,
+      "sha256": "18a73910ac9c1db1ae52a8c48abcbd891838d75206c5da48eb1338fd0db622ce"
+    },
+    "zkir/activate_initial_device_with_jubjub.zkir": {
+      "size": 6789,
+      "sha256": "aa57039b114151e1889e8ae86afcc3aa2ca0e5929275bcc75061b28088eb868b"
+    },
+    "zkir/activate_initial_device_with_k256.bzkir": {
+      "size": 2509,
+      "sha256": "7f4bc97ce74a9bd5a67c20353a88bead7991b6c3407941ab4e3deb40cf169fa7"
+    },
+    "zkir/activate_initial_device_with_k256.zkir": {
+      "size": 8639,
+      "sha256": "b197e27eaa0b96c3e320a65c238ff662ce3e6cb0be7d56a5e1dabba0e7db8662"
+    },
+    "zkir/activate_initial_device_with_p256.bzkir": {
+      "size": 2280,
+      "sha256": "12f725bccb2efa1e7efee56a6167a150464604e4ef7bc28bf4a11e5ea8e868d9"
+    },
+    "zkir/activate_initial_device_with_p256.zkir": {
+      "size": 7891,
+      "sha256": "a6c4420309515190f2f93ff5ceb3caf8faf32c1a277c249456a7db6520cf8510"
+    },
+    "zkir/add_device_with_jubjub.bzkir": {
+      "size": 3788,
+      "sha256": "7f5029b616e9be3fc37aa47d64c89b90cdb96860cec0b6e1b07ac5c7534945eb"
+    },
+    "zkir/add_device_with_jubjub.zkir": {
+      "size": 12609,
+      "sha256": "d6086a4bcd2f3d6c0c891657121df7ad753f4b5c52f9843c68e9c927471e6c5f"
+    },
+    "zkir/add_device_with_k256.bzkir": {
+      "size": 6817,
+      "sha256": "18c1a452542d3a2ed869f2deaec360712d65924d66e7eb9950777808492b9118"
+    },
+    "zkir/add_device_with_k256.zkir": {
+      "size": 23394,
+      "sha256": "86bdb1c8b2106d8c484efd67f3f68e851fccce96a1d4f3ad50c7cbc88216db5e"
+    },
+    "zkir/add_device_with_p256.bzkir": {
+      "size": 275326,
+      "sha256": "d9b34e64ae42692d4ed59491fb005388a377c04921c5c98885bd0c71fe061e97"
+    },
+    "zkir/add_device_with_p256.zkir": {
+      "size": 838592,
+      "sha256": "2be1e309f137954462acad7d4844eab565e3cbca3d208424b805b91ca25a0141"
+    },
+    "zkir/append_inbox_with_jubjub.bzkir": {
+      "size": 3907,
+      "sha256": "5f3085f9669fbc3ce6eba0aaacd8fa1fd3cb9ccdacbb1210955c9a736a192c56"
+    },
+    "zkir/append_inbox_with_jubjub.zkir": {
+      "size": 13045,
+      "sha256": "7eabd8bcd3ef27e69937e8f84b3e2b280d38c2b2b6cb0c341f296fdc1b6b0135"
+    },
+    "zkir/append_inbox_with_k256.bzkir": {
+      "size": 6947,
+      "sha256": "b11b97b050ba5e3265479be6d6a53083b54f5f664d47f3b19446daaf2e7dbf23"
+    },
+    "zkir/append_inbox_with_k256.zkir": {
+      "size": 23841,
+      "sha256": "803210bd546868494b8f990eb1af15a2b9b64bc43839b49aa8fef9efee131f48"
+    },
+    "zkir/append_inbox_with_p256.bzkir": {
+      "size": 275560,
+      "sha256": "66c35601c32e9a6c0aa3f9c107f8e5f5876caacdf323b52be6bda67977304383"
+    },
+    "zkir/append_inbox_with_p256.zkir": {
+      "size": 839143,
+      "sha256": "490d11d394d43a48b9a008be877d76d9a2d23daf332abbe2e6c0be7cf18d8f15"
+    },
+    "zkir/deposit_shielded.bzkir": {
+      "size": 1652,
+      "sha256": "e61e8dd6f86999518f5d9dfe5d09f63c172f989e8eed3ccf5d90e43a7ab81951"
+    },
+    "zkir/deposit_shielded.zkir": {
+      "size": 5871,
+      "sha256": "9b4af24b42dce2987835aa08b517835015e5e08db893c783088e6f0ffe7943cc"
+    },
+    "zkir/deposit_unshielded.bzkir": {
+      "size": 1654,
+      "sha256": "b64d5d0243053a4b383493835a3a2412e09c89248d351076c5097f528eb7e2f8"
+    },
+    "zkir/deposit_unshielded.zkir": {
+      "size": 4975,
+      "sha256": "e1384ddb55763bd0a3226bbad3337b83a4e076087f212dbe0281e6db671dce1d"
+    },
+    "zkir/issue_grant_with_jubjub.bzkir": {
+      "size": 10152,
+      "sha256": "19887b86c759417a93ff30f90830e479ef987f5df2785a2ff9f42668cf8b0a99"
+    },
+    "zkir/issue_grant_with_jubjub.zkir": {
+      "size": 31716,
+      "sha256": "5a375421790a8e1e2c7ee2a6a04bc45b59af6d3e5fd39ceac047605178bed0e8"
+    },
+    "zkir/issue_grant_with_k256.bzkir": {
+      "size": 13266,
+      "sha256": "9e2689714f3714684806997559279f6c16f06f39c0d2e8d5c2363f66595d9cfa"
+    },
+    "zkir/issue_grant_with_k256.zkir": {
+      "size": 42586,
+      "sha256": "4c7bf5878f4a389ddc72e6795d486b6914161b80abea9010df2b4a6daa533a49"
+    },
+    "zkir/issue_grant_with_p256.bzkir": {
+      "size": 282160,
+      "sha256": "251e232722a295b3000bd2e90e9d5442c735fb3cee77d867789cbd9a6030328e"
+    },
+    "zkir/issue_grant_with_p256.zkir": {
+      "size": 858169,
+      "sha256": "fb74c5f84d4bdbe56839fe7419d1d0982f8f5798e36e773ba8a19685ff1d8978"
+    },
+    "zkir/publish_recovery_session_with_jubjub.bzkir": {
+      "size": 6717,
+      "sha256": "dca9f2a33349f5d2968230c754f17b24141d0f91fc1cac2cef26a239546de22c"
+    },
+    "zkir/publish_recovery_session_with_jubjub.zkir": {
+      "size": 20252,
+      "sha256": "b3c9ba85558a6114552f1ccf3a0a8f5a3ad2931be27ec588ba8a80768500a23b"
+    },
+    "zkir/publish_recovery_session_with_k256.bzkir": {
+      "size": 9860,
+      "sha256": "932442839907973dfb6fd445ce4f5ac031cfc620757ebaabe3d6e4373f93e94c"
+    },
+    "zkir/publish_recovery_session_with_k256.zkir": {
+      "size": 31285,
+      "sha256": "280b5f54ba806fa04e5ebdc405462e7e169dd2bb6a8a8a86ee2dbf986134dc6a"
+    },
+    "zkir/publish_recovery_session_with_p256.bzkir": {
+      "size": 278557,
+      "sha256": "143ac72fc8598da5e30f9694f451bb0d2c2c5686f693ca1aa29c64c9f0b4716e"
+    },
+    "zkir/publish_recovery_session_with_p256.zkir": {
+      "size": 846671,
+      "sha256": "e646ac46a4746c10c38791dd78305214a42a2d8c4269f0920142c241fa9e0baf"
+    },
+    "zkir/recover_cancel_with_jubjub.bzkir": {
+      "size": 4163,
+      "sha256": "c57abd77a80ed4e621b34443af26db53fafdbd7a49096b16d1546660bfc6c809"
+    },
+    "zkir/recover_cancel_with_jubjub.zkir": {
+      "size": 12846,
+      "sha256": "e1f31a71a6cacf62ccfca7becddec9b606bf64a0260606992de763d1bd4043ef"
+    },
+    "zkir/recover_cancel_with_k256.bzkir": {
+      "size": 7206,
+      "sha256": "524168d4ebb34e98a0ee4dea5ee608da7a0247203468502650b71316eb1ed318"
+    },
+    "zkir/recover_cancel_with_k256.zkir": {
+      "size": 23712,
+      "sha256": "8b9f8ff7f7d407ea073da725f140390a58ecd73d6d25ac794ed516b49798edfc"
+    },
+    "zkir/recover_cancel_with_p256.bzkir": {
+      "size": 274621,
+      "sha256": "776da8ab14ec029c9639d7a1fdc8a2501edce22854c24aaae0b4162c59b1e652"
+    },
+    "zkir/recover_cancel_with_p256.zkir": {
+      "size": 837816,
+      "sha256": "80de9c0fa9e0dc66d6fdeb576ffbfabf4ad8cfe657fc0d0d04568e6efc56e606"
+    },
+    "zkir/recover_finalise.bzkir": {
+      "size": 4271,
+      "sha256": "90144b9bd0fe419ca691c716a8eeffea338997c680187c60ddfebf50c4b9d6cb"
+    },
+    "zkir/recover_finalise.zkir": {
+      "size": 11446,
+      "sha256": "c616f88e6a2ba322a8372347c55496b64c93e6098cd6a9384f877a2e7f304ea6"
+    },
+    "zkir/recover_submit.bzkir": {
+      "size": 5513,
+      "sha256": "079c73ba2e7314e580e73204d965c1d047c63776d01252918fa902eb8b776a3a"
+    },
+    "zkir/recover_submit.zkir": {
+      "size": 16102,
+      "sha256": "383f701d09f5c763f17b5821c41944f3f5681a5b9cf9e39e525dded79e13e6d3"
+    },
+    "zkir/remove_device_with_jubjub.bzkir": {
+      "size": 4497,
+      "sha256": "1a7f288bd9606663e82416fa38f6ba3aa29d3631a1b24b0879ee095cde9d337e"
+    },
+    "zkir/remove_device_with_jubjub.zkir": {
+      "size": 15016,
+      "sha256": "a282b7f98e02086266f95257eec57ef6b10b6d6810a5d0b85bdca1d0a8790622"
+    },
+    "zkir/remove_device_with_k256.bzkir": {
+      "size": 7713,
+      "sha256": "c318aa19e102c73eee1dc650e53d79f24dba9c98945f4263a06f1fd465832378"
+    },
+    "zkir/remove_device_with_k256.zkir": {
+      "size": 26380,
+      "sha256": "399cb57558a9ff9b23992a39c3c00c33ebed22ce6198aee1762c5ea2d171832e"
+    },
+    "zkir/remove_device_with_p256.bzkir": {
+      "size": 276332,
+      "sha256": "b35889e775de30fc0d49315740afd2849e76b82f0e7dd13ecccca3729d027609"
+    },
+    "zkir/remove_device_with_p256.zkir": {
+      "size": 841753,
+      "sha256": "f73e0522c55f4c7a8e9b89e4d48f6ab2716b4be7e2910819fe774d33452ee0d4"
+    },
+    "zkir/revoke_all_grants_with_jubjub.bzkir": {
+      "size": 3453,
+      "sha256": "bf4cde37c13b4a36cac999909154703cf2c05259c88f8b8cfe073cb49e60ce38"
+    },
+    "zkir/revoke_all_grants_with_jubjub.zkir": {
+      "size": 11564,
+      "sha256": "59995aa084d8c21882a925db6ea6f7978e657dc2d55a583935046cb618aba5ff"
+    },
+    "zkir/revoke_all_grants_with_k256.bzkir": {
+      "size": 6473,
+      "sha256": "25280f9de6e654a4cc25d7f729c8e7ca075e50714d3653370ceeb29b03876cf1"
+    },
+    "zkir/revoke_all_grants_with_k256.zkir": {
+      "size": 22340,
+      "sha256": "219e152e58f3159486f53f068867b6a3e85953a474acac7253a7916013de61d4"
+    },
+    "zkir/revoke_all_grants_with_p256.bzkir": {
+      "size": 273878,
+      "sha256": "81aeb2fa249ff79c0489f890d2a362784f32ef21175c2c8eda35b4654f2642d4"
+    },
+    "zkir/revoke_all_grants_with_p256.zkir": {
+      "size": 836434,
+      "sha256": "9608c093f2e34911f8f598208da6890909a0d123f488eac4387d5f107de77556"
+    },
+    "zkir/revoke_grant_with_jubjub.bzkir": {
+      "size": 4621,
+      "sha256": "5bd4be3866cc3ecd94dbebb041813ecb3d9612f2de67b5f6fc4dc614303cdd0a"
+    },
+    "zkir/revoke_grant_with_jubjub.zkir": {
+      "size": 15355,
+      "sha256": "003661371a42bef348e1545ddd6cd0ee39cff090cfe5c992219f564d3f09f75d"
+    },
+    "zkir/revoke_grant_with_k256.bzkir": {
+      "size": 7718,
+      "sha256": "e26652047875e884c4a3bb9bb84a4093d1df48bbca7f95593e3e746d0a6aaf76"
+    },
+    "zkir/revoke_grant_with_k256.zkir": {
+      "size": 26208,
+      "sha256": "db75ac6df522d542403ac4618eeb49bc83b62889f4ea5a2b3b18e7eeaca0ed6e"
+    },
+    "zkir/revoke_grant_with_p256.bzkir": {
+      "size": 276335,
+      "sha256": "e67e450d46e6f68da3fe2e0241cb7ed91df77f7cf20e985f17d517b3fa454d1b"
+    },
+    "zkir/revoke_grant_with_p256.zkir": {
+      "size": 841514,
+      "sha256": "d2a3726252eb53b019ba85600d1ec7ff1b48784e5d64cc7edc97dac73d900690"
+    },
+    "zkir/rotate_enc_key_with_jubjub.bzkir": {
+      "size": 3276,
+      "sha256": "6dbbbdf1d7a82c04ede1104a0e21b9685c821217ced445033c8c25d62ce79fec"
+    },
+    "zkir/rotate_enc_key_with_jubjub.zkir": {
+      "size": 11013,
+      "sha256": "c9e1e5f58c19179f290face9c90935a20c28938c4c8db2bbf0bf1fc0d10999ab"
+    },
+    "zkir/rotate_enc_key_with_k256.bzkir": {
+      "size": 6292,
+      "sha256": "0a51fb926fac2cf86840912f226b48d2e5b8e8955c281f78ea67be8c6b0eb71c"
+    },
+    "zkir/rotate_enc_key_with_k256.zkir": {
+      "size": 21785,
+      "sha256": "7f22b917111f9de789a5da7d7b2c1182c8c5578b9d06bb7c11b5339ac829052f"
+    },
+    "zkir/rotate_enc_key_with_p256.bzkir": {
+      "size": 274796,
+      "sha256": "79b9070b95967b3ab102c40019e64daf48d4455dd5e7acc7982c70f7ec621b3a"
+    },
+    "zkir/rotate_enc_key_with_p256.zkir": {
+      "size": 836978,
+      "sha256": "83e512fd2f42b399a038901b907714320b3cd6bd95207578c7c148edb407a118"
+    },
+    "zkir/withdraw_shielded_to_contract_with_grant_jubjub.bzkir": {
+      "size": 10875,
+      "sha256": "268482cdcce97012f709257a44511e136598fc035660b6dbba397cfadbf0ba8a"
+    },
+    "zkir/withdraw_shielded_to_contract_with_grant_jubjub.zkir": {
+      "size": 35780,
+      "sha256": "4fc97af5c50876b4bd0ea47a2123979fc4ce41ddea9c765d6443d0ef5e476a6a"
+    },
+    "zkir/withdraw_shielded_to_contract_with_grant_k256.bzkir": {
+      "size": 13895,
+      "sha256": "455fa1f9feef6028d10a27f3b345bdf02c5bd7d11fb6139aef0be96fa00cecb2"
+    },
+    "zkir/withdraw_shielded_to_contract_with_grant_k256.zkir": {
+      "size": 46246,
+      "sha256": "c6bc89a91a74236892fccbf1674edc5e66fc6e7c45859f0ad7e5d627fbf0f35d"
+    },
+    "zkir/withdraw_shielded_to_contract_with_grant_p256.bzkir": {
+      "size": 283334,
+      "sha256": "6c7d534ed510daa702df5314fbe45bb0518d7ecf7e4e97ec7c9a1e8a08433557"
+    },
+    "zkir/withdraw_shielded_to_contract_with_grant_p256.zkir": {
+      "size": 863082,
+      "sha256": "4d0921ffa3340d0481d5184af8ee2c9a11e217e9a20290f38c0293bb292f6789"
+    },
+    "zkir/withdraw_shielded_to_contract_with_jubjub.bzkir": {
+      "size": 5898,
+      "sha256": "7affd1c494c23a69ae89393741ef018d98bdd241950412f405a9358d5f683b8f"
+    },
+    "zkir/withdraw_shielded_to_contract_with_jubjub.zkir": {
+      "size": 20347,
+      "sha256": "c087bf65963c03672d68c11eff432bac02c912d089855f0c9c8664b45c67076e"
+    },
+    "zkir/withdraw_shielded_to_contract_with_k256.bzkir": {
+      "size": 9034,
+      "sha256": "9818e67b1ebde1b70cb4cbbcb000de963d8894ca05ca5f3d63e625315d948b4a"
+    },
+    "zkir/withdraw_shielded_to_contract_with_k256.zkir": {
+      "size": 31239,
+      "sha256": "0db43b367e679e53477200c9ab5576baa640ede5b0ddaf9da89b866a1c423daa"
+    },
+    "zkir/withdraw_shielded_to_contract_with_p256.bzkir": {
+      "size": 277730,
+      "sha256": "c1de39cf5f2f11be4ad6805e412b910776a045af5768613746716e73fb971a4a"
+    },
+    "zkir/withdraw_shielded_to_contract_with_p256.zkir": {
+      "size": 846624,
+      "sha256": "222b714d0977b767453f339afec8b7b91608b2284a9c7de22a0ac863b2198ce0"
+    },
+    "zkir/withdraw_shielded_with_grant_jubjub.bzkir": {
+      "size": 10355,
+      "sha256": "adceb619d744cc08024186eb502a6de6a5a97d6db85a2fecbb9ae7dd75b7e79c"
+    },
+    "zkir/withdraw_shielded_with_grant_jubjub.zkir": {
+      "size": 34150,
+      "sha256": "c7c7fb70f44d9a1400ac80884fe5b49bfab2b3c89ddc481bc3cc999db612ebec"
+    },
+    "zkir/withdraw_shielded_with_grant_k256.bzkir": {
+      "size": 13376,
+      "sha256": "706e37884fb0936704135bf07a96759ef1b1f2fe34d8a20da83d7ef8775ba089"
+    },
+    "zkir/withdraw_shielded_with_grant_k256.zkir": {
+      "size": 44618,
+      "sha256": "767cc78b0c8b62f95b4d340061620868607807af57051446f5597751aa569878"
+    },
+    "zkir/withdraw_shielded_with_grant_p256.bzkir": {
+      "size": 282792,
+      "sha256": "520eb7e934f745bb3b42188255e30fbc555652cbbe55005f9cc02ddd2aeceee2"
+    },
+    "zkir/withdraw_shielded_with_grant_p256.zkir": {
+      "size": 861431,
+      "sha256": "88c7dce821205f752e453e168698ea06959e7dc832c09e0518d42f57634b7aa3"
+    },
+    "zkir/withdraw_shielded_with_jubjub.bzkir": {
+      "size": 5391,
+      "sha256": "3adddc4067d19ab9809caaa3c64b227ccad8d04cbe162fba8403b2c2728e9e5c"
+    },
+    "zkir/withdraw_shielded_with_jubjub.zkir": {
+      "size": 18730,
+      "sha256": "7f5f16ce5a776c531d6edffb65c129d2291ced12a4bbc76223905e11d468c48b"
+    },
+    "zkir/withdraw_shielded_with_k256.bzkir": {
+      "size": 8514,
+      "sha256": "524b55567b0f3e8e6996da23258825c643367956b9932ca59ee0240e94b61fe4"
+    },
+    "zkir/withdraw_shielded_with_k256.zkir": {
+      "size": 29609,
+      "sha256": "88c323da596cb4d463159a1b25c30eedffef0106729dec657b03bdd0ad020535"
+    },
+    "zkir/withdraw_shielded_with_p256.bzkir": {
+      "size": 277187,
+      "sha256": "b16a1fa19dc9522f9808930ae943f5f0ce4fecd76a910562ebd61ed044e04433"
+    },
+    "zkir/withdraw_shielded_with_p256.zkir": {
+      "size": 844971,
+      "sha256": "660ef5245213b51a7ab92987831ec595debe7c1f0366b574a863a704d64e0354"
+    },
+    "zkir/withdraw_unshielded_with_grant_jubjub.bzkir": {
+      "size": 8019,
+      "sha256": "17415c24728d9ad48acc37becd15faaca3ee900bfc63f11849cfc9d587324d57"
+    },
+    "zkir/withdraw_unshielded_with_grant_jubjub.zkir": {
+      "size": 26036,
+      "sha256": "c3694f8f2c42693d9b3ab45605194d4a3dc31ba6664985902c1e64fa3b5c5f40"
+    },
+    "zkir/withdraw_unshielded_with_grant_k256.bzkir": {
+      "size": 11003,
+      "sha256": "2dcc73fa099dc3e2363dddbb8e499a3ca76e2d9e7ac735a7bff64ab5bfe19171"
+    },
+    "zkir/withdraw_unshielded_with_grant_k256.zkir": {
+      "size": 36467,
+      "sha256": "b0ec72d2b80131da5caa38715865048ca6d27938b85263f2afff0670c9ef6328"
+    },
+    "zkir/withdraw_unshielded_with_grant_p256.bzkir": {
+      "size": 280257,
+      "sha256": "5330239c53dd0ed79d0b085fde18de4231ba4bf8c4adbe12120107000f4a8848"
+    },
+    "zkir/withdraw_unshielded_with_grant_p256.zkir": {
+      "size": 853118,
+      "sha256": "2f22583ef5eff834f7c3b9ff9433b5f71ce951840dfbab2d30e7294ea1747698"
+    },
+    "zkir/withdraw_unshielded_with_jubjub.bzkir": {
+      "size": 4774,
+      "sha256": "8a8213796ff2816a8eb30bdfec3b28e825f689180ae37663853a7c3b8c2cb4bd"
+    },
+    "zkir/withdraw_unshielded_with_jubjub.zkir": {
+      "size": 15368,
+      "sha256": "5f17d3c2335ce77121a9b5dede0cf9c16b5f5aa3bb8ede55118cebc4796a6299"
+    },
+    "zkir/withdraw_unshielded_with_k256.bzkir": {
+      "size": 7812,
+      "sha256": "78dc9adfd0b54adb66bb56f293df151a05ea2406418bee02856ec407763775cb"
+    },
+    "zkir/withdraw_unshielded_with_k256.zkir": {
+      "size": 26162,
+      "sha256": "86687ed1b92a4ac33ab7d72e7eb14fe1e01e701ef99f46677d408103018a5688"
+    },
+    "zkir/withdraw_unshielded_with_p256.bzkir": {
+      "size": 276402,
+      "sha256": "39cff27c4ffee008e06b259062328ddaee6c8c0b9c1e3eb1fa4db6c62b29af19"
+    },
+    "zkir/withdraw_unshielded_with_p256.zkir": {
+      "size": 841441,
+      "sha256": "6f9a906c7a1977016d0fd72fc4c6073b6d6d76ec0bc6c4f6ed8018c59b1bb538"
+    }
+  }
+}
