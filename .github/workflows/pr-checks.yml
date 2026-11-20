@@ -66,6 +66,9 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: .nvmrc
+      # Ubuntu 24.04 blocks unprivileged user namespaces, and the Chromium sandbox needs them.
+      - name: Allow user namespaces for the Chromium sandbox
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - name: Install, then format, build, lint, and test
         run: |
           corepack enable

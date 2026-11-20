@@ -4,7 +4,7 @@
   "type": "module",
   "packageManager": "pnpm@10.34.4",
   "engines": {
-    "node": ">=22.1"
+    "node": ">=22.15"
   },
   "scripts": {
     "build": "tsc -b tsconfig.build.json && node scripts/bundle-packages.mjs && tsc -p tsconfig.json",
@@ -27,6 +27,7 @@
     "prettier": "3.9.6",
     "publint": "0.3.25",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.72.2"
+    "typescript-eslint": "8.72.2",
+    "vite": "8.3.7"
   }
 }
