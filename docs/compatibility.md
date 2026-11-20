@@ -1,6 +1,6 @@
 # Compatibility matrix
 
-> **Status:** live · updated 2026/11/17
+> **Status:** live · updated 2026/11/20
 > **Owns:** the two version axes of the SDK, and the toolchain that each
 > binding uses.
 > **Maintained by:** `mn-passport-skills:deps`. A row changes only through a
@@ -28,7 +28,7 @@
 
 | SDK | ACC binding | Compact CLI | Compiler | Manifest hash | Origin length | Language | Runtime (`@midnight-ntwrk/compact-runtime`) | Status |
 |---|---|---|---|---|---|---|---|---|
-| dev (unreleased) | None | — | — | — | — | — | — | Placeholder. Pending the first ACC build (E05.01). |
+| dev (unreleased) | passport `6497e22` | — | 0.36.1 | `f39ce43b…` | 21 | 0.28.0 | 0.21.0 | Provisional. Built with compactf-0.36.1, which alone reproduces `--check` (ADR 0004). |
 
 The `Compiler`, `Manifest hash`, and `Origin length` columns are the three
 fields of `BindingVersion` (`mn-passport-contract`). The manifest hash commits
@@ -53,7 +53,7 @@ keys"). Thus, the matrix records the revisions, not only the versions.
 | `@midnightntwrk/ledger-v9` | 1.0.2 | midnight-js 5.0.1 requires exactly 1.0.2. ledger-v9 1.0.0 prices some calls lower than the node does (error 138) |
 | Proof server | 9.0.2 | The prover must match the ledger version of the build (ledger 9.1.0.2) |
 | `effect` (Effect 4) | 4.1.3 | The SDK will bundle Effect 4. midnight-js keeps its own Effect 3 |
-| zkir crate | None yet | The prover must use the same revision to make the same keys |
+| zkir crate | zkir-3.2.1 (7a51b3385bbf) | The prover must use the same revision to make the same keys |
 | midnight-zk crate | None yet | Same as zkir |
 
 Compact and the proof server are not npm packages. Their rows are not in the

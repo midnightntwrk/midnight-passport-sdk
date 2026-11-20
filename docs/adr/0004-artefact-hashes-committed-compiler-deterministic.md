@@ -1,6 +1,6 @@
 # 0004 — Compilation is deterministic after all: commit the artefact hashes
 
-Date: 2026/07/29 · Status: accepted · Supersedes: ADR 0003
+Date: 2026/07/29 · Status: accepted, amended 2026/11/20 · Supersedes: ADR 0003
 Refs: midnightntwrk/passport#50 ·
 [midnightntwrk/passport#116](https://github.com/midnightntwrk/passport/issues/116)
 (amended — see Consequences)
@@ -45,6 +45,7 @@ Revert to the spec's original, simpler, stronger integrity model:
 - **`--check` recompiles and compares** — meaningful again under
   determinism: it re-derives the manifest from a fresh compile and fails
   on any divergence (source, toolchain, circuit table, or bytes).
+  (Changed by the 2026/11/20 amendment.)
 - The pin remains `[PROVISIONAL]` over the prototype until the contract
   team publishes an official versioned artefact; published hashes then
   replace or confirm ours (the `publishedHashes` slot is dropped — the
@@ -70,3 +71,25 @@ Revert to the spec's original, simpler, stronger integrity model:
   be verified against the underlying bytes before it becomes a finding.**
   The false positive cost an ADR, five register entries, and an upstream
   issue; the correction cost one byte-level diff.
+
+## Amendment (2026/11/20)
+
+Refs midnightntwrk/midnight-passport-sdk#85. The decision above stays. Three
+parts change:
+
+- **The manifest is a JSON file, and the pin is the SHA-256 of its raw
+  bytes.** The file is `packages/contract/generated/passport-manifest.json`,
+  and `packages/contract/src/pin.ts` holds the pin. No step parses the file
+  and writes it again before the hash. Prettier ignores the file. Thus, no
+  tool can reformat it and cause a false drift, which is the lesson of the
+  Context above.
+- **`--check` does not recompile.** `node scripts/acc-pin.mjs <dir> --check`
+  builds the manifest again from a compiled directory and compares the bytes.
+  Only the deploy uses the keys. Until the compiler is faster, CI builds
+  nothing and holds no keys. CI checks only that the pin, the toolchain, the
+  circuit lists, and the wave 1 lists agree with the committed manifest. Whoever
+  changes the pin runs `--check` on a local build, and the reviewer runs it
+  again.
+- **The first pin is a compactf-0.36.1 build.** Its keys, ZKIR, and JS match
+  the released 0.36.1, but its `contract-info.json` names the compactf
+  commit. Thus, only compactf-0.36.1 reproduces `--check` until compactf is published.
