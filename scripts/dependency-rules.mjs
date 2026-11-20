@@ -4,6 +4,7 @@
 // An empty workspace passes, and each package added later is checked:
 // - its directory is in the graph, and its name is the scoped package name;
 // - each @midnight-ntwrk/mn-passport-* dependency is a permitted edge;
+// - an adapter may list `dev` in devDependencies only, for its tests;
 // - its tsconfig project references mirror those dependencies;
 // - `connect`, `agent`, `ecosystems`, and `dev` reach no forbidden package,
 //   not even transitively.
@@ -53,13 +54,20 @@ export function checkWorkspace(root) {
     if (manifest.name !== SCOPE + dir) {
       violations.push(`"${dir}" must be named "${SCOPE}${dir}", got "${String(manifest.name)}"`);
     }
+    // `dev` never ships, so an adapter's test-only use of it is not an edge of the graph.
+    const testStubs = SCOPE + 'dev';
+    const testOnly = (/** @type {string} */ name) =>
+      name === testStubs &&
+      dir.startsWith('adapter-') &&
+      !manifest.dependencies?.[name] &&
+      !manifest.peerDependencies?.[name];
     const deps = new Set(
       Object.keys({
         ...manifest.dependencies,
         ...manifest.devDependencies,
         ...manifest.peerDependencies,
       })
-        .filter((name) => name.startsWith(SCOPE))
+        .filter((name) => name.startsWith(SCOPE) && !testOnly(name))
         .map((name) => name.slice(SCOPE.length)),
     );
     for (const dep of deps) {
