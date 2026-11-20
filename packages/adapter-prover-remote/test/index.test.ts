@@ -1,7 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-test('placeholder', async () => {
+test('the entry exports the factory and the four prover errors', async () => {
   const entry = await import('@midnight-ntwrk/mn-passport-adapter-prover-remote');
-  assert.deepEqual(Object.keys(entry), []);
+  assert.deepEqual(Object.keys(entry).sort(), [
+    'ProverBusyError',
+    'ProverRejectedError',
+    'ProverUnauthorizedError',
+    'ProverUnavailableError',
+    'remoteProver',
+  ]);
 });
