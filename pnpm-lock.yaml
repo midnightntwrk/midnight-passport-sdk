@@ -146,6 +146,12 @@ importers:
 
   packages/core:
     dependencies:
+      '@midnight-ntwrk/compact-js':
+        specifier: 3.0.2
+        version: 3.0.2
+      '@midnight-ntwrk/midnight-js':
+        specifier: 5.0.1
+        version: 5.0.1
       '@midnight-ntwrk/mn-passport-contract':
         specifier: workspace:*
         version: link:../contract

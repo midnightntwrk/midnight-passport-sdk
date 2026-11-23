@@ -69,14 +69,14 @@ test(
 );
 
 const page = join(root, 'tests/fixtures/app/page.js');
-/** @type {Record<string, () => Promise<Parameters<typeof runPage>[2]>>} */
+/** @type {Record<string, (entry: string) => Promise<Parameters<typeof runPage>[2]>>} */
 const builds = {
   esbuild: async () => ({ build: appBuild }),
-  Vite: async () => viteBundle(page),
+  Vite: viteBundle,
 };
 for (const [name, build] of Object.entries(builds)) {
   browserTest(`the ${name} app runs the smoke in Chromium`, async (bin) => {
-    const options = { ...(await build()), files: { '/state': state } };
+    const options = { ...(await build(page)), files: { '/state': state } };
     const { value, errors, wasmRequests } = await runPage(
       bin,
       `import ${JSON.stringify(page)};`,
@@ -87,4 +87,20 @@ for (const [name, build] of Object.entries(builds)) {
     assert.ok(value && typeof value === 'object');
     assert.equal(Reflect.get(value, 'intents'), 1);
   });
+}
+
+const chain = join(root, 'tests/fixtures/app/chain.js');
+for (const [name, build] of Object.entries(builds)) {
+  browserTest(
+    `the ${name} app loads the chain entry and the midnight-js of a call build`,
+    async (bin) => {
+      const { value, errors } = await runPage(
+        bin,
+        `import ${JSON.stringify(chain)};`,
+        await build(chain),
+      );
+      assert.deepEqual(errors, []);
+      assert.deepEqual(value, { build: 'function', hex: '0aff' });
+    },
+  );
 }
