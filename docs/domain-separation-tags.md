@@ -13,6 +13,9 @@ collide with the start of a longer tag, and `:v1` cannot collide with `:v10`.
 
 The SDK authors the message tags under `midnight:passport:<area>:<purpose>:v<n>`.
 The four recovery tags come from MIP-0022 and keep its `midnight:account:` names.
+The device-call tags and the connector prefix come from the account contract.
+They follow the ACC binding version, not the wire version. The SDK keeps one
+prefix for each arm, and the contract appends the operation name.
 
 | Tag | Purpose | Used by | Owner |
 |---|---|---|---|
@@ -23,6 +26,9 @@ The four recovery tags come from MIP-0022 and keep its `midnight:account:` names
 | `midnight:account:recovery:share:v1` | The share derivation. | Guardian recovery. | MIP-0022 |
 | `midnight:account:recovery:submit:v1` | The recover-gate signature challenge. | Guardian recovery. | MIP-0022 |
 | `midnight:account:recovery:wrap:v1` | The viewing-key wrap. | Guardian recovery. | MIP-0022 |
+| `midnight:account:auth:k1:v1:<operation>` | The challenge of a k256 device call. | The k256 key providers. | Account contract |
+| `midnight:account:auth:r1:v1:<operation>` | The challenge of a p256 device call. | The p256 key providers. | Account contract |
+| `midnight_signed_message:32:` | The digest prefix of a k256 key on envelope 1. | The k256 envelope digest. | Account contract |
 
 The KeyProvider (#86) is the first story these tags unlock.
 
