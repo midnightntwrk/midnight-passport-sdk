@@ -73,10 +73,11 @@ export interface DeviceChallenge {
 
 const FIELD_MODULUS = 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001n;
 // Every tag and prefix is ASCII. The ES2022 lib has no TextEncoder.
-const ascii = (text: string): Uint8Array => Uint8Array.from(text, (char) => char.charCodeAt(0));
+export const ascii = (text: string): Uint8Array =>
+  Uint8Array.from(text, (char) => char.charCodeAt(0));
 const CONNECTOR_PREFIX = ascii(K256_CONNECTOR_PREFIX);
 
-function bytes(value: Uint8Array, length: number, name: string): Uint8Array {
+export function bytes(value: Uint8Array, length: number, name: string): Uint8Array {
   if (value.length !== length) throw new RangeError(`${name} must be ${length} bytes.`);
   return value;
 }
@@ -161,7 +162,7 @@ const ENCODERS: {
   recover_cancel: () => [],
 };
 
-function hash(parts: readonly Uint8Array[]): Uint8Array {
+export function hash(parts: readonly Uint8Array[]): Uint8Array {
   const out = new Uint8Array(parts.reduce((total, part) => total + part.length, 0));
   let offset = 0;
   for (const part of parts) {

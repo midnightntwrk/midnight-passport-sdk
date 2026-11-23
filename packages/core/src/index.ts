@@ -28,3 +28,12 @@ export {
   type ShieldedCoin,
 } from './keys/challenge.js';
 export { StaleNonceError, assertFresh } from './keys/nonce.js';
+export {
+  AssertionProfileError,
+  checkP256Assertion,
+  webauthnClientData,
+  webauthnDigest,
+  type AssertionProfileReason,
+  type P256Assertion,
+  type WebAuthnPolicy,
+} from './keys/webauthn.js';

@@ -23,6 +23,7 @@
   "dependencies": {
     "@midnight-ntwrk/mn-passport-contract": "workspace:*",
     "@midnight-ntwrk/mn-passport-protocol": "workspace:*",
+    "@noble/curves": "2.4.0",
     "@noble/hashes": "2.4.0"
   }
 }

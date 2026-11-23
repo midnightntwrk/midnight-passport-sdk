@@ -128,7 +128,7 @@ interface KeyProvider {
 | Key provider | Scheme | Usual registration | Lives in |
 |---|---|---|---|
 | Passkey | JubJub, from the PRF output | Device | `owner` |
-| Passkey on secp256r1 | p256, `wa-json134` WebAuthn profile only | Device or grant | `owner`, `connect` |
+| Passkey on secp256r1 | p256, `wa-json134-or-chrome243` WebAuthn profile only | Device or grant | `owner`, `connect` |
 | Embedded wallet of a WaaS provider | k256, envelope 0 | Device: an optional backup owner key | `adapter-waas` |
 | Midnight connector wallet | k256, envelope 1 (`signData` with `ecdsa_secp256k1_sha256`) | Device, or a read-only grant | `owner`, `connect` |
 | dApp per-origin key | JubJub, k256 (envelope 0), or p256 | Grant | `connect` |
@@ -231,13 +231,13 @@ a different dApp.
 A passkey can act as a device on two arms of the ACC. The arms differ in what
 reaches the code of the Passport app.
 
-| | JubJub arm (PRF) | p256 arm (`wa-json134`) |
+| | JubJub arm (PRF) | p256 arm (`wa-json134-or-chrome243`) |
 |---|---|---|
 | Signing key | A JubJub key that the kernel derives from the PRF output | The credential key of the passkey |
 | Where the key lives | In the memory of the kernel, for one operation only | In the authenticator. It never leaves it. |
 | What reaches the page | The PRF output, after a user tap | A WebAuthn assertion (a signature) only |
 | Exposure | Code that runs in the Passport app origin during the operation | None in the page |
-| Limits | The authenticator must support PRF | Exactly 134 bytes of `clientDataJSON` and a 21-byte origin |
+| Limits | The authenticator must support PRF | A 21-byte origin, and a `clientDataJSON` of exactly 134 bytes, or 243 bytes with the Chrome GREASE member |
 
 On the JubJub arm, the kernel derives the key, signs, and then discards the PRF
 output and the key. It never stores or sends them. The p256 arm gives a
