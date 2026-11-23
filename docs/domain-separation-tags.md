@@ -18,6 +18,7 @@ The four recovery tags come from MIP-0022 and keep its `midnight:account:` names
 The device-call tags and the connector prefix come from the account contract.
 They follow the ACC binding version, not the wire version. The SDK keeps one
 prefix for each arm, and the contract appends the operation name.
+The inbox tag comes from MIP-0012 (section 6.4) and keeps its name.
 
 | Tag | Purpose | Used by | Owner |
 |---|---|---|---|
@@ -37,6 +38,7 @@ prefix for each arm, and the contract appends the operation name.
 | `midnight:passport:authority:wrap:v1` | The HKDF info of the authority wrap key. | Account creation, maintenance updates. | SDK |
 | `midnight:passport:viewing:wrap:v1` | The HKDF info of the viewing-key wrap key. | Account creation, session start. | SDK |
 | `midnight:passport:store:key:v1` | The HKDF info of the local store key, from the viewing secret. | The local private-state store. | SDK |
+| `midnight:custody:inbox:v1` | The HKDF info of the inbox entry key. | The inbox codec. | MIP-0012 |
 
 The five `prf` and HKDF rows come from ADR 0014. The first four join
 `domain-tags.ts` with the account deploy, and the store-key tag with the local

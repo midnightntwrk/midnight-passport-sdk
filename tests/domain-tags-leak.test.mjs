@@ -8,7 +8,7 @@ const repoRoot = fileURLToPath(new URL('../', import.meta.url));
 
 // Built from fragments, and the test name avoids them, so this file never holds
 // the literals it searches for.
-const needles = ['midnight:' + 'passport:', 'midnight:' + 'account:'];
+const needles = ['midnight:' + 'passport:', 'midnight:' + 'account:', 'midnight:' + 'custody:'];
 const tagModule = join('packages', 'protocol', 'src', 'domain-tags.ts');
 
 /**
