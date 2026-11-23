@@ -15,5 +15,6 @@ test('the entry exports createIndexer only, and an indexer has only the seam met
     'transaction',
     'watchContract',
     'watchTransaction',
+    'zswapEvents',
   ]);
 });

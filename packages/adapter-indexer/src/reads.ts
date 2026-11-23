@@ -43,6 +43,10 @@ const CALL_INPUTS_QUERY = `query CALL_INPUTS_QUERY($address: HexEncoded!, $offse
   contract(address: $address, offset: $offset) { state stateAt { height hash } }
 }`;
 
+const ZSWAP_EVENTS_QUERY = `query ZSWAP_EVENTS_QUERY($offset: BlockOffset!) {
+  block(offset: $offset) { height hash transactions { zswapLedgerEvents { raw } } }
+}`;
+
 // A `Map`, so a status such as "constructor" finds nothing on the prototype.
 const RESULTS: ReadonlyMap<unknown, TransactionResult> = new Map<unknown, TransactionResult>([
   ['SUCCESS', 'succeeded'],
@@ -100,6 +104,21 @@ export async function readCallInputs(
     zswapChainState: bytesOf(zswap),
     block,
   };
+}
+
+const list = (value: unknown): readonly unknown[] => (Array.isArray(value) ? value : malformed());
+
+export async function readZswapEvents(
+  endpoint: Endpoint,
+  at: BlockRef,
+  options?: CallOptions,
+): Promise<readonly Uint8Array[] | undefined> {
+  const data = await query(endpoint, ZSWAP_EVENTS_QUERY, { offset: { hash: at.hash } }, options);
+  if (data.block === null) return undefined;
+  if (blockRef(data.block).hash !== at.hash.toLowerCase()) return malformed();
+  return list(field(data.block, 'transactions')).flatMap((tx) =>
+    list(field(tx, 'zswapLedgerEvents')).map((event) => bytesOf(field(event, 'raw'))),
+  );
 }
 
 export interface IndexerStateRead {
@@ -166,7 +185,7 @@ export interface StateRead {
 
 export interface Reads extends Pick<
   Indexer,
-  'contractState' | 'transaction' | 'ledgerParameters' | 'callInputs'
+  'contractState' | 'transaction' | 'ledgerParameters' | 'callInputs' | 'zswapEvents'
 > {
   /** `contractState` with where the state came from. */
   readState(address: ContractAddress, options?: CallOptions): Promise<StateRead>;
@@ -212,5 +231,6 @@ export function createReads(options: ReadOptions): Reads {
     // The node has no parameters or Zswap state, so these reads never use it.
     ledgerParameters: (call) => readLedgerParameters(indexer, call),
     callInputs: (address, call) => readCallInputs(indexer, address, call),
+    zswapEvents: (block, call) => readZswapEvents(indexer, block, call),
   };
 }

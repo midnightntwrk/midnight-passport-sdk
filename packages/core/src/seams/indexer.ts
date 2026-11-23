@@ -53,6 +53,13 @@ export interface Indexer {
   ledgerParameters(options?: CallOptions): Promise<LedgerParametersRead>;
   /** `undefined` when no contract is at `address` at the latest block that the source holds. */
   callInputs(address: ContractAddress, options?: CallOptions): Promise<CallInputs | undefined>;
+  /**
+   * The serialized Zswap ledger events of every transaction in `block`. A `zswapOutput` event
+   * names its contract and its position in the commitment tree. `undefined` when the source has
+   * no block with that hash yet. For the block where a contract changed, use
+   * `callInputs(address).state.block`: a state from the node has the node's best block instead.
+   */
+  zswapEvents(block: BlockRef, options?: CallOptions): Promise<readonly Uint8Array[] | undefined>;
   /** `undefined` when no block holds the transaction yet. */
   transaction(id: TransactionId, options?: CallOptions): Promise<TransactionStatus | undefined>;
   watchContract(address: ContractAddress): StateSource<Lookup<ContractState>>;

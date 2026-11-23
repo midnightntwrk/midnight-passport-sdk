@@ -35,10 +35,10 @@ the list:
    | DID | `owner` | E24 |
 
 2. **The indexer seam** reads contract state and transaction status, once or
-   as a `StateSource`. It also reads the ledger parameters and the inputs of
-   a call, once. "Not found" is a value, and a source that cannot be
-   reached is an error. `adapter-indexer` implements it, over the indexer and
-   the node.
+   as a `StateSource`. It also reads the ledger parameters, the inputs of a
+   call, and the Zswap events of a block, once. "Not found" is a value, and a
+   source that cannot be reached is an error. `adapter-indexer` implements it,
+   over the indexer and the node.
 3. **Fees and broadcast are two seams.** Fees takes a proven transaction and
    returns the paid transaction. Broadcast submits the paid transaction and
    waits to the level that the caller asks for, `in-block` or `final`.

@@ -136,6 +136,51 @@ test('an indexer with no block yet is IndexerUnreachableError for parameters and
   await rejectsUnreachable(() => empty.callInputs(local), 'response');
 });
 
+const deposit = {
+  height: 2969,
+  hash: 'f713af4cb7c4e2ea01e6d5d134ed68133eb9070bffe510a7db810b424d5dabe0',
+};
+const depositBody = fixture('zswap-events-deposit').response.body as {
+  data: { block: { transactions: { zswapLedgerEvents: { raw: string }[] }[] } };
+};
+const depositEvents = depositBody.data.block.transactions.flatMap((tx) =>
+  tx.zswapLedgerEvents.map((event) => hex(event.raw)),
+);
+
+test('the Zswap events of a block are its raw ledger events', async () => {
+  const events = await reads(replay('zswap-events-deposit')).zswapEvents(deposit);
+  assert.equal(events?.length, 3);
+  assert.deepEqual(events, depositEvents);
+});
+
+test('the Zswap events of a block come from all of its transactions', async () => {
+  const [tx] = depositBody.data.block.transactions;
+  const body = {
+    data: {
+      block: { ...depositBody.data.block, transactions: [{ zswapLedgerEvents: [] }, tx, tx] },
+    },
+  };
+  const events = await reads(async () => ok(body)).zswapEvents(deposit);
+  assert.deepEqual(events, [...depositEvents, ...depositEvents]);
+});
+
+test('the Zswap events of an unknown block read as undefined', async () => {
+  const unknown = { height: 1, hash: 'ee'.repeat(32) };
+  assert.equal(await reads(replay('zswap-events-not-found')).zswapEvents(unknown), undefined);
+});
+
+const brokenEvents: readonly (readonly [string, Record<string, unknown>])[] = [
+  ['another block', { hash: 'ee'.repeat(32) }],
+  ['a transaction with no event list', { transactions: [{}] }],
+  ['an event that is not hex', { transactions: [{ zswapLedgerEvents: [{ raw: 'xyz' }] }] }],
+];
+for (const [name, fields] of brokenEvents) {
+  test(`Zswap events with ${name} are IndexerUnreachableError`, async () => {
+    const body = { data: { block: { ...depositBody.data.block, ...fields } } };
+    await rejectsUnreachable(() => reads(async () => ok(body)).zswapEvents(deposit), 'response');
+  });
+}
+
 // Valid "not found" data for both reads, so only the check under test can reject it.
 const notFound = '{"data":{"block":null,"contract":null,"transactions":[]}}';
 

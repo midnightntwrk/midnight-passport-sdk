@@ -99,7 +99,7 @@ transaction crosses a seam as serialized bytes: unproven, proven, or paid.
 | Prover | `prove(unprovenTx, circuitIds) → provenTx` | `core` | All three | `adapter-prover-remote` |
 | Fees | `pay(provenTx) → paidTx`: a sponsor pays, or a Capacity Exchange swap | `core` | All three | `adapter-broadcast` (sponsor), `adapter-fee-capacity-exchange` |
 | Broadcast | `submit(paidTx, until)`, with `until` as `in-block` or `final`, and a bounded wait | `core` | All three | `adapter-broadcast` |
-| Indexer | Contract state and transaction status, once or as a `StateSource`; ledger parameters and call inputs, once | `core` | All three | `adapter-indexer` |
+| Indexer | Contract state and transaction status, once or as a `StateSource`; ledger parameters, call inputs, and the Zswap events of a block, once | `core` | All three | `adapter-indexer` |
 | Platform | HTTP, random bytes, WASM load order, a local store with a wipe, WebAuthn or its absence | `core` | All three | `adapter-browser`, `adapter-nodejs` |
 | Private state | An SDK-owned interface that matches the midnight-js `PrivateStateProvider` | `core` | `connect` (agents: open) | The WPP client in `core`, over the WPP package of the dApp |
 | Account metadata | Namespaced, versioned entries; read, merge, write, read back | `core` | `owner` | `adapter-waas` |

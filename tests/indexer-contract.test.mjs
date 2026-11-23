@@ -76,6 +76,9 @@ function chainHttp(chain, ids) {
       const block = pinned && { ...pinned, ledgerParameters: '01', contractZswapState: zswap };
       return ok({ data: { block, contract: contractData } });
     }
+    if (body.query.includes('ZSWAP_EVENTS_QUERY')) {
+      return ok({ data: { block: pinned && { ...pinned, transactions: [] } } });
+    }
     const status = chain.status(body.variables.offset.identifier);
     const found = status?.level === 'final';
     const tx = found && {

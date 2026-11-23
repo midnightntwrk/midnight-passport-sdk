@@ -31,6 +31,7 @@ export interface IndexerHarness {
 
 const unknownAddress = 'ff'.repeat(32);
 const unknownId = 'ee'.repeat(32);
+const unknownBlock = { height: 1, hash: 'dd'.repeat(32) };
 
 /** Resolves with every value up to the first that `done` accepts. */
 function collect<A>(source: StateSource<A>, done: (value: A) => boolean, timeoutMs: number) {
@@ -72,6 +73,7 @@ export function indexerContract(
           check((await indexer.contractState(unknownAddress)) === undefined, 'found a contract');
           check((await indexer.transaction(unknownId)) === undefined, 'found a transaction');
           check((await indexer.callInputs(unknownAddress)) === undefined, 'found call inputs');
+          check((await indexer.zswapEvents(unknownBlock)) === undefined, 'found a block');
         },
       },
       {
@@ -128,6 +130,7 @@ export function indexerContract(
           await expectRejection(() => indexer.transaction(unknownId), tag);
           await expectRejection(() => indexer.callInputs(unknownAddress), tag);
           await expectRejection(() => indexer.ledgerParameters(), tag);
+          await expectRejection(() => indexer.zswapEvents(unknownBlock), tag);
           const watchContract = () =>
             collect(indexer.watchContract(unknownAddress), () => true, timeoutMs);
           await expectRejection(watchContract, tag);
@@ -146,6 +149,7 @@ export function indexerContract(
           const { indexer, contract, hold } = await make();
           await expectCancel((signal) => indexer.contractState(contract, { signal }), hold);
           await expectCancel((signal) => indexer.callInputs(contract, { signal }), hold);
+          await expectCancel((signal) => indexer.zswapEvents(unknownBlock, { signal }), hold);
         },
       },
     ],
