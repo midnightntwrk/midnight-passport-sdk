@@ -160,6 +160,9 @@ importers:
       '@midnight-ntwrk/mn-passport-core':
         specifier: workspace:*
         version: link:../core
+      '@noble/curves':
+        specifier: 2.4.0
+        version: 2.4.0
 
   packages/owner:
     dependencies:

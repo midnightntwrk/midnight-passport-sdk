@@ -224,6 +224,18 @@ async function generate(dir) {
   });
   out['webauthn.json'] = { manifest: pin, vectors: webauthn };
 
+  const keys = arms.flatMap(([arm, order]) =>
+    MODES.map((mode) => {
+      const scalar = scalarOf(mode, order);
+      return {
+        arm,
+        secretKey: Uint8Array.from(be32(scalar)),
+        publicKey: pointBytes(pointOf(arm, scalar)),
+      };
+    }),
+  );
+  out['keys.json'] = { manifest: pin, vectors: keys };
+
   /** @type {Record<string, string>} */
   const texts = {};
   for (const [name, data] of Object.entries(out)) {

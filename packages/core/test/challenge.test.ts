@@ -1,7 +1,14 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readdirSync } from 'node:fs';
 import { deviceChallenge, envelopeDigest } from '@midnight-ntwrk/mn-passport-core';
 import { hex, isRecord, loadVectors } from './vectors.js';
+
+test('every vector file comes from the pinned artifact', () => {
+  const files = readdirSync(new URL('../generated/acc-vectors/', import.meta.url));
+  assert.ok(files.length > 0);
+  for (const name of files) loadVectors(name);
+});
 
 for (const arm of ['k256', 'p256'] as const) {
   describe(`the ${arm} challenges`, () => {
