@@ -71,6 +71,7 @@ export function indexerContract(
           const { indexer } = await make();
           check((await indexer.contractState(unknownAddress)) === undefined, 'found a contract');
           check((await indexer.transaction(unknownId)) === undefined, 'found a transaction');
+          check((await indexer.callInputs(unknownAddress)) === undefined, 'found call inputs');
         },
       },
       {
@@ -82,6 +83,20 @@ export function indexerContract(
           check(state.bytes.length > 0, 'the contract state is empty');
           const [first] = await collect(indexer.watchContract(contract), () => true, timeoutMs);
           check(first?.found === true, 'the watch did not find the contract');
+        },
+      },
+      {
+        name: 'the call inputs of a known contract are all as of one block',
+        async run() {
+          const { indexer, contract } = await make();
+          const inputs = await indexer.callInputs(contract);
+          check(inputs?.state.address === contract, 'the call inputs are missing');
+          check(inputs.state.bytes.length > 0, 'the contract state is empty');
+          check(inputs.ledgerParameters.length > 0, 'the ledger parameters are empty');
+          check(inputs.zswapChainState.length > 0, 'the Zswap state is empty');
+          check(inputs.state.block.height <= inputs.block.height, 'the state is after its block');
+          const parameters = await indexer.ledgerParameters();
+          check(parameters.bytes.length > 0, 'the ledger parameters are empty');
         },
       },
       {
@@ -111,6 +126,8 @@ export function indexerContract(
           const tag = 'IndexerUnreachableError';
           await expectRejection(() => indexer.contractState(unknownAddress), tag);
           await expectRejection(() => indexer.transaction(unknownId), tag);
+          await expectRejection(() => indexer.callInputs(unknownAddress), tag);
+          await expectRejection(() => indexer.ledgerParameters(), tag);
           const watchContract = () =>
             collect(indexer.watchContract(unknownAddress), () => true, timeoutMs);
           await expectRejection(watchContract, tag);
@@ -128,6 +145,7 @@ export function indexerContract(
         async run() {
           const { indexer, contract, hold } = await make();
           await expectCancel((signal) => indexer.contractState(contract, { signal }), hold);
+          await expectCancel((signal) => indexer.callInputs(contract, { signal }), hold);
         },
       },
     ],

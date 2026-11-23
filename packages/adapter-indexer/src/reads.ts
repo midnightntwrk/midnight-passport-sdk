@@ -1,12 +1,14 @@
 import {
   IndexerUnreachableError,
   type BlockRef,
+  type CallInputs,
   type CallOptions,
   type ContractAddress,
   type ContractState,
   type HttpRequest,
   type HttpResponse,
   type Indexer,
+  type LedgerParametersRead,
   type TransactionId,
   type TransactionResult,
   type TransactionStatus,
@@ -29,6 +31,16 @@ const TX_ID_QUERY = `query TX_ID_QUERY($offset: TransactionOffset!) {
     block { height hash }
     ... on RegularTransaction { transactionResult { status } }
   }
+}`;
+
+const HEAD_QUERY = `query HEAD_QUERY { block { height hash } }`;
+
+const LEDGER_PARAMETERS_QUERY = `query LEDGER_PARAMETERS_QUERY { block { height hash ledgerParameters } }`;
+
+// Pinned to one hash. Unpinned, `block` and `contract` each follow the tip and can name two blocks.
+const CALL_INPUTS_QUERY = `query CALL_INPUTS_QUERY($address: HexEncoded!, $offset: BlockOffset!) {
+  block(offset: $offset) { height hash ledgerParameters contractZswapState(address: $address) }
+  contract(address: $address, offset: $offset) { state stateAt { height hash } }
 }`;
 
 // A `Map`, so a status such as "constructor" finds nothing on the prototype.
@@ -55,6 +67,39 @@ function blockRef(value: unknown): BlockRef {
   if (typeof height !== 'number' || !Number.isSafeInteger(height) || height < 0) return malformed();
   if (typeof hash !== 'string' || !HASH.test(hash)) return malformed();
   return { height, hash: hash.toLowerCase() };
+}
+
+const bytesOf = (value: unknown): Uint8Array => decodeHex(value) ?? malformed();
+
+/** An indexer with no block yet is unreachable: nothing can be built on it. */
+export async function readLedgerParameters(
+  endpoint: Endpoint,
+  options?: CallOptions,
+): Promise<LedgerParametersRead> {
+  const head = (await query(endpoint, LEDGER_PARAMETERS_QUERY, {}, options)).block;
+  return { bytes: bytesOf(field(head, 'ledgerParameters')), block: blockRef(head) };
+}
+
+export async function readCallInputs(
+  endpoint: Endpoint,
+  address: ContractAddress,
+  options?: CallOptions,
+): Promise<CallInputs | undefined> {
+  const head = blockRef((await query(endpoint, HEAD_QUERY, {}, options)).block);
+  const variables = { address, offset: { hash: head.hash } };
+  const data = await query(endpoint, CALL_INPUTS_QUERY, variables, options);
+  const block = blockRef(data.block);
+  if (block.hash !== head.hash) return malformed();
+  const zswap = field(data.block, 'contractZswapState');
+  // Only both `null` is "no contract". One `null` alone fails below.
+  if (data.contract === null && zswap === null) return undefined;
+  const bytes = bytesOf(field(data.contract, 'state'));
+  return {
+    state: { address, bytes, block: blockRef(field(data.contract, 'stateAt')) },
+    ledgerParameters: bytesOf(field(data.block, 'ledgerParameters')),
+    zswapChainState: bytesOf(zswap),
+    block,
+  };
 }
 
 export interface IndexerStateRead {
@@ -119,7 +164,10 @@ export interface StateRead {
   readonly nodeBlock: BlockRef | undefined;
 }
 
-export interface Reads extends Pick<Indexer, 'contractState' | 'transaction'> {
+export interface Reads extends Pick<
+  Indexer,
+  'contractState' | 'transaction' | 'ledgerParameters' | 'callInputs'
+> {
   /** `contractState` with where the state came from. */
   readState(address: ContractAddress, options?: CallOptions): Promise<StateRead>;
 }
@@ -161,5 +209,8 @@ export function createReads(options: ReadOptions): Reads {
     readState,
     contractState: async (address, call) => (await readState(address, call)).state,
     transaction: (id, call) => readTransaction(indexer, id, call),
+    // The node has no parameters or Zswap state, so these reads never use it.
+    ledgerParameters: (call) => readLedgerParameters(indexer, call),
+    callInputs: (address, call) => readCallInputs(indexer, address, call),
   };
 }

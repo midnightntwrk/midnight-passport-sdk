@@ -21,15 +21,17 @@ const fixture = (name: string): Fixture =>
     readFileSync(new URL(`../test/fixtures/${name}.json`, import.meta.url), 'utf8'),
   ) as Fixture;
 
-/** Fails the test when the adapter's request is not the recorded one. */
-function replay(name: string): (request: HttpRequest) => Promise<HttpResponse> {
-  const { request, response: recorded } = fixture(name);
+/** Fails the test when the adapter's requests are not the recorded ones, in order. */
+function replay(...names: string[]): (request: HttpRequest) => Promise<HttpResponse> {
+  const fixtures = names.map(fixture);
   return async (sent) => {
+    const next = fixtures.shift();
+    assert.ok(next, 'one request too many');
     assert.equal(sent.method, 'POST');
     assert.equal(sent.url, INDEXER_URL);
     assert.equal(sent.headers?.['content-type'], 'application/json');
-    assert.deepEqual(JSON.parse(String(sent.body)), request);
-    return response(recorded.status, encode(JSON.stringify(recorded.body)));
+    assert.deepEqual(JSON.parse(String(sent.body)), next.request);
+    return response(next.response.status, encode(JSON.stringify(next.response.body)));
   };
 }
 
@@ -59,6 +61,79 @@ test('a found transaction is final, with its block and result', async () => {
     block: { height: 1040, hash: '2d'.repeat(32) },
     result: 'partly-failed',
   });
+});
+
+const hex = (value: string): Uint8Array => Uint8Array.from(Buffer.from(value, 'hex'));
+const local = '19d0e7afd018aebcf526678dda828d3b59ae482f9043bf58180b4c98580a4c6a';
+const recordedHead = {
+  height: 2935,
+  hash: 'dc12b44a0c030c441d68dcc0beeb1960721733ad2b8892474a991f74f51c2444',
+};
+const recordedParameters =
+  '6d69646e696768743a6c65646765722d706172616d65746572735b76385d3ac64a0600008e0a8c0072618b007eed6000';
+
+test('the ledger parameters have their bytes and the head block', async () => {
+  assert.deepEqual(await reads(replay('ledger-parameters')).ledgerParameters(), {
+    bytes: hex(recordedParameters),
+    block: recordedHead,
+  });
+});
+
+test('the call inputs are pinned to the head block', async () => {
+  const inputs = await reads(replay('head', 'call-inputs-found')).callInputs(local);
+  assert.deepEqual(inputs, {
+    state: {
+      address: local,
+      bytes: hex(
+        '6d69646e696768743a636f6e74726163742d73746174655b76385d3aa90300040404000801040404900304408035a4e6',
+      ),
+      block: {
+        height: 1545,
+        hash: '23de74a1f6782ce21961540c2c9b73bb4a236a9a3542074e6bf32298022be764',
+      },
+    },
+    ledgerParameters: hex(recordedParameters),
+    zswapChainState: hex(
+      '6d69646e696768743a7a737761702d6c65646765722d73746174655b76355d3a7101008473b35bda8df702a240f2b760',
+    ),
+    block: recordedHead,
+  });
+});
+
+test('call inputs at an address with no contract read as undefined', async () => {
+  const missing = 'ff'.repeat(32);
+  const http = replay('head', 'call-inputs-not-found');
+  assert.equal(await reads(http).callInputs(missing), undefined);
+});
+
+/** The head answer, then `pinned` as the answer of the pinned query. */
+const pinnedAnswer = (pinned: unknown) => {
+  const answers = [fixture('head').response.body, pinned];
+  return async () => ok(answers.shift());
+};
+const found = fixture('call-inputs-found').response.body as {
+  data: { block: Record<string, unknown>; contract: Record<string, unknown> };
+};
+const withBlock = (fields: Record<string, unknown>) => ({
+  data: { ...found.data, block: { ...found.data.block, ...fields } },
+});
+
+const brokenInputs: readonly (readonly [string, unknown])[] = [
+  ['a contract with no Zswap state', withBlock({ contractZswapState: null })],
+  ['a Zswap state with no contract', { data: { ...found.data, contract: null } }],
+  ['a pinned block with another hash', withBlock({ hash: 'ee'.repeat(32) })],
+  ['parameters that are not hex', withBlock({ ledgerParameters: 'xyz' })],
+];
+for (const [name, pinned] of brokenInputs) {
+  test(`call inputs with ${name} are IndexerUnreachableError`, async () => {
+    await rejectsUnreachable(() => reads(pinnedAnswer(pinned)).callInputs(local), 'response');
+  });
+}
+
+test('an indexer with no block yet is IndexerUnreachableError for parameters and call inputs', async () => {
+  const empty = reads(async () => ok({ data: { block: null } }));
+  await rejectsUnreachable(() => empty.ledgerParameters(), 'response');
+  await rejectsUnreachable(() => empty.callInputs(local), 'response');
 });
 
 // Valid "not found" data for both reads, so only the check under test can reject it.
@@ -175,6 +250,8 @@ test('an abort before the read sends nothing and rejects with CancelledError', a
     'CancelledError',
   );
   await expectRejection(() => indexer.transaction(id, { signal: aborted }), 'CancelledError');
+  await expectRejection(() => indexer.callInputs(address, { signal: aborted }), 'CancelledError');
+  await expectRejection(() => indexer.ledgerParameters({ signal: aborted }), 'CancelledError');
   assert.equal(sent, 0);
 });
 

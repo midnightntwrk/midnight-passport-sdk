@@ -78,6 +78,8 @@ function harness(script: {
   };
   const indexer: Indexer = {
     contractState: async () => undefined,
+    ledgerParameters: () => Promise.reject(new Error('not used')),
+    callInputs: async () => undefined,
     transaction: async (id) => finals.get(id),
     watchContract: () => createStateSource(() => () => {}),
     watchTransaction: (id) =>

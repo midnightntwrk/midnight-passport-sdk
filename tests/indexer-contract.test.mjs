@@ -56,13 +56,25 @@ function chainHttp(chain, ids) {
   /** @param {HttpRequest} request @returns {Promise<HttpResponse>} */
   const indexer = async (request) => {
     const body =
-      /** @type {{ query: string, variables: { address: string, offset: { identifier: string } } }} */ (
+      /** @type {{ query: string, variables: { address: string, offset: { identifier: string, hash: string } } }} */ (
         parseJson(String(request.body))
       );
+    const state = body.variables?.address ? chain.contract(body.variables.address) : undefined;
+    const contractData = (state && { state: hex(state.bytes), stateAt: state.block }) ?? null;
+    const head = finalHead() ?? null;
     if (body.query.includes('CONTRACT_STATE_QUERY')) {
-      const state = chain.contract(body.variables.address);
-      const contractData = state && { state: hex(state.bytes), stateAt: state.block };
-      return ok({ data: { block: finalHead() ?? null, contract: contractData ?? null } });
+      return ok({ data: { block: head, contract: contractData } });
+    }
+    if (body.query.includes('HEAD_QUERY')) return ok({ data: { block: head } });
+    if (body.query.includes('LEDGER_PARAMETERS_QUERY')) {
+      return ok({ data: { block: head && { ...head, ledgerParameters: '01' } } });
+    }
+    // The fake has the head block only.
+    const pinned = head?.hash === body.variables.offset.hash ? head : null;
+    if (body.query.includes('CALL_INPUTS_QUERY')) {
+      const zswap = contractData && '02';
+      const block = pinned && { ...pinned, ledgerParameters: '01', contractZswapState: zswap };
+      return ok({ data: { block, contract: contractData } });
     }
     const status = chain.status(body.variables.offset.identifier);
     const found = status?.level === 'final';

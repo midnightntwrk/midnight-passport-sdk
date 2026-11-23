@@ -43,3 +43,4 @@ export {
   type P256Assertion,
   type WebAuthnPolicy,
 } from './keys/webauthn.js';
+export type { CallInputs, LedgerParametersRead } from './seams/indexer.js';

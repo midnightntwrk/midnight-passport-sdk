@@ -11,7 +11,14 @@ import type { StubChain } from './chain.js';
 export interface StubIndexerOptions {
   /** Each read rejects, and each watch fails, as if no source answered. */
   readonly unreachable?: boolean;
+  /** Default: one zero byte. */
+  readonly ledgerParameters?: Uint8Array;
+  /** The same bytes for every contract. Default: one zero byte. */
+  readonly zswapChainState?: Uint8Array;
 }
+
+// The stub's parameters never change, so they hold from the first block.
+const GENESIS = { height: 0, hash: '00'.repeat(32) };
 
 export type StubIndexer = Indexer & {
   /** The next read stays in flight until its signal aborts. */
@@ -51,8 +58,25 @@ export function createStubIndexer(chain: StubChain, options: StubIndexerOptions 
       return chain.onChange(push);
     });
 
+  const ledgerParameters = options.ledgerParameters ?? new Uint8Array(1);
+  const zswapChainState = options.zswapChainState ?? new Uint8Array(1);
+
   return {
     contractState: (address, o) => read(o?.signal, () => chain.contract(address)),
+    ledgerParameters: (o) =>
+      read(o?.signal, () => ({ bytes: ledgerParameters.slice(), block: GENESIS })),
+    callInputs: (address, o) =>
+      read(o?.signal, () => {
+        const state = chain.contract(address);
+        return (
+          state && {
+            state,
+            ledgerParameters: ledgerParameters.slice(),
+            zswapChainState: zswapChainState.slice(),
+            block: state.block,
+          }
+        );
+      }),
     transaction: (id, o) => read(o?.signal, () => chain.status(id)),
     watchContract: (address) => watch(() => chain.contract(address)),
     watchTransaction: (id) => watch(() => chain.status(id)),

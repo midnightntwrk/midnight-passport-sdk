@@ -35,7 +35,8 @@ the list:
    | DID | `owner` | E24 |
 
 2. **The indexer seam** reads contract state and transaction status, once or
-   as a `StateSource`. "Not found" is a value, and a source that cannot be
+   as a `StateSource`. It also reads the ledger parameters and the inputs of
+   a call, once. "Not found" is a value, and a source that cannot be
    reached is an error. `adapter-indexer` implements it, over the indexer and
    the node.
 3. **Fees and broadcast are two seams.** Fees takes a proven transaction and
