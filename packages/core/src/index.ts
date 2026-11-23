@@ -27,3 +27,4 @@ export {
   type DeviceOperationArgs,
   type ShieldedCoin,
 } from './keys/challenge.js';
+export { StaleNonceError, assertFresh } from './keys/nonce.js';
