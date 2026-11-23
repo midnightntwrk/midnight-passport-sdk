@@ -44,3 +44,12 @@ export {
   type WebAuthnPolicy,
 } from './keys/webauthn.js';
 export type { CallInputs, LedgerParametersRead } from './seams/indexer.js';
+export {
+  InboxKeyError,
+  InboxRecipientKeyError,
+  deriveInboxKey,
+  openInboxEntry,
+  sealInboxEntry,
+  type CoinDescription,
+  type InboxKey,
+} from './inbox/entry.js';
