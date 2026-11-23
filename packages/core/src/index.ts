@@ -18,3 +18,12 @@ export {
   type Sender,
   type TranscriptRejectionCause,
 } from './send.js';
+export {
+  deviceChallenge,
+  envelopeDigest,
+  type ChallengeContext,
+  type DeviceChallenge,
+  type DeviceOperation,
+  type DeviceOperationArgs,
+  type ShieldedCoin,
+} from './keys/challenge.js';
