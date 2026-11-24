@@ -8,10 +8,11 @@ import {
   type Sender,
   type TransactionStatus,
 } from '@midnight-ntwrk/mn-passport-core';
+import { saveRecord } from '../account.js';
 import { AuthorityKeyMismatchError, type AuthorityKey } from '../kernel/index.js';
 import { deployTransaction, updateTransaction } from './birth.js';
 import type { Ledger } from './price.js';
-import { saveRecord, type BirthRecord } from './record.js';
+import { writeRecord, type BirthRecord } from './record.js';
 
 export type DeployProgress =
   | { readonly kind: 'planned'; readonly waves: number }
@@ -65,10 +66,12 @@ export async function runBirth(start: BirthRecord, options: RunOptions): Promise
   if (options.authority.verifyingKey.value !== start.authority.publicKey) {
     throw new AuthorityKeyMismatchError();
   }
+  // A second birth on this device stops here, before anything is paid.
+  await saveRecord(options.store, start);
   let record = start;
   const save = async (next: BirthRecord): Promise<void> => {
     record = next;
-    await saveRecord(options.store, next);
+    await writeRecord(options.store, next);
   };
   options.onProgress?.({ kind: 'planned', waves: of });
 
