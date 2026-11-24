@@ -22,7 +22,8 @@
   "dependencies": {
     "@midnight-ntwrk/mn-passport-contract": "workspace:*",
     "@midnight-ntwrk/mn-passport-core": "workspace:*",
-    "@midnight-ntwrk/mn-passport-protocol": "workspace:*"
+    "@midnight-ntwrk/mn-passport-protocol": "workspace:*",
+    "@midnightntwrk/ledger-v9": "1.0.2"
   },
   "devDependencies": {
     "@noble/curves": "2.4.0"

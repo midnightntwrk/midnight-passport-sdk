@@ -185,6 +185,9 @@ importers:
       '@midnight-ntwrk/mn-passport-protocol':
         specifier: workspace:*
         version: link:../protocol
+      '@midnightntwrk/ledger-v9':
+        specifier: 1.0.2
+        version: 1.0.2
     devDependencies:
       '@noble/curves':
         specifier: 2.4.0

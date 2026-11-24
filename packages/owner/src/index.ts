@@ -22,3 +22,7 @@ export {
   type PasskeyReason,
   type PasskeySite,
 } from './passkey.js';
+export { packWaves, planBirth, WaveTooLargeError } from './deploy/plan.js';
+export type { BirthPlan, BirthPlanOptions, WaveKind, WavePrice } from './deploy/plan.js';
+export { createWavePrice, VERIFIER_KEY_VERSION } from './deploy/price.js';
+export type { Ledger, WavePriceOptions } from './deploy/price.js';
