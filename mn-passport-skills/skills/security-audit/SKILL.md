@@ -14,8 +14,8 @@ and "provider-integration" name a section of those docs.
 
 ## Blocking checklist
 
-- **Plaintext secret outside the kernel** — the PRF output, the JubJub device
-  key, a WPP account or package key, or the viewing key passed to an adapter,
+- **Plaintext secret outside the kernel** — the PRF output, the maintenance
+  authority key, a WPP account or package key, or the viewing key passed to an adapter,
   dApp, agent, log line, error message, telemetry, or state projection, other
   than as "What leaves the kernel" allows (architecture, "The owner kernel
   invariant").
