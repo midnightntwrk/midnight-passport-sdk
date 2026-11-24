@@ -37,6 +37,10 @@ export {
 export {
   AssertionProfileError,
   checkP256Assertion,
+  isProfileOrigin,
+  p256KeyFromSpki,
+  p256SignatureFromDer,
+  webauthnChallenge,
   webauthnClientData,
   webauthnDigest,
   type AssertionProfileReason,

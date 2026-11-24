@@ -1,10 +1,17 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
+import {
+  createHash,
+  generateKeyPairSync,
+  sign as cryptoSign,
+  verify as cryptoVerify,
+} from 'node:crypto';
 import { p256 } from '@noble/curves/nist.js';
 import {
   AssertionProfileError,
   checkP256Assertion,
+  p256KeyFromSpki,
+  p256SignatureFromDer,
   webauthnClientData,
   webauthnDigest,
   type AssertionProfileReason,
@@ -110,5 +117,62 @@ test('both client data shapes match the contract on each vector', () => {
     assert.equal(hex(json.subarray(36, 79)), hex(v.base64));
     assert.equal(createHash('sha256').update(json).digest('hex'), hex(v.clientDataHash));
     assert.equal(createHash('sha256').update(grease).digest('hex'), hex(v.greaseHash));
+  }
+});
+
+describe('the WebAuthn conversions', () => {
+  // Node's own crypto gives an independent SPKI and DER encoder.
+  const pair = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const jwk = pair.publicKey.export({ format: 'jwk' });
+  const spki = pair.publicKey.export({ type: 'spki', format: 'der' });
+
+  test('reads the key of a P-256 SPKI', () => {
+    const xy = Buffer.concat([jwk.x, jwk.y].map((part) => Buffer.from(part ?? '', 'base64url')));
+    assert.equal(hex(p256KeyFromSpki(spki)), xy.toString('hex'));
+  });
+
+  test('refuses a key of another curve, and a point off the curve', () => {
+    const k256 = generateKeyPairSync('ec', { namedCurve: 'secp256k1' });
+    assert.throws(
+      () => p256KeyFromSpki(k256.publicKey.export({ type: 'spki', format: 'der' })),
+      RangeError,
+    );
+    const offCurve = Uint8Array.from(spki, (byte, i) => (i === 90 ? byte ^ 1 : byte));
+    assert.throws(() => p256KeyFromSpki(offCurve), RangeError);
+  });
+
+  test('gives the r and s of each DER signature, as Node.js reads them', () => {
+    const lengths = new Set<number>();
+    for (let i = 0; i < 64; i++) {
+      const data = Buffer.from([i]);
+      const der = cryptoSign('sha256', data, pair.privateKey);
+      lengths.add(der.length);
+      const raw = p256SignatureFromDer(der);
+      const key = { key: pair.publicKey, dsaEncoding: 'ieee-p1363' as const };
+      assert.ok(cryptoVerify('sha256', data, key, raw));
+    }
+    // A 33-byte integer (leading zero) and a short one both occur in 64 signatures.
+    assert.ok(Math.max(...lengths) > 70 && Math.min(...lengths) < 71);
+  });
+
+  test('keeps a high S', () => {
+    const sig = highS(p256.sign(new Uint8Array(32), secretKey, { prehash: false }));
+    const der = p256.Signature.fromBytes(sig, 'compact').toBytes('der');
+    assert.equal(hex(p256SignatureFromDer(der)), hex(sig));
+  });
+
+  const der = cryptoSign('sha256', Buffer.from('x'), pair.privateKey);
+  const refused: Record<string, Uint8Array> = {
+    'a trailing byte': Uint8Array.from([...der, 0]),
+    's = 0': Uint8Array.from([0x30, 6, 2, 1, 1, 2, 1, 0]),
+    'a raw signature': new Uint8Array(64),
+  };
+  for (const [name, input] of Object.entries(refused)) {
+    test(`refuses a DER signature with ${name}`, () => {
+      assert.throws(
+        () => p256SignatureFromDer(input),
+        (error: unknown) => error instanceof AssertionProfileError && error.reason === 'signature',
+      );
+    });
   }
 });

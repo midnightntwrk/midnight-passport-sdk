@@ -50,6 +50,16 @@ function base64url(data: Uint8Array): string {
   return out;
 }
 
+/** The 43 unpadded base64url characters that carry the challenge in `clientDataJSON`. */
+export function webauthnChallenge(challenge: Uint8Array): string {
+  return base64url(bytes(challenge, 32, 'challenge'));
+}
+
+/** The contract can rebuild the client data of this origin: its length and its bytes. */
+export function isProfileOrigin(origin: string, originLength: number): boolean {
+  return origin.length === originLength && ORIGIN.test(origin);
+}
+
 /** The exact `clientDataJSON` that the contract rebuilds. Chrome sometimes adds the GREASE member. */
 export function webauthnClientData(
   challenge: Uint8Array,
@@ -59,7 +69,7 @@ export function webauthnClientData(
   if (!ORIGIN.test(origin)) {
     throw new RangeError('origin must be printable ASCII with no quote and no backslash.');
   }
-  const c = base64url(bytes(challenge, 32, 'challenge'));
+  const c = webauthnChallenge(challenge);
   const extra = chromeGrease ? GREASE : '';
   return ascii(
     `{"type":"webauthn.get","challenge":"${c}","origin":"${origin}","crossOrigin":false${extra}}`,
@@ -95,7 +105,7 @@ export function checkP256Assertion(
   const fail = (reason: AssertionProfileReason): never => {
     throw new AssertionProfileError(reason);
   };
-  if (policy.origin.length !== originLength || !ORIGIN.test(policy.origin)) fail('origin');
+  if (!isProfileOrigin(policy.origin, originLength)) fail('origin');
   const { clientDataJSON, authenticatorData, signature } = assertion;
   const shape = (grease: boolean) =>
     equal(clientDataJSON, webauthnClientData(challenge, policy.origin, grease));
@@ -111,4 +121,33 @@ export function checkP256Assertion(
     fail('signature');
   }
   return { chromeGrease };
+}
+
+// DER of SEQUENCE { SEQUENCE { id-ecPublicKey, prime256v1 }, BIT STRING { 04 ‖ x ‖ y } }.
+const SPKI_PREFIX = Uint8Array.from(
+  '3059301306072a8648ce3d020106082a8648ce3d030107034200'.match(/../g) ?? [],
+  (byte) => parseInt(byte, 16),
+);
+
+/** The 64-byte key of a P-256 SPKI, as `getPublicKey()` gives it. Throws `RangeError` otherwise. */
+export function p256KeyFromSpki(spki: Uint8Array): Uint8Array {
+  const point = spki.subarray(SPKI_PREFIX.length);
+  const prefix = spki.subarray(0, SPKI_PREFIX.length);
+  if (
+    spki.length !== 91 ||
+    !equal(prefix, SPKI_PREFIX) ||
+    !p256.utils.isValidPublicKey(point, false)
+  ) {
+    throw new RangeError('spki must be an uncompressed P-256 key on the curve.');
+  }
+  return point.slice(1);
+}
+
+/** The 64-byte `r ‖ s` of an ES256 assertion signature. A malformed one is refused as `signature`. */
+export function p256SignatureFromDer(der: Uint8Array): Uint8Array {
+  try {
+    return p256.Signature.fromBytes(der, 'der').toBytes('compact');
+  } catch {
+    throw new AssertionProfileError('signature');
+  }
 }
