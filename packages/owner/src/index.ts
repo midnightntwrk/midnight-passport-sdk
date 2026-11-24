@@ -47,3 +47,7 @@ export { Kernel, SecretHandle } from './kernel/index.js';
 export type { AuthorityKey } from './kernel/index.js';
 export { DeployRecordInvalidError, loadRecord, saveRecord } from './deploy/record.js';
 export type { BirthRecord } from './deploy/record.js';
+export { activationCall } from './deploy/activate.js';
+export type { ActivationOptions } from './deploy/activate.js';
+export { runBirth } from './deploy/run.js';
+export type { DeployProgress, RunOptions } from './deploy/run.js';
