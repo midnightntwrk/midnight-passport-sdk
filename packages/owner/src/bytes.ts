@@ -12,6 +12,15 @@ export function ascii(text: string): Uint8Array {
   });
 }
 
+export function fromAscii(bytes: Uint8Array): string {
+  let text = '';
+  // A spread of a long array passes the engine's argument limit.
+  for (let i = 0; i < bytes.length; i += 4096) {
+    text += String.fromCharCode(...bytes.subarray(i, i + 4096));
+  }
+  return text;
+}
+
 export function toHex(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
