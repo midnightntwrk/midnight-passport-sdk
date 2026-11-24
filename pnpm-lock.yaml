@@ -176,6 +176,9 @@ importers:
 
   packages/owner:
     dependencies:
+      '@midnight-ntwrk/compact-runtime':
+        specifier: 0.21.0
+        version: 0.21.0
       '@midnight-ntwrk/mn-passport-contract':
         specifier: workspace:*
         version: link:../contract

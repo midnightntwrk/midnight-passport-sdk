@@ -28,5 +28,22 @@ export { createWavePrice, VERIFIER_KEY_VERSION } from './deploy/price.js';
 export type { Ledger, WavePriceOptions } from './deploy/price.js';
 export { AuthorityKeyMismatchError, PrfUnavailableError, prfInputs } from './kernel/index.js';
 export type { PrfInputs, PrfResult } from './kernel/index.js';
+export {
+  deployTransaction,
+  openAuthority,
+  openViewing,
+  prepareBirth,
+  updateTransaction,
+  ViewingWrapError,
+} from './deploy/birth.js';
+export type {
+  AccBirthModule,
+  Birth,
+  BirthOptions,
+  BirthPasskey,
+  SessionPasskey,
+} from './deploy/birth.js';
+export { Kernel, SecretHandle } from './kernel/index.js';
+export type { AuthorityKey } from './kernel/index.js';
 export { DeployRecordInvalidError, loadRecord, saveRecord } from './deploy/record.js';
 export type { BirthRecord } from './deploy/record.js';
