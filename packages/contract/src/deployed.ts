@@ -24,7 +24,7 @@ const perGroup = <T>(make: (group: AccGroup) => T): Record<AccGroup, T> => ({
   p256: make('p256'),
 });
 
-const pinnedKey = (manifest: AccManifest, circuit: string): string | undefined =>
+export const pinnedKey = (manifest: AccManifest, circuit: string): string | undefined =>
   manifest.files.get(`keys/${circuit}.verifier`)?.sha256;
 
 /**
