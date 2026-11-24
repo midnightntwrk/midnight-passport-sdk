@@ -34,6 +34,25 @@ for (const arm of ['k256', 'p256'] as const) {
   });
 }
 
+test('the JubJub challenge grinds to the nonce and bytes of the pure circuit', () => {
+  const vectors = loadVectors('jubjub.json');
+  assert.equal(vectors.length, 48);
+  for (const v of vectors) {
+    const challenge: unknown = Reflect.apply(deviceChallenge, undefined, [
+      'jubjub',
+      v.operation,
+      v.args,
+      v,
+    ]);
+    assert.ok(isRecord(challenge) && typeof challenge.bind === 'function');
+    const bound: unknown = Reflect.apply(challenge.bind, challenge, [v.commitment]);
+    assert.ok(isRecord(bound));
+    const name = `${String(v.operation)} (${String(v.mode)})`;
+    assert.equal(bound.grindNonce, v.grindNonce, name);
+    assert.equal(hex(bound.bytes), hex(v.challenge), name);
+  }
+});
+
 test('the envelope digest matches the pure circuit for both envelopes', () => {
   for (const v of loadVectors('envelope.json')) {
     const digest: unknown = Reflect.apply(envelopeDigest, undefined, [v.envelope, v.challenge]);
@@ -79,7 +98,7 @@ describe('a value outside its contract type throws RangeError', () => {
     'a Field equal to the modulus': () =>
       deviceChallenge('p256', 'publish_recovery_session', recovery, context),
     'an unknown operation': untyped(deviceChallenge, 'k256', 'toString', {}, context),
-    'an unknown arm': untyped(deviceChallenge, 'jubjub', 'recover_cancel', {}, context),
+    'an unknown arm': untyped(deviceChallenge, 'ed25519', 'recover_cancel', {}, context),
     'a 31-byte challenge': () => envelopeDigest(0, new Uint8Array(31)),
     'envelope 2': untyped(envelopeDigest, 2, new Uint8Array(32)),
   };

@@ -14,6 +14,7 @@ export const DOMAIN_TAGS: Readonly<typeof tags> = Object.freeze(tags);
 export type DomainTag = (typeof DOMAIN_TAGS)[keyof typeof DOMAIN_TAGS];
 
 const deviceAuth = {
+  jubjub: 'midnight:account:auth:v1:',
   k256: 'midnight:account:auth:k1:v1:',
   p256: 'midnight:account:auth:r1:v1:',
 } as const;
