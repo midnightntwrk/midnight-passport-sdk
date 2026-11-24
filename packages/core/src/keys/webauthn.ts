@@ -10,6 +10,13 @@ export interface WebAuthnPolicy {
   readonly origin: string;
 }
 
+/** The policy that the account binds for a passkey on this RP and origin. */
+export function webauthnPolicy(rpId: string, origin: string): WebAuthnPolicy {
+  // A domain name is ASCII; a non-ASCII one would hash to an RP that the authenticator never signs.
+  if (!/^[!-~]+$/.test(rpId)) throw new RangeError('rpId must be an ASCII domain name.');
+  return { rpIdHash: sha256(ascii(rpId)), origin };
+}
+
 export type P256Assertion = Extract<Authorization, { readonly scheme: 'p256' }>;
 
 export type AssertionProfileReason =
@@ -87,18 +94,20 @@ export function webauthnDigest(
 const equal = (a: Uint8Array, b: Uint8Array): boolean =>
   a.length === b.length && a.every((byte, i) => byte === b[i]);
 
+export interface P256CheckContext {
+  readonly challenge: Uint8Array;
+  readonly publicKey: Uint8Array;
+  readonly policy: WebAuthnPolicy;
+  readonly originLength: number;
+}
+
 /**
  * Throws `AssertionProfileError` where the contract would refuse the assertion. `publicKey` is
  * the enrolled key, 64 bytes, `x` then `y`, big-endian. `chromeGrease` goes into `P256Auth`.
  */
 export function checkP256Assertion(
   assertion: P256Assertion,
-  context: {
-    readonly challenge: Uint8Array;
-    readonly publicKey: Uint8Array;
-    readonly policy: WebAuthnPolicy;
-    readonly originLength: number;
-  },
+  context: P256CheckContext,
 ): { readonly chromeGrease: boolean } {
   const { challenge, policy, originLength } = context;
   const publicKey = Uint8Array.from([4, ...bytes(context.publicKey, 64, 'publicKey')]);
@@ -150,4 +159,47 @@ export function p256SignatureFromDer(der: Uint8Array): Uint8Array {
   } catch {
     throw new AssertionProfileError('signature');
   }
+}
+
+/** The `P256Auth` argument of a p256 owner circuit, in the contract's own field names. */
+export interface P256AuthArgument {
+  readonly pk: { readonly x: bigint; readonly y: bigint; readonly identity: false };
+  readonly use_counter: bigint;
+  readonly policy: { readonly rp_id_hash: Uint8Array; readonly origin: Uint8Array };
+  readonly authenticator_data: Uint8Array;
+  readonly sig: { readonly r: bigint; readonly s: bigint };
+  readonly chrome_grease: boolean;
+}
+
+const bigEndian = (data: Uint8Array): bigint =>
+  data.reduce((value, byte) => (value << 8n) | BigInt(byte), 0n);
+
+/**
+ * Checks the assertion as `checkP256Assertion` does, then encodes it. `useCounter` is the
+ * counter of the device entry; with one device and no removal it equals `auth_nonce`.
+ */
+export function p256AuthArgument(
+  assertion: P256Assertion,
+  context: P256CheckContext & { readonly useCounter: bigint },
+): P256AuthArgument {
+  if (context.useCounter < 0n || context.useCounter >= 1n << 64n) {
+    throw new RangeError('useCounter must be a Uint<64>.');
+  }
+  const { chromeGrease } = checkP256Assertion(assertion, context);
+  const { publicKey, policy } = context;
+  return {
+    pk: {
+      x: bigEndian(publicKey.subarray(0, 32)),
+      y: bigEndian(publicKey.subarray(32)),
+      identity: false,
+    },
+    use_counter: context.useCounter,
+    policy: { rp_id_hash: policy.rpIdHash.slice(), origin: ascii(policy.origin) },
+    authenticator_data: assertion.authenticatorData.slice(),
+    sig: {
+      r: bigEndian(assertion.signature.subarray(0, 32)),
+      s: bigEndian(assertion.signature.subarray(32)),
+    },
+    chrome_grease: chromeGrease,
+  };
 }

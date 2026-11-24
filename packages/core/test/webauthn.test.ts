@@ -10,10 +10,12 @@ import { p256 } from '@noble/curves/nist.js';
 import {
   AssertionProfileError,
   checkP256Assertion,
+  p256AuthArgument,
   p256KeyFromSpki,
   p256SignatureFromDer,
   webauthnClientData,
   webauthnDigest,
+  webauthnPolicy,
   type AssertionProfileReason,
   type P256Assertion,
 } from '@midnight-ntwrk/mn-passport-core';
@@ -175,4 +177,38 @@ describe('the WebAuthn conversions', () => {
       );
     });
   }
+});
+
+describe('p256AuthArgument', () => {
+  const grease = assertion({ clientDataJSON: webauthnClientData(challenge, origin, true) });
+  const big = (data: Uint8Array) => BigInt(`0x${hex(data)}`);
+
+  test('gives the contract fields of a checked assertion', () => {
+    const auth = p256AuthArgument(grease, { ...context, useCounter: 3n });
+    assert.deepEqual(auth.pk, {
+      x: big(publicKey.subarray(0, 32)),
+      y: big(publicKey.subarray(32)),
+      identity: false,
+    });
+    assert.deepEqual(auth.sig, {
+      r: big(grease.signature.subarray(0, 32)),
+      s: big(grease.signature.subarray(32)),
+    });
+    assert.equal(auth.chrome_grease, true);
+    assert.equal(new TextDecoder().decode(auth.policy.origin), origin);
+    assert.equal(auth.use_counter, 3n);
+  });
+
+  test('refuses an RP ID that is not ASCII', () => {
+    assert.throws(() => webauthnPolicy('pässport.test', origin), RangeError);
+  });
+
+  test('refuses a counter outside Uint<64>, and an assertion the check refuses', () => {
+    assert.throws(
+      () => p256AuthArgument(grease, { ...context, useCounter: 1n << 64n }),
+      RangeError,
+    );
+    const other = { ...context, challenge: new Uint8Array(32), useCounter: 0n };
+    assert.throws(() => p256AuthArgument(grease, other), AssertionProfileError);
+  });
 });

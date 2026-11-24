@@ -39,12 +39,16 @@ export {
   checkP256Assertion,
   isProfileOrigin,
   p256KeyFromSpki,
+  p256AuthArgument,
   p256SignatureFromDer,
   webauthnChallenge,
   webauthnClientData,
   webauthnDigest,
+  webauthnPolicy,
   type AssertionProfileReason,
   type P256Assertion,
+  type P256AuthArgument,
+  type P256CheckContext,
   type WebAuthnPolicy,
 } from './keys/webauthn.js';
 export type { CallInputs, LedgerParametersRead } from './seams/indexer.js';
