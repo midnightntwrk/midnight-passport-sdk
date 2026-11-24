@@ -29,6 +29,11 @@ export {
 } from './keys/challenge.js';
 export { StaleNonceError, assertFresh } from './keys/nonce.js';
 export {
+  createSoftwareKeyProvider,
+  type SoftwareKeyOptions,
+  type SoftwareKeyProvider,
+} from './keys/software.js';
+export {
   AssertionProfileError,
   checkP256Assertion,
   webauthnClientData,
