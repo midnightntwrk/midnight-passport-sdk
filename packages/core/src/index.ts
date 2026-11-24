@@ -47,6 +47,7 @@ export type { CallInputs, LedgerParametersRead } from './seams/indexer.js';
 export {
   InboxKeyError,
   InboxRecipientKeyError,
+  checkCoin,
   deriveInboxKey,
   openInboxEntry,
   sealInboxEntry,
