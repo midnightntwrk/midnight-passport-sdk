@@ -1,9 +1,15 @@
 import {
+  CancelledError,
   RefusalError,
+  checkP256Assertion,
   isProfileOrigin,
   p256KeyFromSpki,
+  p256SignatureFromDer,
   webauthnChallenge,
+  webauthnPolicy,
+  type Authorization,
   type CallOptions,
+  type KeyProvider,
   type Platform,
   type WebAuthn,
   type WebAuthnCreated,
@@ -128,5 +134,50 @@ export async function createPasskey(
   return {
     passkey: { credentialId: created.credentialId, publicKey, userId },
     prf: created.prf && { ...created.prf, userVerified: created.userVerified },
+  };
+}
+
+export type PasskeyProvider = KeyProvider & { readonly scheme: 'p256' };
+
+/**
+ * Signs with one prompt for each call. An assertion that the contract would refuse rejects with
+ * `AssertionProfileError` and is not asked for again: the next tap gives the same shape.
+ */
+export function passkeyProvider(
+  site: PasskeySite & Pick<Passkey, 'credentialId' | 'publicKey'>,
+): PasskeyProvider {
+  const webauthn = passkeyWebAuthn(site);
+  const policy = webauthnPolicy(site.rpId, site.origin);
+  const publicKey = site.publicKey.slice();
+  const credentialId = site.credentialId.slice();
+  return {
+    scheme: 'p256',
+    publicKey(options) {
+      if (options?.signal?.aborted) return Promise.reject(new CancelledError('caller'));
+      return Promise.resolve(publicKey.slice());
+    },
+    async sign(challenge, options): Promise<Authorization> {
+      // A bad challenge would cost a tap before the profile check fails.
+      if (challenge.length !== 32) throw new RangeError('challenge must be 32 bytes.');
+      const asserted = await webauthn.get({
+        rpId: site.rpId,
+        challenge,
+        allowCredentialIds: [credentialId],
+        ...(options?.signal ? { signal: options.signal } : {}),
+      });
+      const authorization = {
+        scheme: 'p256' as const,
+        signature: p256SignatureFromDer(asserted.signature),
+        authenticatorData: asserted.authenticatorData,
+        clientDataJSON: asserted.clientDataJSON,
+      };
+      checkP256Assertion(authorization, {
+        challenge,
+        publicKey,
+        policy,
+        originLength: site.originLength,
+      });
+      return authorization;
+    },
   };
 }

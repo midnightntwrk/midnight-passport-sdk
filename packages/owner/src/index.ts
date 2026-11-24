@@ -14,9 +14,11 @@ export { accountConsentRecord } from './consent.js';
 export {
   PasskeyError,
   createPasskey,
+  passkeyProvider,
   type CreatedPasskey,
   type Passkey,
   type PasskeyPrf,
+  type PasskeyProvider,
   type PasskeyReason,
   type PasskeySite,
 } from './passkey.js';

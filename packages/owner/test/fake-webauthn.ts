@@ -1,6 +1,9 @@
+import { createHash } from 'node:crypto';
 import { p256 } from '@noble/curves/nist.js';
 import {
   webauthnChallenge,
+  webauthnClientData,
+  webauthnDigest,
   type Platform,
   type WebAuthn,
   type WebAuthnPrfValues,
@@ -20,6 +23,12 @@ export interface FakeAuthenticator {
   /** The create gives PRF outputs, as some authenticators do. */
   prfAtCreate?: boolean;
   createdPrf?: WebAuthnPrfValues | undefined;
+  /** Each get adds Chrome's GREASE member when this is true. */
+  grease: boolean;
+  flags: number;
+  /** Changes the client data of each assertion. */
+  getClientData?: (json: Uint8Array) => Uint8Array;
+  signingKey?: Uint8Array;
   prompts: number;
   lastUserId: Uint8Array | undefined;
 }
@@ -29,7 +38,13 @@ export function fakeAuthenticator(secretKey = new Uint8Array(32).fill(5)): {
   authenticator: FakeAuthenticator;
   webauthn: WebAuthn;
 } {
-  const authenticator: FakeAuthenticator = { secretKey, prompts: 0, lastUserId: undefined };
+  const authenticator: FakeAuthenticator = {
+    secretKey,
+    prompts: 0,
+    lastUserId: undefined,
+    grease: false,
+    flags: 5,
+  };
   const webauthn: WebAuthn = {
     create(options) {
       authenticator.prompts++;
@@ -57,8 +72,23 @@ export function fakeAuthenticator(secretKey = new Uint8Array(32).fill(5)): {
         publicKey: authenticator.createdPublicKey ? authenticator.createdPublicKey(spki) : spki,
       });
     },
-    get() {
-      return Promise.reject(new Error('not used'));
+    get(options) {
+      authenticator.prompts++;
+      const rpIdHash = createHash('sha256').update(options.rpId).digest();
+      const authenticatorData = Uint8Array.from([...rpIdHash, authenticator.flags, 0, 0, 0, 0]);
+      const plain = webauthnClientData(options.challenge, origin, authenticator.grease);
+      const clientDataJSON = authenticator.getClientData?.(plain) ?? plain;
+      const digest = webauthnDigest(authenticatorData, clientDataJSON);
+      const key = authenticator.signingKey ?? secretKey;
+      return Promise.resolve({
+        credentialId: options.allowCredentialIds?.[0] ?? new Uint8Array(16),
+        clientDataJSON,
+        authenticatorData,
+        signature: p256.sign(digest, key, { prehash: false, format: 'der' }),
+        userHandle: undefined,
+        prf: undefined,
+        userVerified: (authenticator.flags & 0x04) !== 0,
+      });
     },
   };
   return { authenticator, webauthn };

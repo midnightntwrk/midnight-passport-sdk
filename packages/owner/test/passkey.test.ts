@@ -2,7 +2,17 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
 import { p256 } from '@noble/curves/nist.js';
-import { PasskeyError, createPasskey, type PasskeyReason } from '@midnight-ntwrk/mn-passport-owner';
+import {
+  AssertionProfileError,
+  p256AuthArgument,
+  webauthnPolicy,
+} from '@midnight-ntwrk/mn-passport-core';
+import {
+  PasskeyError,
+  createPasskey,
+  passkeyProvider,
+  type PasskeyReason,
+} from '@midnight-ntwrk/mn-passport-owner';
 import { fakeAuthenticator, fakePlatform, site, type FakeAuthenticator } from './fake-webauthn.js';
 
 const user = { name: 'alice', displayName: 'Alice' };
@@ -91,6 +101,58 @@ describe('createPasskey', () => {
       await assert.rejects(createPasskey(options), refusal(reason));
       // A refused create keeps no PRF secret.
       assert.deepEqual(authenticator.createdPrf?.first, new Uint8Array(32));
+    });
+  }
+});
+
+describe('passkeyProvider', () => {
+  const enroll = async () => {
+    const { authenticator, webauthn } = fakeAuthenticator();
+    const platform = fakePlatform(webauthn);
+    const { passkey } = await createPasskey({ ...site, platform, rpName: 'Passport', user });
+    return { authenticator, provider: passkeyProvider({ ...site, platform, ...passkey }), passkey };
+  };
+  const challenge = new Uint8Array(32).fill(8);
+
+  test('a create and one signature cost two prompts, with or without GREASE', async () => {
+    for (const grease of [false, true]) {
+      const { authenticator, provider, passkey } = await enroll();
+      authenticator.grease = grease;
+      const signed = await provider.sign(challenge);
+      assert.ok(signed.scheme === 'p256');
+      const policy = webauthnPolicy(site.rpId, site.origin);
+      const context = { challenge, publicKey: passkey.publicKey, policy, originLength: 21 };
+      const auth = p256AuthArgument(signed, { ...context, useCounter: 0n });
+      assert.equal(auth.chrome_grease, grease);
+      assert.equal(authenticator.prompts, 2);
+    }
+  });
+
+  test('refuses a challenge that is not 32 bytes before any prompt', async () => {
+    const { authenticator, provider } = await enroll();
+    await assert.rejects(provider.sign(new Uint8Array(31)), RangeError);
+    assert.equal(authenticator.prompts, 1);
+  });
+
+  const cases: Record<string, [string, (a: FakeAuthenticator) => void]> = {
+    'a cross-origin assertion': [
+      'client-data',
+      (a) =>
+        (a.getClientData = (json) =>
+          Buffer.from(Buffer.from(json).toString('latin1').replace('false', 'true'), 'latin1')),
+    ],
+    'an assertion with no user verification': ['flags', (a) => (a.flags = 1)],
+    'a signature by another key': ['signature', (a) => (a.signingKey = new Uint8Array(32).fill(6))],
+  };
+  for (const [name, [reason, change]] of Object.entries(cases)) {
+    test(`refuses ${name} after one prompt, with no re-prompt`, async () => {
+      const { authenticator, provider } = await enroll();
+      change(authenticator);
+      await assert.rejects(
+        provider.sign(challenge),
+        (error: unknown) => error instanceof AssertionProfileError && error.reason === reason,
+      );
+      assert.equal(authenticator.prompts, 2);
     });
   }
 });
