@@ -59,3 +59,10 @@ export {
   saveRecord,
 } from './account.js';
 export type { AccLookupModule, AccountLedger, AccountLookup, LookupOptions } from './account.js';
+export {
+  AuthorityRetiredError,
+  canAddCircuits,
+  grantSpendCircuits,
+  planAddition,
+} from './deploy/add.js';
+export type { AdditionOptions } from './deploy/add.js';
