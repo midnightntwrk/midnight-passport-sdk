@@ -1,4 +1,4 @@
-import type { KeyProvider } from '@midnight-ntwrk/mn-passport-core';
+import type { Authorization, CallOptions, KeyProvider } from '@midnight-ntwrk/mn-passport-core';
 import { check, expectCancel, expectRejection, guarded, type ContractCase } from '../contract.js';
 
 export interface KeyProviderHarness {
@@ -10,9 +10,11 @@ export interface KeyProviderHarness {
 }
 
 const challenge = Uint8Array.from({ length: 32 }, (_, i) => i + 1);
-// k256 and p256: the account contract reads x and y, and r and s, as 32 bytes each.
-const sizeOk = (scheme: KeyProvider['scheme'], bytes: Uint8Array): boolean =>
-  scheme === 'jubjub' ? bytes.length > 0 : bytes.length === 64;
+const jubjubChallenge = { authNonce: 0n, bind: () => ({ bytes: challenge, grindNonce: 0n }) };
+const sign = (provider: KeyProvider, options?: CallOptions): Promise<Authorization> =>
+  provider.scheme === 'jubjub'
+    ? provider.sign(jubjubChallenge, options)
+    : provider.sign(challenge, options);
 
 export function keyProviderContract(
   make: () => Promise<KeyProviderHarness>,
@@ -26,7 +28,8 @@ export function keyProviderContract(
           const { provider } = await make();
           const first = await provider.publicKey();
           const second = await provider.publicKey();
-          check(sizeOk(provider.scheme, first), `the public key has ${first.length} bytes`);
+          // The account contract reads x and y as 32 bytes each.
+          check(first.length === 64, `the public key has ${first.length} bytes`);
           check(first.join() === second.join(), 'the public key changed between calls');
         },
       },
@@ -34,10 +37,15 @@ export function keyProviderContract(
         name: 'sign gives an authorization of the provider scheme',
         async run() {
           const { provider } = await make();
-          const authorization = await provider.sign(challenge);
+          const authorization = await sign(provider);
           check(authorization.scheme === provider.scheme, `got scheme ${authorization.scheme}`);
-          const { signature } = authorization;
-          check(sizeOk(provider.scheme, signature), `the signature has ${signature.length} bytes`);
+          if (authorization.scheme === 'jubjub') {
+            const { commitment, response } = authorization;
+            check(commitment.length === 64 && response.length === 32, 'R or s has the wrong size');
+          } else {
+            const { signature } = authorization;
+            check(signature.length === 64, `the signature has ${signature.length} bytes`);
+          }
           if (authorization.scheme === 'k256' && provider.scheme === 'k256') {
             check(authorization.envelope === provider.envelope, 'the envelope changed');
           }
@@ -54,7 +62,7 @@ export function keyProviderContract(
         name: 'an abort before or during sign or publicKey rejects with CancelledError',
         async run() {
           const { provider, hold } = await make();
-          await expectCancel((signal) => provider.sign(challenge, { signal }), hold);
+          await expectCancel((signal) => sign(provider, { signal }), hold);
           await expectCancel((signal) => provider.publicKey({ signal }), hold);
         },
       },
@@ -63,7 +71,7 @@ export function keyProviderContract(
         async run() {
           const { provider, dismissNextPrompt } = await make();
           dismissNextPrompt();
-          const error = await expectRejection(() => provider.sign(challenge), 'CancelledError');
+          const error = await expectRejection(() => sign(provider), 'CancelledError');
           check('by' in error && error.by === 'user', 'expected by: user');
         },
       },

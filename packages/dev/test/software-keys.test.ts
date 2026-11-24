@@ -86,7 +86,9 @@ test('a k256 signature for account A is refused for account B with the same nonc
   const provider = createSoftwareKeyProvider({ scheme: 'k256', secretKey });
   const publicKey = await provider.publicKey();
   const a = challengeFor('k256', accountA, publicKey);
-  const { signature } = await provider.sign(a);
+  const signed = await provider.sign(a);
+  assert.ok(signed.scheme === 'k256');
+  const { signature } = signed;
   const verifies = (challenge: Uint8Array) =>
     secp256k1.verify(signature, envelopeDigest(0, challenge), Uint8Array.from([4, ...publicKey]), {
       prehash: false,
