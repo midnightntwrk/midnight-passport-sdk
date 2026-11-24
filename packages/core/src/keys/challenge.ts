@@ -72,7 +72,7 @@ export interface DeviceChallenge {
   readonly authNonce: bigint;
 }
 
-const JUBJUB_ORDER = 0xe7db4ea6533afa906673b0101343b00a6682093ccc81082d0970e5ed6f72cb7n;
+export const JUBJUB_ORDER = 0xe7db4ea6533afa906673b0101343b00a6682093ccc81082d0970e5ed6f72cb7n;
 // About 1 try in 18 passes, so 2^16 tries all fail with a chance below 2^-5000.
 const GRIND_LIMIT = 1n << 16n;
 const FIELD_MODULUS = 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001n;
@@ -182,8 +182,13 @@ function tagHash(tag: string): Uint8Array {
   return sha256(padded);
 }
 
-const littleEndian = (data: Uint8Array): bigint =>
+export const littleEndian = (data: Uint8Array): bigint =>
   data.reduceRight((value, byte) => (value << 8n) | BigInt(byte), 0n);
+export const bigEndian = (data: Uint8Array): bigint =>
+  data.reduce((value, byte) => (value << 8n) | BigInt(byte), 0n);
+/** A value below 2^256 as 32 bytes, big-endian. */
+export const be32 = (value: bigint): Uint8Array =>
+  Uint8Array.from({ length: 32 }, (_, i) => Number((value >> BigInt(8 * (31 - i))) & 0xffn));
 
 /**
  * The challenge of `<operation>_with_<arm>` for the pinned account contract. A value out of its

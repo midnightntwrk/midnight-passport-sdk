@@ -294,6 +294,16 @@ async function generate(dir) {
   }
   out['jubjub.json'] = { manifest: pin, arm: 'jubjub', vectors: jubjub };
 
+  const jubjubKeys = MODES.map((mode) => {
+    const scalar = scalarOf(mode, rt.JUBJUB_SCALAR_MODULUS);
+    return {
+      arm: 'jubjub',
+      secretKey: Uint8Array.from(be32(scalar)),
+      publicKey: pointBytes(pointOf('jubjub', scalar)),
+    };
+  });
+  out['keys.json'] = { manifest: pin, vectors: [...keys, ...jubjubKeys] };
+
   /** @type {Record<string, string>} */
   const texts = {};
   for (const [name, data] of Object.entries(out)) {

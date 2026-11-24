@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { jubjub } from '@noble/curves/misc.js';
 import { secp256k1 } from '@noble/curves/secp256k1.js';
 import {
   AssertionProfileError,
@@ -21,6 +22,12 @@ import { run } from './run.js';
 const policy = { rpIdHash: new Uint8Array(32).fill(7), origin: 'https://passport.test' };
 const secretKey = new Uint8Array(32).fill(3);
 const hex = (bytes: Uint8Array) => Buffer.from(bytes).toString('hex');
+const big = (bytes: Uint8Array) => BigInt(`0x${hex(bytes)}`);
+// The contract's generator, read from its own circuit in the pinned build.
+const generator = jubjub.Point.fromAffine({
+  x: 0x3ea5c4673a121ca35ed37ee3b172f5ee04315c657fbe375f512dfea318d56fe5n,
+  y: 0x57137b83ea6edb4f78f7d30d3f616cb3b9aa6e8e40808413c10cea38d50c55cbn,
+});
 
 run(
   'software p256 provider',
@@ -34,24 +41,33 @@ run(
   }),
 );
 
-// The k256 key has no prompt and does not wait, so the prompt and in-flight cases do not apply.
+// A software key has no prompt and does not wait, so the prompt and in-flight cases do not apply.
 const noPrompt = () => {
-  throw new Error('the software k256 provider has no prompt');
+  throw new Error('a software key has no prompt');
 };
-run(
-  'software k256 provider',
-  keyProviderContract(async () => ({
-    provider: createSoftwareKeyProvider({ scheme: 'k256', secretKey }),
-    dismissNextPrompt: noPrompt,
-    hold: noPrompt,
-  })).filter((c) => !/abort|dismissed/.test(c.name)),
-);
+for (const scheme of ['k256', 'jubjub'] as const) {
+  run(
+    `software ${scheme} provider`,
+    keyProviderContract(async () => ({
+      provider:
+        scheme === 'k256'
+          ? createSoftwareKeyProvider({ scheme, secretKey })
+          : createSoftwareKeyProvider({ scheme, secretKey }),
+      dismissNextPrompt: noPrompt,
+      hold: noPrompt,
+    })).filter((c) => !/abort|dismissed/.test(c.name)),
+  );
+}
 
-test('the software k256 provider rejects an aborted call with CancelledError', async () => {
-  const provider = createSoftwareKeyProvider({ scheme: 'k256', secretKey });
+test('a software provider rejects an aborted call with CancelledError', async () => {
   const signal = abortedSignal();
-  await expectRejection(() => provider.sign(new Uint8Array(32), { signal }), 'CancelledError');
-  await expectRejection(() => provider.publicKey({ signal }), 'CancelledError');
+  const k256 = createSoftwareKeyProvider({ scheme: 'k256', secretKey });
+  await expectRejection(() => k256.sign(new Uint8Array(32), { signal }), 'CancelledError');
+  await expectRejection(() => k256.publicKey({ signal }), 'CancelledError');
+  const jubjub = createSoftwareKeyProvider({ scheme: 'jubjub', secretKey });
+  const challenge = { authNonce: 0n, bind: () => ({ bytes: new Uint8Array(32), grindNonce: 0n }) };
+  await expectRejection(() => jubjub.sign(challenge, { signal }), 'CancelledError');
+  await expectRejection(() => jubjub.publicKey({ signal }), 'CancelledError');
 });
 
 test('each public key is the point that the contract derives from the secret', async () => {
@@ -60,7 +76,7 @@ test('each public key is the point that the contract derives from the secret', a
   const file: unknown = JSON.parse(readFileSync(url, 'utf8'));
   assert.ok(typeof file === 'object' && file !== null && 'vectors' in file);
   const vectors: unknown = file.vectors;
-  assert.ok(Array.isArray(vectors) && vectors.length === 8);
+  assert.ok(Array.isArray(vectors) && vectors.length === 12);
   for (const v of vectors as unknown[]) {
     assert.ok(typeof v === 'object' && v !== null && 'arm' in v && 'publicKey' in v);
     assert.ok('secretKey' in v && typeof v.secretKey === 'string');
@@ -68,7 +84,9 @@ test('each public key is the point that the contract derives from the secret', a
     const provider =
       v.arm === 'p256'
         ? createSoftwareP256Provider({ secretKey: key, policy })
-        : createSoftwareKeyProvider({ scheme: 'k256', secretKey: key });
+        : v.arm === 'jubjub'
+          ? createSoftwareKeyProvider({ scheme: 'jubjub', secretKey: key })
+          : createSoftwareKeyProvider({ scheme: 'k256', secretKey: key });
     assert.equal(`0x${hex(await provider.publicKey())}`, v.publicKey, String(v.arm));
   }
 });
@@ -123,8 +141,41 @@ test('a p256 assertion for account A is refused for account B with the same nonc
   }
 });
 
+test('a JubJub signature for account A is refused for account B with the same nonce', async () => {
+  const provider = createSoftwareKeyProvider({ scheme: 'jubjub', secretKey });
+  const publicKey = await provider.publicKey();
+  const challengeOf = (address: string) =>
+    deviceChallenge(
+      'jubjub',
+      'rotate_enc_key',
+      { key: new Uint8Array(32).fill(9) },
+      {
+        address,
+        publicKey,
+        authNonce: 4n,
+      },
+    );
+  const signed = await provider.sign(challengeOf(accountA));
+  assert.ok(signed.scheme === 'jubjub');
+  const point = (xy: Uint8Array) =>
+    jubjub.Point.fromAffine({ x: big(xy.subarray(0, 32)), y: big(xy.subarray(32)) });
+  // The contract's check: s·G == R + c·pk, with c read little-endian.
+  const verifies = (address: string) => {
+    const c = challengeOf(address).bind(signed.commitment).bytes;
+    const right = point(signed.commitment).add(point(publicKey).multiply(big(c.slice().reverse())));
+    return generator.multiply(big(signed.response)).equals(right);
+  };
+  assert.ok(verifies(accountA));
+  assert.ok(!verifies(accountB));
+  // Two signatures with one R would give away the secret key.
+  const again = await provider.sign(challengeOf(accountA));
+  assert.ok(again.scheme === 'jubjub');
+  assert.notDeepEqual(again.commitment, signed.commitment);
+});
+
 test('each provider refuses a secret key that is not a scalar', () => {
   const zero = new Uint8Array(32);
+  assert.throws(() => createSoftwareKeyProvider({ scheme: 'jubjub', secretKey: zero }), RangeError);
   assert.throws(() => createSoftwareP256Provider({ secretKey: zero, policy }), RangeError);
   assert.throws(() => createSoftwareKeyProvider({ scheme: 'k256', secretKey: zero }), RangeError);
 });
