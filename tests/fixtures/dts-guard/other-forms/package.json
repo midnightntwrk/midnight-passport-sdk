@@ -1,0 +1,8 @@
+{
+  "name": "other-forms",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts"
+    }
+  }
+}

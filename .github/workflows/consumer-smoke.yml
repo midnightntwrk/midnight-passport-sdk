@@ -1,0 +1,30 @@
+name: Consumer smoke
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  consumer-smoke:
+    name: Packed SDK installs with one Effect 3 copy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+      # The runner has no bun, so the bun rows skip; the local verify step runs them.
+      - name: Build, then pack and install the SDK in fresh apps
+        env:
+          PASSPORT_CONSUMER_SMOKE: '1'
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+          pnpm run build
+          node --test tests/consumer-smoke.test.mjs
