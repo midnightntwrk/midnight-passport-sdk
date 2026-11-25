@@ -1,0 +1,26 @@
+{
+  "source": "Built from the midnight-js 5.0.1 indexer documents and schema, not recorded from a live indexer.",
+  "request": {
+    "query": "query TX_ID_QUERY($offset: TransactionOffset!) {\n  transactions(offset: $offset) {\n    __typename\n    block { height hash }\n    ... on RegularTransaction { transactionResult { status } }\n  }\n}",
+    "variables": {
+      "offset": { "identifier": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd" }
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "data": {
+        "transactions": [
+          {
+            "__typename": "RegularTransaction",
+            "block": {
+              "height": 1040,
+              "hash": "2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d"
+            },
+            "transactionResult": { "status": "PARTIAL_SUCCESS" }
+          }
+        ]
+      }
+    }
+  }
+}

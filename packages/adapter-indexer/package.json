@@ -21,5 +21,8 @@
   },
   "dependencies": {
     "@midnight-ntwrk/mn-passport-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@midnight-ntwrk/mn-passport-dev": "workspace:*"
   }
 }

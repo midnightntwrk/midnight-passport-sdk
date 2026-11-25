@@ -1,0 +1,25 @@
+{
+  "source": "Built from the midnight-js 5.0.1 indexer documents and schema, not recorded from a live indexer.",
+  "request": {
+    "query": "query CONTRACT_STATE_QUERY($address: HexEncoded!) {\n  block { height hash }\n  contract(address: $address) { state stateAt { height hash } }\n}",
+    "variables": { "address": "abababababababababababababababababababababababababababababababab" }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "data": {
+        "block": {
+          "height": 1042,
+          "hash": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"
+        },
+        "contract": {
+          "state": "000102a0ff",
+          "stateAt": {
+            "height": 1037,
+            "hash": "1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e"
+          }
+        }
+      }
+    }
+  }
+}
