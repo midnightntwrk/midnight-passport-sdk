@@ -58,7 +58,8 @@ keys"). Thus, the matrix records the revisions, not only the versions.
 
 Compact and the proof server are not npm packages. Their rows are not in the
 lockfile. The other npm rows are exact pins in the root `package.json`, except
-ledger-v9, which comes through midnight-js. The lockfile must agree.
+ledger-v9. midnight-js brings it, and `adapter-prover-remote` pins it as a
+runtime dependency. The lockfile must agree.
 
 `pnpm run lint` runs `scripts/check-single-copy.mjs`. It fails when the
 lockfile has two versions of ledger-v9, `compact-js`, `compact-runtime`, or
