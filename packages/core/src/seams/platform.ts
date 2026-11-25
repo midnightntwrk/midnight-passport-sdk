@@ -28,11 +28,19 @@ export interface LocalStore {
   wipe(): Promise<void>;
 }
 
+/** The two values of the WebAuthn PRF extension, each 32 bytes in an output. */
+export interface WebAuthnPrfValues {
+  readonly first: Uint8Array;
+  readonly second?: Uint8Array;
+}
+
 export interface WebAuthnCreateOptions {
   readonly rp: { readonly id: string; readonly name: string };
   readonly user: { readonly id: Uint8Array; readonly name: string; readonly displayName: string };
   readonly challenge: Uint8Array;
   readonly excludeCredentialIds?: readonly Uint8Array[];
+  /** A create always turns PRF on where the authenticator has it. These inputs also read it now. */
+  readonly prf?: WebAuthnPrfValues;
   readonly timeoutMs?: number;
   readonly signal?: AbortSignalLike;
 }
@@ -43,12 +51,17 @@ export interface WebAuthnCreated {
   readonly attestationObject: Uint8Array;
   /** DER SPKI, when the platform gives it. */
   readonly publicKey: Uint8Array | undefined;
+  /** Secret. Many authenticators give it only on a later get. The receiver zeros it. */
+  readonly prf: WebAuthnPrfValues | undefined;
+  /** The UV flag of the authenticator data. */
+  readonly userVerified: boolean;
 }
 
 export interface WebAuthnGetOptions {
   readonly rpId: string;
   readonly challenge: Uint8Array;
   readonly allowCredentialIds?: readonly Uint8Array[];
+  readonly prf?: WebAuthnPrfValues;
   readonly timeoutMs?: number;
   readonly signal?: AbortSignalLike;
 }
@@ -59,6 +72,10 @@ export interface WebAuthnAssertion {
   readonly authenticatorData: Uint8Array;
   readonly signature: Uint8Array;
   readonly userHandle: Uint8Array | undefined;
+  /** Secret. `undefined` when the authenticator has no PRF. The receiver zeros it. */
+  readonly prf: WebAuthnPrfValues | undefined;
+  /** The UV flag of the authenticator data. */
+  readonly userVerified: boolean;
 }
 
 /** A dismissed prompt rejects with `CancelledError` (`by: 'user'`). */

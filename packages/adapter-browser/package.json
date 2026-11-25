@@ -9,6 +9,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./esbuild": {
+      "types": "./dist/esbuild.d.ts",
+      "default": "./dist/esbuild.js"
+    },
+    "./vite": {
+      "types": "./dist/vite.d.ts",
+      "default": "./dist/vite.js"
     }
   },
   "files": [
@@ -20,6 +28,8 @@
     "test": "node --test \"dist-test/**/*.test.js\""
   },
   "dependencies": {
-    "@midnight-ntwrk/mn-passport-core": "workspace:*"
+    "@midnight-ntwrk/compact-runtime": "0.21.0",
+    "@midnight-ntwrk/mn-passport-core": "workspace:*",
+    "@midnightntwrk/ledger-v9": "1.0.2"
   }
 }

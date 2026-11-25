@@ -24,7 +24,8 @@ test('the repo is a private pnpm workspace over packages/*', async () => {
 
 test('the Node baseline agrees across manifest, .nvmrc, and the CI gate', async () => {
   assert.ok(root.engines, 'root manifest must declare engines');
-  assert.equal(root.engines.node, '>=22.1');
+  // The tests use `module.registerHooks`, which came in 22.15.
+  assert.equal(root.engines.node, '>=22.15');
   assert.equal((await read('../.nvmrc')).trim(), '22');
   const workflow = await read('../.github/workflows/pr-checks.yml');
   const pins = [...workflow.matchAll(/node-version(?:-file)?:\s*(.+)/g)].map((m) =>
@@ -66,6 +67,10 @@ test('every dependency in every workspace manifest is exact-pinned', async () =>
 
 const packageDirs = (await readdir(new URL('../packages', import.meta.url))).sort();
 
+// The browser adapter also ships its bundler plugins. Every other package has one entry.
+/** @type {Record<string, string[]>} */
+const SUBPATHS = { 'adapter-browser': ['esbuild', 'vite'] };
+
 test('package shape', async () => {
   assert.ok(packageDirs.length > 0, 'packages/ must hold the scaffolded packages');
   for (const dir of packageDirs) {
@@ -77,8 +82,13 @@ test('package shape', async () => {
     assert.equal(manifest.sideEffects, false, `${dir}: sideEffects`);
     assert.deepEqual(
       manifest.exports,
-      { '.': { types: './dist/index.d.ts', default: './dist/index.js' } },
-      `${dir}: one exports entry`,
+      Object.fromEntries(
+        ['index', ...(SUBPATHS[dir] ?? [])].map((name) => [
+          name === 'index' ? '.' : `./${name}`,
+          { types: `./dist/${name}.d.ts`, default: `./dist/${name}.js` },
+        ]),
+      ),
+      `${dir}: the "." entry, and the listed subpaths`,
     );
     // The bundle test checks what a bundled package ships.
     if (!BUNDLED.includes(`packages/${dir}`)) {

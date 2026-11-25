@@ -61,6 +61,8 @@ export function createStubPlatform(options: StubPlatformOptions = {}): StubPlatf
         clientDataJSON: bytes(1),
         attestationObject: bytes(1),
         publicKey: undefined,
+        prf: undefined,
+        userVerified: true,
       })),
     get: (o) =>
       prompt(o.signal, () => ({
@@ -69,6 +71,8 @@ export function createStubPlatform(options: StubPlatformOptions = {}): StubPlatf
         authenticatorData: bytes(37),
         signature: bytes(64),
         userHandle: undefined,
+        prf: undefined,
+        userVerified: true,
       })),
   };
   return {
