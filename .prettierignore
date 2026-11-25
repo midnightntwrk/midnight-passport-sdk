@@ -19,3 +19,4 @@ mn-passport-skills/
 /experiments/
 renovate.json
 CODEOWNERS
+packages/contract/generated/
