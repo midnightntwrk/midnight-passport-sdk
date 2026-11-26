@@ -1,6 +1,13 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
-import { BUILTIN, bindingModule, builtinMessage, fileList, type ResolveEntry } from './bundler.js';
+import {
+  BUILTIN,
+  bindingModule,
+  builtinMessage,
+  fileList,
+  isRuntimeWasm,
+  type ResolveEntry,
+} from './bundler.js';
 
 interface Message {
   readonly text: string;
@@ -105,10 +112,11 @@ export function passportWasm(): EsbuildPluginLike {
         contents: await readFile(path),
         loader: 'file',
       }));
-      build.onResolve({ filter: /\.wasm$/ }, ({ path, resolveDir }) => ({
-        path: resolve(resolveDir, path),
-        namespace: 'mn-passport-binding',
-      }));
+      build.onResolve({ filter: /\.wasm$/ }, async ({ path, importer, resolveDir }) =>
+        (await isRuntimeWasm(path, importer))
+          ? { path: resolve(resolveDir, path), namespace: 'mn-passport-binding' }
+          : undefined,
+      );
       build.onLoad({ filter: /.*/, namespace: 'mn-passport-binding' }, async ({ path }) => ({
         contents: await bindingModule(path),
         resolveDir: dirname(path),

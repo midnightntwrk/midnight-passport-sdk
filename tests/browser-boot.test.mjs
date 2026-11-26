@@ -1,10 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { passportWasm } from '../packages/adapter-browser/dist/esbuild.js';
 import { browserTest, bundle, runPage, viteBundle } from './chromium.mjs';
 import { listen } from './server.mjs';
 
@@ -60,10 +61,28 @@ async function importStubbed(page, url) {
   return import(pathToFileURL(join(outdir, 'page.js')).href);
 }
 
-/** @type {Record<string, (entry: string) => Promise<unknown>>} */
+// Stands in for the app's own WASM handling, which runs after the Passport plugin.
+const APP_WASM = 'export default "app wasm";';
+/** @type {import('esbuild').Plugin} */
+const appWasmEsbuild = {
+  name: 'app-wasm',
+  setup(build) {
+    build.onResolve({ filter: /\.wasm$/ }, ({ path }) => ({ path, namespace: 'app-wasm' }));
+    build.onLoad({ filter: /.*/, namespace: 'app-wasm' }, () => ({ contents: APP_WASM }));
+  },
+};
+/** @type {import('vite').Plugin} */
+const appWasmVite = {
+  name: 'app-wasm',
+  enforce: 'pre',
+  resolveId: (source) => (source.endsWith('.wasm') ? `\0app-wasm:${source}` : undefined),
+  load: (id) => (id.startsWith('\0app-wasm:') ? APP_WASM : undefined),
+};
+
+/** @type {Record<string, (entry: string) => Promise<{ outdir: string }>>} */
 const bundlers = {
-  esbuild: (entry) => bundle(`import ${JSON.stringify(entry)};`),
-  Vite: viteBundle,
+  esbuild: (entry) => bundle(`import ${JSON.stringify(entry)};`, [passportWasm(), appWasmEsbuild]),
+  Vite: (entry) => viteBundle(entry, [appWasmVite]),
 };
 for (const [name, build] of Object.entries(bundlers)) {
   test(`${name}: a Node.js built-in fails the build, unless the app has a package of that name`, async (t) => {
@@ -84,6 +103,24 @@ for (const [name, build] of Object.entries(bundlers)) {
     );
     await assert.rejects(build(join(app, 'bare.js')), /imports the Node\.js built-in "fs"/);
     await build(join(app, 'buffer.js'));
+  });
+
+  test(`${name}: a WASM import outside the Midnight runtimes is left to the app`, async (t) => {
+    const app = await mkdtemp(join(tmpdir(), 'mn-passport-app-'));
+    t.after(() => rm(app, { recursive: true, force: true }));
+    const other = join(app, 'node_modules/other-wasm');
+    await mkdir(other, { recursive: true });
+    await writeFile(join(other, 'package.json'), '{ "name": "other-wasm", "main": "index.js" }');
+    await writeFile(join(other, 'index.js'), "export { default } from './x.wasm';");
+    await writeFile(join(other, 'x.wasm'), EMPTY_WASM);
+    await writeFile(
+      join(app, 'main.js'),
+      "import a from 'other-wasm'; import b from 'other-wasm/x.wasm'; console.log(a, b);",
+    );
+    const { outdir } = await build(join(app, 'main.js'));
+    const page = await readFile(resolve(outdir, 'page.js'), 'utf8');
+    assert.match(page, /app wasm/);
+    assert.doesNotMatch(page, /loadRuntimes/);
   });
 }
 
