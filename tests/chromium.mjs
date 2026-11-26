@@ -66,6 +66,7 @@ export const appBuild = {
     ),
   },
   nodePaths: [join(root, 'packages/adapter-browser/node_modules')],
+  loader: /** @type {Record<string, import('esbuild').Loader>} */ ({ '.wasm': 'file' }),
 };
 
 /**

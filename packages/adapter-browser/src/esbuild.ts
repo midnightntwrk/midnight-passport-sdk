@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import {
   BUILTIN,
+  SHIMS,
   bindingModule,
   builtinMessage,
   fileList,
@@ -66,12 +67,15 @@ export interface EsbuildPluginLike {
 const ASSET = '?mn-passport-asset';
 const POLYFILL_CHECK = Symbol('polyfill check');
 
-/** For an ESM browser build: the WASM URLs resolve against `import.meta.url`. */
+/**
+ * For an ESM browser build: the WASM URLs resolve against `import.meta.url`. Set a `.wasm`
+ * loader, such as `file`, for the WASM that is not a Passport runtime: midnight-js imports some.
+ */
 export function passportWasm(): EsbuildPluginLike {
   return {
     name: 'mn-passport-wasm',
     setup(build) {
-      // A bare name such as `buffer` passes when the app installs a package of that name.
+      // A bare name such as `buffer` passes when the app installs a package of that name, or has a shim.
       build.onResolve({ filter: BUILTIN }, async ({ path, importer, resolveDir, pluginData }) => {
         if (pluginData === POLYFILL_CHECK) return undefined;
         if (!path.startsWith('node:')) {
@@ -86,6 +90,8 @@ export function passportWasm(): EsbuildPluginLike {
             return resolved;
           }
         }
+        const shim = SHIMS.get(path);
+        if (shim) return { path: shim };
         return { errors: [{ text: builtinMessage(importer, path) }] };
       });
       const resolveEntry: ResolveEntry = async (name, from) => {

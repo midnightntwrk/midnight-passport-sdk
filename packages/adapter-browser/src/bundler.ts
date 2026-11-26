@@ -2,9 +2,17 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { builtinModules } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // eslint-disable-next-line @typescript-eslint/no-inferrable-types -- isolatedDeclarations needs the type.
 export const BUILTIN: RegExp = new RegExp(`^(?:node:.*|(?:${builtinModules.join('|')})(?:/.*)?)$`);
+
+/** The browser copies of the built-ins that midnight-js imports, for an app that installs none. */
+export const SHIMS: ReadonlyMap<string, string> = new Map([
+  // The file path finds the package, not the Node.js built-in.
+  ['buffer', fileURLToPath(import.meta.resolve('buffer/index.js'))],
+  ['assert', fileURLToPath(new URL('./assert.js', import.meta.url))],
+]);
 
 export const builtinMessage = (importer: string, path: string): string =>
   `${importer} imports the Node.js built-in "${path}". A browser cannot load it.`;

@@ -124,6 +124,39 @@ for (const [name, build] of Object.entries(bundlers)) {
   });
 }
 
+/** @type {Record<string, (entry: string) => Promise<{ build?: object, outdir?: string }>>} */
+const pages = {
+  esbuild: async () => ({}),
+  Vite: async (entry) => viteBundle(entry),
+};
+for (const [name, build] of Object.entries(pages)) {
+  browserTest(`${name}: a bare buffer or assert gets the adapter's browser copy`, async (bin) => {
+    const app = await mkdtemp(join(tmpdir(), 'mn-passport-app-'));
+    try {
+      // The default import shape that TypeScript emits, as @subsquid/scale-codec uses it.
+      await writeFile(
+        join(app, 'check.cjs'),
+        `const assert = ((m) => (m && m.__esModule ? m : { default: m }))(require('assert'));
+module.exports = (value) => { try { assert.default(value, 'no'); return 'passed'; } catch (e) { return e.message; } };`,
+      );
+      const entry = join(app, 'page.js');
+      await writeFile(
+        entry,
+        `import { Buffer } from 'buffer';
+import check from './check.cjs';
+window.result = { hex: Buffer.from('0aff', 'hex').toString('hex'), pass: check(true), fail: check(false) };`,
+      );
+      const { value, errors } = await runPage(bin, `import ${JSON.stringify(entry)};`, {
+        ...(await build(entry)),
+      });
+      assert.deepEqual(errors, []);
+      assert.deepEqual(value, { hex: '0aff', pass: 'passed', fail: 'no' });
+    } finally {
+      await rm(app, { recursive: true, force: true });
+    }
+  });
+}
+
 test('an esbuild external does not pass the built-in check', async () => {
   await assert.rejects(bundle("import 'fs';", undefined, { external: ['fs'] }), /built-in "fs"/);
 });
