@@ -58,13 +58,20 @@ async function ceremony<A>(
   const controller = new AbortController();
   const onAbort = (): void => controller.abort();
   signal?.addEventListener('abort', onAbort);
+  let credential: Credential | null = null;
   try {
-    const credential = await run(controller.signal);
+    credential = await run(controller.signal);
     // The browser can finish the ceremony after the abort.
     if (signal?.aborted) throw new CancelledError('caller');
     if (!(credential instanceof PublicKeyCredential)) throw new WebAuthnError('NoCredential');
     return read(credential);
   } catch (error) {
+    // No receiver gets this PRF output, so zero it here.
+    if (credential instanceof PublicKeyCredential) {
+      const prf = prfResults(credential);
+      prf?.first.fill(0);
+      prf?.second?.fill(0);
+    }
     if (signal?.aborted) throw new CancelledError('caller');
     if (error instanceof WebAuthnError) throw error;
     const name =
