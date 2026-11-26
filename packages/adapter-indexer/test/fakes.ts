@@ -42,6 +42,29 @@ export const stateAnswer = (state: string | null, at = 5, head = 9): HttpRespons
     },
   });
 
+/** The block hash that a state read pins its second query to, `undefined` for any other request. */
+export function pinnedHash(request: HttpRequest): string | undefined {
+  const body = JSON.parse(String(request.body)) as { variables?: { offset?: { hash?: string } } };
+  return body.variables?.offset?.hash;
+}
+
+/**
+ * An indexer at `head`, where each state of `history` starts at its block. A pinned query reads
+ * its block. An unpinned `contract` lags `block` by one, as two fields that follow the tip can.
+ */
+export function indexerAt(
+  head: number,
+  history: readonly (readonly [from: number, state: string])[],
+): (request: HttpRequest) => HttpResponse {
+  return (request) => {
+    const hash = pinnedHash(request);
+    const at = hash === undefined ? head - 1 : parseInt(hash, 16);
+    const last = history.filter(([from]) => from <= at).at(-1);
+    const contract = last === undefined ? null : { state: last[1], stateAt: block(last[0]) };
+    return ok({ data: { block: block(hash === undefined ? head : at), contract } });
+  };
+}
+
 export const NODE_URL = 'https://node.test';
 
 /** A node at `height` with `state` at the contract, or with no contract. */

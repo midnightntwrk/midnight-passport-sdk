@@ -97,7 +97,7 @@ test('without a node URL, no node request is sent', async () => {
   assert.deepEqual((await indexer.contractState(address))?.bytes, OLD);
   assert.deepEqual(
     sent.map((s) => s.url),
-    [INDEXER_URL],
+    [INDEXER_URL, INDEXER_URL],
   );
 });
 

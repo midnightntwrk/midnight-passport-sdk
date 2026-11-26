@@ -41,7 +41,7 @@ const reads = (http: (request: HttpRequest) => Promise<HttpResponse>, requestTim
   createReads({ indexerUrl: INDEXER_URL, http, requestTimeoutMs });
 
 test('a found contract has its bytes and the block where the state last changed', async () => {
-  const state = await reads(replay('contract-found')).contractState(address);
+  const state = await reads(replay('head', 'contract-found')).contractState(address);
   assert.deepEqual(state, {
     address,
     bytes: Uint8Array.of(0x00, 0x01, 0x02, 0xa0, 0xff),
@@ -50,7 +50,7 @@ test('a found contract has its bytes and the block where the state last changed'
 });
 
 test('an unknown contract and an unknown transaction read as undefined', async () => {
-  assert.equal(await reads(replay('contract-not-found')).contractState(address), undefined);
+  assert.equal(await reads(replay('head', 'contract-not-found')).contractState(address), undefined);
   assert.equal(await reads(replay('transaction-not-found')).transaction(id), undefined);
 });
 
@@ -214,7 +214,7 @@ const failures: readonly (readonly [string, Reason, () => Promise<HttpResponse>]
     'response',
     async () => response(200, encode(`{"errors":{"message":"x"},${notFound.slice(1)}`)),
   ],
-  ['a missing field', 'response', async () => response(200, encode('{"data":{"block":null}}'))],
+  ['a missing field', 'response', async () => response(200, encode('{"data":{}}'))],
   [
     'a body over 16 MiB',
     'response',
@@ -247,7 +247,7 @@ for (const [name, reason, http] of failures) {
 for (const state of ['xyz', 'abc', '']) {
   test(`the state "${state}" is IndexerUnreachableError`, async () => {
     const contract = { state, stateAt: { height: 1, hash: 'aa'.repeat(32) } };
-    const body = { data: { block: null, contract } };
+    const body = { data: { block: { height: 1, hash: 'aa'.repeat(32) }, contract } };
     const indexer = reads(async () => ok(body));
     await rejectsUnreachable(() => indexer.contractState(address), 'response');
   });

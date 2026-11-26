@@ -20,9 +20,11 @@ import { readNodeState } from './node.js';
 import { ownSignal, type Data, type Endpoint } from './transport.js';
 
 // Keep these in step with the indexer API of the pinned midnight-js version.
-const CONTRACT_STATE_QUERY = `query CONTRACT_STATE_QUERY($address: HexEncoded!) {
-  block { height hash }
-  contract(address: $address) { state stateAt { height hash } }
+// Each query with a `$offset` is pinned to one hash. Unpinned, `block` and `contract` each follow
+// the tip and can name two blocks.
+const CONTRACT_STATE_QUERY = `query CONTRACT_STATE_QUERY($address: HexEncoded!, $offset: BlockOffset!) {
+  block(offset: $offset) { height hash }
+  contract(address: $address, offset: $offset) { state stateAt { height hash } }
 }`;
 
 const TX_ID_QUERY = `query TX_ID_QUERY($offset: TransactionOffset!) {
@@ -37,7 +39,6 @@ const HEAD_QUERY = `query HEAD_QUERY { block { height hash } }`;
 
 const LEDGER_PARAMETERS_QUERY = `query LEDGER_PARAMETERS_QUERY { block { height hash ledgerParameters } }`;
 
-// Pinned to one hash. Unpinned, `block` and `contract` each follow the tip and can name two blocks.
 const CALL_INPUTS_QUERY = `query CALL_INPUTS_QUERY($address: HexEncoded!, $offset: BlockOffset!) {
   block(offset: $offset) { height hash ledgerParameters contractZswapState(address: $address) }
   contract(address: $address, offset: $offset) { state stateAt { height hash } }
@@ -75,6 +76,22 @@ function blockRef(value: unknown): BlockRef {
 
 const bytesOf = (value: unknown): Uint8Array => decodeHex(value) ?? malformed();
 
+/** Reads the head, then `document` at its hash. `undefined` before the indexer's first block. */
+async function atHead(
+  endpoint: Endpoint,
+  document: string,
+  variables: Data,
+  options?: CallOptions,
+): Promise<{ readonly head: BlockRef; readonly data: Data } | undefined> {
+  const answer = (await query(endpoint, HEAD_QUERY, {}, options)).block;
+  if (answer === null) return undefined;
+  const head = blockRef(answer);
+  const offset = { hash: head.hash };
+  const data = await query(endpoint, document, { ...variables, offset }, options);
+  if (blockRef(data.block).hash !== head.hash) return malformed();
+  return { head, data };
+}
+
 /** An indexer with no block yet is unreachable: nothing can be built on it. */
 export async function readLedgerParameters(
   endpoint: Endpoint,
@@ -89,11 +106,8 @@ export async function readCallInputs(
   address: ContractAddress,
   options?: CallOptions,
 ): Promise<CallInputs | undefined> {
-  const head = blockRef((await query(endpoint, HEAD_QUERY, {}, options)).block);
-  const variables = { address, offset: { hash: head.hash } };
-  const data = await query(endpoint, CALL_INPUTS_QUERY, variables, options);
-  const block = blockRef(data.block);
-  if (block.hash !== head.hash) return malformed();
+  const { head, data } =
+    (await atHead(endpoint, CALL_INPUTS_QUERY, { address }, options)) ?? malformed();
   const zswap = field(data.block, 'contractZswapState');
   // Only both `null` is "no contract". One `null` alone fails below.
   if (data.contract === null && zswap === null) return undefined;
@@ -102,7 +116,7 @@ export async function readCallInputs(
     state: { address, bytes, block: blockRef(field(data.contract, 'stateAt')) },
     ledgerParameters: bytesOf(field(data.block, 'ledgerParameters')),
     zswapChainState: bytesOf(zswap),
-    block,
+    block: head,
   };
 }
 
@@ -132,11 +146,12 @@ export async function readContractState(
   address: ContractAddress,
   options?: CallOptions,
 ): Promise<IndexerStateRead> {
-  const data = await query(endpoint, CONTRACT_STATE_QUERY, { address }, options);
-  if (!('block' in data) || !('contract' in data)) return malformed();
-  const head = data.block === null ? undefined : blockRef(data.block);
+  const read = await atHead(endpoint, CONTRACT_STATE_QUERY, { address }, options);
+  if (read === undefined) return { head: undefined, state: undefined };
+  const { head, data } = read;
+  if (!('contract' in data)) return malformed();
   if (data.contract === null) return { head, state: undefined };
-  const bytes = decodeHex(field(data.contract, 'state')) ?? malformed();
+  const bytes = bytesOf(field(data.contract, 'state'));
   return { head, state: { address, bytes, block: blockRef(field(data.contract, 'stateAt')) } };
 }
 
