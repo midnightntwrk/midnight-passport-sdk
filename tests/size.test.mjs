@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { extname } from 'node:path';
+import { basename, extname } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { appBuild, bundle } from './chromium.mjs';
 
@@ -9,18 +9,22 @@ const BASELINE = new URL('./fixtures/app/size-baseline.json', import.meta.url);
 const LIMIT = 0.05;
 
 test(
-  'the gzip size of the esbuild app stays within 5% of the baseline, for the JS and the WASM',
+  'the gzip size of the esbuild app stays within 5% of the baseline: the entry chunk, all JS, and the WASM',
   { timeout: 60_000 },
   async (t) => {
     const { outputs } = await bundle("export * from './fixtures/app/app.js';", undefined, appBuild);
-    const size = { js: 0, wasm: 0 };
+    const size = { entry: 0, js: 0, wasm: 0 };
     for (const file of outputs) {
       const kind = extname(file).slice(1);
-      if (kind === 'js' || kind === 'wasm') size[kind] += gzipSync(await readFile(file)).length;
+      if (kind !== 'js' && kind !== 'wasm') continue;
+      const bytes = gzipSync(await readFile(file)).length;
+      size[kind] += bytes;
+      // The app loads the lazy chunks only when it calls the chain code.
+      if (basename(file) === 'page.js') size.entry = bytes;
     }
-    t.diagnostic(`gzip: JS ${size.js} bytes, WASM ${size.wasm} bytes`);
+    t.diagnostic(`gzip: entry ${size.entry}, JS ${size.js}, WASM ${size.wasm} bytes`);
     const baseline = /** @type {typeof size} */ (JSON.parse(await readFile(BASELINE, 'utf8')));
-    for (const kind of /** @type {const} */ (['js', 'wasm'])) {
+    for (const kind of /** @type {const} */ (['entry', 'js', 'wasm'])) {
       const least = Math.round(baseline[kind] * (1 - LIMIT));
       const most = Math.round(baseline[kind] * (1 + LIMIT));
       // A shrink also fails, so that a missing file or a stale baseline does not pass.
