@@ -20,3 +20,17 @@ export class PaymentExpiredError extends PassportError {
     this.sent = sent;
   }
 }
+
+/** The proof's own ttl has passed, so no payment of it can land. Build and prove again. */
+export class ProofExpiredError extends PassportError {
+  static {
+    this.prototype.name = 'ProofExpiredError';
+  }
+
+  readonly _tag = 'ProofExpiredError' as const;
+  readonly code = 'PROOF_EXPIRED' as const;
+
+  constructor() {
+    super('The proof expired before its payment.');
+  }
+}

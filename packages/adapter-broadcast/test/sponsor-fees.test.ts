@@ -56,6 +56,15 @@ test('pay posts the proven bytes and returns the sponsor bytes with the fee iden
   assert.ok(result.submitBy >= before + 50_000 && result.submitBy <= after + 50_000);
 });
 
+test('a proof past its own ttl goes to no sponsor', async () => {
+  const platform = createStubPlatform();
+  const fees = sponsorFees({ url: URL, platform });
+  const tx = await provenTx({ ttlMs: -1_000 });
+  const error = await rejection(() => fees.pay(tx));
+  assert.equal(error._tag, 'ProofExpiredError');
+  assert.equal(platform.requests.length, 0);
+});
+
 test('the id is the fee identifier, also when the last identifier is the proof one, and the fee ttl caps submitBy', async () => {
   const { platform, fees, tx } = await setup();
   const { Transaction } = await import('@midnightntwrk/ledger-v9');

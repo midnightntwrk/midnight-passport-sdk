@@ -5,7 +5,7 @@ export * from './seams/index.js';
 export * from './refusals.js';
 export * from './prover-consent.js';
 export { proverDisclosure } from './prover-disclosure.js';
-export { PaymentExpiredError } from './payment-errors.js';
+export { PaymentExpiredError, ProofExpiredError } from './payment-errors.js';
 export {
   CallFailedError,
   SendUncertainError,

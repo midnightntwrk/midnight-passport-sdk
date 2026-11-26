@@ -8,6 +8,7 @@ import type {
 } from '@midnightntwrk/ledger-v9';
 import {
   CancelledError,
+  ProofExpiredError,
   RefusalError,
   SponsorUnavailableError,
   sponsorRefusal,
@@ -71,6 +72,10 @@ export function sponsorFees(options: SponsorFeesOptions): Fees {
       // The ledger loads before the request, so a load failure locks no fee coin.
       const ledger = await loadLedger(platform, signal, requestTimeoutMs);
       const proven = requireProven(ledger, tx.bytes);
+      // No fee coin is locked for bytes that no ledger takes.
+      if ((earliestTtl(proven.intents) ?? Number.POSITIVE_INFINITY) <= Date.now()) {
+        throw new ProofExpiredError();
+      }
       const startedAt = Date.now();
       const answer = await send(
         platform,

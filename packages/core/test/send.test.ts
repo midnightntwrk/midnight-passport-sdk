@@ -4,6 +4,7 @@ import {
   CallFailedError,
   CancelledError,
   PaymentExpiredError,
+  ProofExpiredError,
   SendUncertainError,
   TimeoutError,
   createSender,
@@ -207,6 +208,13 @@ it('a node rebuild row with no new proof pays the same proof again', async () =>
     assert.equal(new Set(h.log.submitted).size, 2);
     assert.deepEqual(h.log.proofs[0], h.log.proofs[1]);
   }
+});
+
+it('a proof past its own ttl is built again before any payment', async () => {
+  const h = harness({ pays: [new ProofExpiredError()] });
+  assert.equal((await send(h)).level, 'final');
+  assert.equal(h.log.builds, 2);
+  assert.equal(h.log.paid.length, 1);
 });
 
 it('a node stop row throws', async () => {

@@ -21,7 +21,7 @@ export interface SendSeams {
 export interface SendLimits {
   /** Default: 4. */
   readonly sponsorRetries?: number;
-  /** New payments after a node refusal or a lost transaction. Default: 3. */
+  /** New payments after a node refusal, a lost transaction, or an expired proof. Default: 3. */
   readonly rebuilds?: number;
   /** The longest wait for a lost payment to land or expire. Default: 300,000. */
   readonly lostWaitMs?: number;
@@ -76,7 +76,7 @@ export interface SendOptions extends CallOptions {
 export interface Sender {
   /**
    * Resolves at the `until` level or later. `build` runs again only for a
-   * refusal that needs a new proof. After a payment, an abort or a timeout
+   * refusal that needs a new proof, or for a proof past its own ttl. After a payment, an abort or a timeout
    * rejects with `SendUncertainError`: wait with `final(error.id)`. At `final`,
    * a failed call rejects with `CallFailedError`, and so does `final`.
    */
@@ -108,6 +108,7 @@ const isNodeRefusal = (error: unknown): error is NodeRefusedError =>
   tagOf(error) === 'NodeRefusedError';
 const isTimeout = (error: unknown): error is TimeoutError => tagOf(error) === 'TimeoutError';
 const isExpired = (error: unknown): boolean => tagOf(error) === 'PaymentExpiredError';
+const isProofExpired = (error: unknown): boolean => tagOf(error) === 'ProofExpiredError';
 
 function succeeded(status: TransactionStatus): TransactionStatus {
   if (status.level === 'final' && status.result !== 'succeeded') throw new CallFailedError(status);
@@ -276,7 +277,14 @@ export function createSender(seams: SendSeams, limits: SendLimits = {}): Sender 
       return inQueue(account, signal, async (hold) => {
         let proven = await build(options);
         for (let attempt = 0; ; attempt++) {
-          const tx = await pay(proven);
+          let tx: PaidTransaction;
+          try {
+            tx = await pay(proven);
+          } catch (error) {
+            if (!isProofExpired(error) || attempt >= rebuilds) throw error;
+            proven = await build(options);
+            continue;
+          }
           onSubmitted?.(tx.id);
           let status: TransactionStatus;
           try {
