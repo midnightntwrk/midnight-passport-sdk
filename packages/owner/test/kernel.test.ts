@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { Kernel, SecretHandle } from '../dist/kernel/index.js';
-import { zeroize, withSecret, withSecretAsync } from '../dist/kernel/zeroize.js';
+import { zeroize, withSecret } from '../dist/kernel/zeroize.js';
 
 test('every kernel function that takes a secret buffer zeros it after use', async () => {
   const kernel = new Kernel();
@@ -41,20 +41,23 @@ test('every kernel function that takes a secret buffer zeros it after use', asyn
 
   {
     const buffer = Uint8Array.from([1, 2, 3, 4]);
-    const length = await withSecretAsync(buffer, async (secret) => secret.length);
-    assert.equal(length, 4);
+    const first = await withSecret(buffer, async (secret) => {
+      await Promise.resolve();
+      return secret[0];
+    });
+    assert.equal(first, 1, 'an async callback still reads the secret after an await');
     assert.deepEqual([...buffer], [0, 0, 0, 0]);
   }
 
   {
     const buffer = Uint8Array.from([1, 2, 3, 4]);
     await assert.rejects(
-      withSecretAsync(buffer, async () => {
+      withSecret(buffer, async () => {
         throw new Error('boom');
       }),
       /boom/,
     );
-    assert.deepEqual([...buffer], [0, 0, 0, 0], 'withSecretAsync zeros on a reject');
+    assert.deepEqual([...buffer], [0, 0, 0, 0], 'withSecret zeros on a reject');
   }
 
   kernel.dispose();
