@@ -38,7 +38,7 @@ const sponsor = (status?: number, retryAfterMs?: number) => {
   return refusal;
 };
 
-type Outcome = 'block' | 'call-failed' | 'lost' | 'final-timeout' | Error;
+type Outcome = 'block' | 'call-failed' | 'failed-at-once' | 'lost' | 'final-timeout' | Error;
 
 const status = (
   id: string,
@@ -130,6 +130,7 @@ function harness(script: {
             if (next === 'lost') throw new TimeoutError(timeoutMs);
             if (next === 'block') land(tx.id);
             if (next === 'call-failed') land(tx.id, 'partly-failed');
+            if (next === 'failed-at-once') return status(tx.id, 'final', 'partly-failed');
             return status(tx.id, 'in-block');
           },
         },
@@ -362,6 +363,11 @@ it('a final call that failed rejects with its status, and is not paid or built a
   const [id] = h.log.paid;
   assert.ok(id !== undefined);
   await assert.rejects(sender.final(id, { timeoutMs: 1_000 }), failed);
+});
+
+it('a send at in-block rejects an adapter answer that is already final and failed', async () => {
+  const h = harness({ submits: ['failed-at-once'] });
+  await assert.rejects(send(h, 'in-block'), rejectsWith('CallFailedError'));
 });
 
 it('a send at in-block resolves before final', async () => {
