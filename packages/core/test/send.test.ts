@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   CallFailedError,
   CancelledError,
+  OutOfGasError,
   PaymentExpiredError,
   ProofExpiredError,
   SendUncertainError,
@@ -12,11 +13,13 @@ import {
   nodeRefusal,
   sponsorRefusal,
   type Indexer,
+  type BuiltTransaction,
   type Lookup,
   type PaidTransaction,
   type ProvenTransaction,
   type SendLimits,
   type TransactionResult,
+  type TranscriptRejectionCause,
   type TransactionStatus,
 } from '@midnight-ntwrk/mn-passport-core';
 
@@ -55,6 +58,8 @@ function harness(script: {
   /** What a wait on a known id gives, when it does not land. */
   resubmit?: Error;
   submitDelayMs?: number;
+  /** What the hook of each build answers after a 104. */
+  causes?: (TranscriptRejectionCause | Error)[];
 }) {
   const pays = [...(script.pays ?? [])];
   const submits = [...(script.submits ?? [])];
@@ -130,12 +135,21 @@ function harness(script: {
         },
         indexer,
       },
-      { lostWaitMs: 30, ...limits },
+      { lostWaitMs: 30, contentionPauseMs: 4, ...limits },
     );
-  const build = async (): Promise<ProvenTransaction> => {
+  const build = async (): Promise<BuiltTransaction> => {
     log.builds++;
     log.events.push(`build ${log.builds}`);
-    return { stage: 'proven', bytes: Uint8Array.of(log.builds) };
+    const cause = script.causes?.[log.builds - 1];
+    const proven = { stage: 'proven', bytes: Uint8Array.of(log.builds) } as const;
+    if (cause === undefined) return proven;
+    return {
+      ...proven,
+      whyRejected: async () => {
+        if (cause instanceof Error) throw cause;
+        return cause;
+      },
+    };
   };
   return { sender, build, log, land, watchers: () => listeners.size };
 }
@@ -198,6 +212,43 @@ it('a node rebuild row with a new proof builds again, and no paid bytes go twice
     h.log.submitted,
     ['1', '2'].map((n) => n.padStart(66, '0')),
   );
+});
+
+it('a 104 on a build that ran out of gas stops with no new payment', async () => {
+  const refusal = node(104);
+  const h = harness({ submits: [refusal], causes: ['out-of-gas'] });
+  await assert.rejects(send(h), (e) => e instanceof OutOfGasError && e.cause === refusal);
+  assert.equal(h.log.builds, 1);
+  assert.equal(h.log.paid.length, 1);
+});
+
+it('each 104 asks the build that was refused', async () => {
+  const h = harness({ submits: [node(104), node(104)], causes: ['state-moved', 'out-of-gas'] });
+  await assert.rejects(send(h), rejectsWith('OutOfGasError'));
+  assert.equal(h.log.builds, 2);
+  assert.equal(h.log.paid.length, 2);
+});
+
+it('a 104 rebuilds when the hook cannot tell or throws', async () => {
+  for (const cause of ['unknown', new Error('no read')] as const) {
+    const h = harness({ submits: [node(104)], causes: [cause] });
+    assert.equal((await send(h)).level, 'final');
+    assert.equal(h.log.builds, 2);
+  }
+});
+
+it('a contention rebuild waits first, and an abort ends the wait at once', async () => {
+  const h = harness({ submits: [node(104)], causes: ['state-moved'] });
+  const controller = new AbortController();
+  const done = h.sender({ contentionPauseMs: 10_000 }).send(h.build, {
+    account: 'aa',
+    until: 'final',
+    timeoutMs: 50,
+    signal: controller.signal,
+  });
+  setTimeout(() => controller.abort(), 30);
+  await assert.rejects(done, rejectsWith('CancelledError'));
+  assert.equal(h.log.builds, 1);
 });
 
 it('a node rebuild row with no new proof pays the same proof again', async () => {
@@ -360,6 +411,7 @@ it('bad limits throw RangeError, and a bad timeoutMs rejects before any build', 
   assert.throws(() => h.sender({ sponsorRetries: 1.5 }), RangeError);
   assert.throws(() => h.sender({ lostWaitMs: -1 }), RangeError);
   assert.throws(() => h.sender({ lostWaitMs: 2 ** 31 }), RangeError);
+  assert.throws(() => h.sender({ contentionPauseMs: 2 ** 31 }), RangeError);
   for (const timeoutMs of [1.5, -1]) {
     const bad = h.sender().send(h.build, { account: 'aa', until: 'in-block', timeoutMs });
     await assert.rejects(bad, RangeError);

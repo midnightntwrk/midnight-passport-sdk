@@ -25,6 +25,34 @@ export interface SendLimits {
   readonly rebuilds?: number;
   /** The longest wait for a lost payment to land or expire. Default: 300,000. */
   readonly lostWaitMs?: number;
+  /** The longest pause before a rebuild after a rejected transcript. Default: 3,000. */
+  readonly contentionPauseMs?: number;
+}
+
+/** `unknown` when no check can decide. */
+export type TranscriptRejectionCause = 'state-moved' | 'out-of-gas' | 'unknown';
+
+export interface BuiltTransaction extends ProvenTransaction {
+  /**
+   * Runs when the node rejects the transcript, which means a stale read or out of gas.
+   * `state-moved`: the contract state is not the one this build read. `out-of-gas`: the
+   * state did not move, and the cost under the chain's ledger parameters is over the gas.
+   */
+  readonly whyRejected?: (options: CallOptions) => Promise<TranscriptRejectionCause>;
+}
+
+/** The node refused the transcript, and a rebuild with the same parameters fails again. No new payment was made. */
+export class OutOfGasError extends PassportError {
+  static {
+    this.prototype.name = 'OutOfGasError';
+  }
+
+  readonly _tag = 'OutOfGasError' as const;
+  readonly code = 'OUT_OF_GAS' as const;
+
+  constructor(cause: NodeRefusedError) {
+    super("The call runs out of gas under the chain's ledger parameters.", { cause });
+  }
 }
 
 /**
@@ -76,12 +104,13 @@ export interface SendOptions extends CallOptions {
 export interface Sender {
   /**
    * Resolves at the `until` level or later. `build` runs again only for a
-   * refusal that needs a new proof, or for a proof past its own ttl. After a payment, an abort or a timeout
+   * refusal that needs a new proof, or for a proof past its own ttl. A rejected
+   * transcript that ran out of gas rejects with `OutOfGasError`. After a payment, an abort or a timeout
    * rejects with `SendUncertainError`: wait with `final(error.id)`. At `final`,
    * a failed call rejects with `CallFailedError`, and so does `final`.
    */
   send(
-    build: (options: CallOptions) => Promise<ProvenTransaction>,
+    build: (options: CallOptions) => Promise<BuiltTransaction>,
     options: SendOptions,
   ): Promise<TransactionStatus>;
   final(
@@ -153,6 +182,12 @@ export function createSender(seams: SendSeams, limits: SendLimits = {}): Sender 
   const sponsorRetries = count('sponsorRetries', limits.sponsorRetries, 4);
   const rebuilds = count('rebuilds', limits.rebuilds, 3);
   const lostWaitMs = count('lostWaitMs', limits.lostWaitMs, 300_000, MAX_TIMER_MS);
+  const contentionPauseMs = count(
+    'contentionPauseMs',
+    limits.contentionPauseMs,
+    3_000,
+    MAX_TIMER_MS,
+  );
   const tails = new Map<ContractAddress, Promise<void>>();
 
   async function inQueue<A>(
@@ -292,8 +327,18 @@ export function createSender(seams: SendSeams, limits: SendLimits = {}): Sender 
           } catch (error) {
             // The payment cannot land, so a new payment of the same proof is safe.
             if (isExpired(error) && attempt < rebuilds) continue;
-            if (!isNodeRefusal(error) || error.action === 'stop' || attempt >= rebuilds)
-              throw error;
+            if (!isNodeRefusal(error) || error.action === 'stop') throw error;
+            const stale = error.reason === 'transcript-rejected';
+            if (stale) {
+              // No hook, or a hook that fails, cannot tell the causes apart, so the loop rebuilds.
+              const cause = await Promise.resolve()
+                .then(() => proven.whyRejected?.(options))
+                .catch(() => undefined);
+              if (cause === 'out-of-gas') throw new OutOfGasError(error);
+            }
+            if (attempt >= rebuilds) throw error;
+            // A random pause, so two senders that read the same state do not collide again.
+            if (stale) await sleep(contentionPauseMs * (0.5 + Math.random() / 2), signal);
             if (error.newProof) proven = await build(options);
             continue;
           }

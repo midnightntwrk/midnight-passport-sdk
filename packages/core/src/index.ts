@@ -8,10 +8,13 @@ export { proverDisclosure } from './prover-disclosure.js';
 export { PaymentExpiredError, ProofExpiredError } from './payment-errors.js';
 export {
   CallFailedError,
+  OutOfGasError,
   SendUncertainError,
   createSender,
+  type BuiltTransaction,
   type SendLimits,
   type SendOptions,
   type SendSeams,
   type Sender,
+  type TranscriptRejectionCause,
 } from './send.js';
