@@ -12,6 +12,7 @@ import { build as viteBuild } from 'vite';
 import { passportWasm } from '../packages/adapter-browser/dist/esbuild.js';
 import { passportWasm as passportWasmVite } from '../packages/adapter-browser/dist/vite.js';
 import { contractRoutes, listen } from './server.mjs';
+import { parseJson } from '../scripts/json.mjs';
 
 /**
  * @typedef {{ description?: string }} Exception
@@ -322,7 +323,7 @@ async function openPage(bin, url, extraFlags = []) {
     const waiting = new Map();
     let loaded = () => {};
     ws.onmessage = (event) => {
-      const message = /** @type {CdpMessage} */ (JSON.parse(String(event.data)));
+      const message = /** @type {CdpMessage} */ (parseJson(String(event.data)));
       if (message.id) waiting.get(message.id)?.(message);
       if (message.method === 'Page.loadEventFired') loaded();
       if (message.method === 'Runtime.exceptionThrown' && message.params) {

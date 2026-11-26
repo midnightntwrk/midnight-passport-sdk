@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import { dirname, join, sep } from 'node:path';
 import ts from 'typescript';
 import { EFFECT3_EXPORTS } from './effect3-exports.mjs';
+import { parseJson } from '../scripts/json.mjs';
 
 // Follows each export's type a few levels, and flags it when a type comes from
 // an Effect 3 package, or when a namespace holds such a value.
@@ -13,7 +14,7 @@ test('the list of Effect 3 values matches the installed midnight-js', () => {
     createRequire(import.meta.url).resolve('@midnight-ntwrk/midnight-js/package.json'),
   );
   const manifest = /** @type {{ exports: Record<string, { types: string }> }} */ (
-    JSON.parse(readFileSync(join(umbrella, 'package.json'), 'utf8'))
+    parseJson(readFileSync(join(umbrella, 'package.json'), 'utf8'))
   );
   /** @type {Record<string, string>} */
   const entries = {};

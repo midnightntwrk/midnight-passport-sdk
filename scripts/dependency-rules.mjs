@@ -11,6 +11,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { ALLOWED, NEVER_REACHES, SCOPE } from './dependency-graph.mjs';
+import { parseJson } from './json.mjs';
 
 /**
  * @typedef {{ dependencies?: Record<string, string>, devDependencies?: Record<string, string>, peerDependencies?: Record<string, string>, name?: string }} Manifest
@@ -18,7 +19,7 @@ import { ALLOWED, NEVER_REACHES, SCOPE } from './dependency-graph.mjs';
  */
 
 /** @param {string} path @returns {unknown} */
-const readJson = (path) => JSON.parse(readFileSync(path, 'utf8'));
+const readJson = (path) => parseJson(readFileSync(path, 'utf8'));
 
 /**
  * Returns each violation of the dependency rules in the workspace at `root`.

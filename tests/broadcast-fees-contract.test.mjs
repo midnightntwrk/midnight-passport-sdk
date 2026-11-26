@@ -8,6 +8,7 @@ import {
   respond,
   sponsorPays,
 } from '../packages/adapter-broadcast/dist-test/support.js';
+import { parseJson } from '../scripts/json.mjs';
 
 // The graph does not let the adapter depend on dev, so the contract runs here.
 const tx = await provenTx();
@@ -22,7 +23,7 @@ const cases = feesContract(async () => {
     // A held request answers only when its signal aborts, as a stuck sponsor does.
     if (now === 'hold') return never(request);
     if (now === 'refuse') return respond(503, '{}');
-    const { provenTx } = /** @type {{ provenTx: string }} */ (JSON.parse(String(request.body)));
+    const { provenTx } = /** @type {{ provenTx: string }} */ (parseJson(String(request.body)));
     const paid = await sponsorPays(Uint8Array.from(Buffer.from(provenTx, 'hex')));
     return respond(200, JSON.stringify({ tx: hex(paid) }));
   });

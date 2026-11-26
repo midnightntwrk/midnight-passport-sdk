@@ -4,6 +4,7 @@ import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
+import { parseJson } from './json.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 export const MANIFEST_PATH = join(ROOT, 'packages/contract/generated/passport-manifest.json');
@@ -22,7 +23,7 @@ export const VERIFIER_BYTE_BUDGET = 15000;
 export const pinOf = (data) => createHash('sha256').update(data).digest('hex');
 
 /** @template T @param {string} path @returns {T} */
-const readJson = (path) => /** @type {T} */ (JSON.parse(readFileSync(path, 'utf8')));
+const readJson = (path) => /** @type {T} */ (parseJson(readFileSync(path, 'utf8')));
 
 /**
  * The deploy carries the longest prefix that fits, not the best fit.
@@ -130,7 +131,7 @@ export function pinnedToolchain() {
 
 /** @param {string} text @returns {string[]} */
 function problemsOf(text) {
-  const { toolchain } = /** @type {Manifest} */ (JSON.parse(text));
+  const { toolchain } = /** @type {Manifest} */ (parseJson(text));
   const pinned = pinnedToolchain();
   return /** @type {const} */ (['compiler', 'runtime'])
     .filter((key) => toolchain[key] !== pinned[key])
@@ -154,11 +155,11 @@ function main() {
 
   if (values.check) {
     const committed = readFileSync(MANIFEST_PATH, 'utf8');
-    const { source, toolchain, files } = /** @type {Manifest} */ (JSON.parse(committed));
+    const { source, toolchain, files } = /** @type {Manifest} */ (parseJson(committed));
     const built = buildManifest(dir, { commit: source.commit, zkir: toolchain.zkir });
     const problems = problemsOf(built);
     if (built !== committed) {
-      const now = /** @type {Manifest} */ (JSON.parse(built)).files;
+      const now = /** @type {Manifest} */ (parseJson(built)).files;
       const paths = [...new Set([...Object.keys(now), ...Object.keys(files)])];
       const changed = paths.filter((p) => now[p]?.sha256 !== files[p]?.sha256);
       problems.push(`the manifest differs; changed files: ${changed.join(', ') || 'none'}`);

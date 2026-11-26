@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { extname } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { appBuild, bundle } from './chromium.mjs';
+import { parseJson } from '../scripts/json.mjs';
 
 const BASELINE = new URL('./fixtures/app/size-baseline.json', import.meta.url);
 const LIMIT = 0.05;
@@ -19,7 +20,7 @@ test(
       if (kind === 'js' || kind === 'wasm') size[kind] += gzipSync(await readFile(file)).length;
     }
     t.diagnostic(`gzip: JS ${size.js} bytes, WASM ${size.wasm} bytes`);
-    const baseline = /** @type {typeof size} */ (JSON.parse(await readFile(BASELINE, 'utf8')));
+    const baseline = /** @type {typeof size} */ (parseJson(await readFile(BASELINE, 'utf8')));
     for (const kind of /** @type {const} */ (['js', 'wasm'])) {
       const least = Math.round(baseline[kind] * (1 - LIMIT));
       const most = Math.round(baseline[kind] * (1 + LIMIT));

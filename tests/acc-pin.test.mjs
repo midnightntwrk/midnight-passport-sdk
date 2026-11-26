@@ -15,11 +15,12 @@ import {
   MANIFEST_FILE,
   openAccArtifact,
 } from '../packages/contract/dist/index.js';
+import { parseJson } from '../scripts/json.mjs';
 
 const committed = await readFile(MANIFEST_PATH, 'utf8');
 const manifest =
   /** @type {{ source: { commit: string }, toolchain: { compiler: string, runtime: string, zkir: string }, files: Record<string, { size: number }>, circuits: Record<string, string[]>, waveOne: Record<string, string[]> }} */ (
-    JSON.parse(committed)
+    parseJson(committed)
   );
 
 test('the committed pin is the hash of the committed manifest bytes', () => {

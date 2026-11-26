@@ -6,6 +6,7 @@ import {
   createStubNode,
   indexerContract,
 } from '../packages/dev/dist/index.js';
+import { parseJson } from '../scripts/json.mjs';
 
 /** @typedef {import('../packages/core/dist/index.js').Indexer} Indexer */
 /** @typedef {import('../packages/core/dist/index.js').HttpRequest} HttpRequest */
@@ -56,7 +57,7 @@ function chainHttp(chain, ids) {
   const indexer = async (request) => {
     const body =
       /** @type {{ query: string, variables: { address: string, offset: { identifier: string } } }} */ (
-        JSON.parse(String(request.body))
+        parseJson(String(request.body))
       );
     if (body.query.includes('CONTRACT_STATE_QUERY')) {
       const state = chain.contract(body.variables.address);

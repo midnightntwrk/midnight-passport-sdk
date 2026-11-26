@@ -4,6 +4,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
+import { parseJson } from '../scripts/json.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
@@ -32,7 +33,7 @@ const typesOf = (target) => {
  */
 function checkDeclarations(dir) {
   const manifest = /** @type {{ exports?: unknown }} */ (
-    JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'))
+    parseJson(readFileSync(join(dir, 'package.json'), 'utf8'))
   );
   const queue = typesOf(manifest.exports).map((t) => join(dir, t));
   if (queue.length === 0) return [`${dir}: no types entry in exports`];
@@ -100,7 +101,7 @@ test('no published package exposes an Effect, rxjs, midnight-js, or wallet SDK t
       (dir) =>
         !(
           /** @type {{ private?: boolean }} */ (
-            JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'))
+            parseJson(readFileSync(join(dir, 'package.json'), 'utf8'))
           ).private
         ),
     );

@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { BUNDLED, bundle } from '../scripts/bundle-packages.mjs';
+import { parseJson } from '../scripts/json.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const INLINED = /[\\/]effect@4\.\d+\.\d+[\\/]/;
@@ -21,7 +22,7 @@ const packed = (dir) => {
   });
   // npm 10 prints an array, npm 11 an object keyed by package name.
   const [{ files }] = /** @type {[{ files: { path: string }[] }]} */ (
-    Object.values(/** @type {Record<string, unknown>} */ (JSON.parse(out)))
+    Object.values(/** @type {Record<string, unknown>} */ (parseJson(out)))
   );
   return files.map((/** @type {{ path: string }} */ f) => f.path);
 };
@@ -30,7 +31,7 @@ for (const dir of BUNDLED) {
   test(`${dir} does not list effect, and ships only its bundle and types`, () => {
     const manifest =
       /** @type {{ dependencies?: Record<string, string>, peerDependencies?: Record<string, string> }} */ (
-        JSON.parse(readFileSync(join(root, dir, 'package.json'), 'utf8'))
+        parseJson(readFileSync(join(root, dir, 'package.json'), 'utf8'))
       );
     assert.equal(manifest.dependencies?.effect, undefined);
     assert.equal(manifest.peerDependencies?.effect, undefined);

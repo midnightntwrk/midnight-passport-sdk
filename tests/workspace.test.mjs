@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import { BUNDLED } from '../scripts/bundle-packages.mjs';
+import { parseJson } from '../scripts/json.mjs';
 
 /** @param {string} path */
 const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
@@ -12,7 +13,7 @@ const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
  * @typedef {{ dependencies?: Record<string, string>, devDependencies?: Record<string, string>, peerDependencies?: Record<string, string> }} Pins
  * @typedef {Pins & { private?: unknown, workspaces?: unknown, packageManager: string, engines?: { node?: unknown } }} RootManifest
  */
-const root = /** @type {RootManifest} */ (JSON.parse(await read('../package.json')));
+const root = /** @type {RootManifest} */ (parseJson(await read('../package.json')));
 
 test('the repo is a private pnpm workspace over packages/*', async () => {
   assert.equal(root.private, true);
@@ -46,7 +47,7 @@ test('every dependency in every workspace manifest is exact-pinned', async () =>
   const packages = await readdir(new URL('../packages', import.meta.url)).catch(() => []);
   for (const dir of packages) {
     const path = `../packages/${dir}/package.json`;
-    manifests.push([path, /** @type {Pins} */ (JSON.parse(await read(path)))]);
+    manifests.push([path, /** @type {Pins} */ (parseJson(await read(path)))]);
   }
   for (const [path, manifest] of manifests) {
     const all = {
@@ -76,7 +77,7 @@ test('package shape', async () => {
   for (const dir of packageDirs) {
     const manifest =
       /** @type {{ type?: string, sideEffects?: boolean, exports?: unknown, files?: string[], private?: boolean }} */ (
-        JSON.parse(await read(`../packages/${dir}/package.json`))
+        parseJson(await read(`../packages/${dir}/package.json`))
       );
     assert.equal(manifest.type, 'module', `${dir}: type`);
     assert.equal(manifest.sideEffects, false, `${dir}: sideEffects`);
@@ -109,7 +110,7 @@ test('package shape', async () => {
 
 test('the root build references every package', async () => {
   const solution = /** @type {{ references: { path: string }[] }} */ (
-    JSON.parse(await read('../tsconfig.build.json'))
+    parseJson(await read('../tsconfig.build.json'))
   );
   const built = solution.references.map((ref) => ref.path);
   assert.deepEqual(

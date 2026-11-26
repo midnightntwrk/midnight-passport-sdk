@@ -10,6 +10,7 @@ import { nodePlatform } from '../packages/adapter-nodejs/dist/index.js';
 import { appBuild, browserTest, runPage, viteBundle } from './chromium.mjs';
 import { listen } from './server.mjs';
 import { counterState, smoke } from './smoke.mjs';
+import { parseJson } from '../scripts/json.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const counter = join(root, 'tests/fixtures/counter/compiled');
@@ -45,7 +46,7 @@ test('the counter fixture comes from the pinned Compact toolchain', async () => 
     await readFile(join(root, 'docs/compatibility.md'), 'utf8'),
   )?.[1];
   const info = /** @type {{ 'compiler-version'?: string }} */ (
-    JSON.parse(await readFile(join(counter, 'compiler/contract-info.json'), 'utf8'))
+    parseJson(await readFile(join(counter, 'compiler/contract-info.json'), 'utf8'))
   );
   assert.ok(pin, 'docs/compatibility.md names no Compact version');
   assert.equal(info['compiler-version'], pin, 'compile the counter again with the pinned version');

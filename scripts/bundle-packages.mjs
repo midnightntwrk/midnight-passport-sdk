@@ -2,6 +2,7 @@ import { build } from 'esbuild';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseJson } from './json.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
@@ -50,7 +51,7 @@ async function bundleFile(entry, outfile) {
 export async function bundle(dir) {
   const base = resolve(root, dir);
   const { exports } = /** @type {{ exports: Record<string, unknown> }} */ (
-    JSON.parse(readFileSync(join(base, 'package.json'), 'utf8'))
+    parseJson(readFileSync(join(base, 'package.json'), 'utf8'))
   );
   // One entry for now; a split build adds more.
   if (Object.keys(exports).join() !== '.') throw new Error(`${dir}: bundle supports only "."`);

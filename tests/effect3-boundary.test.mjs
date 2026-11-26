@@ -5,6 +5,7 @@ import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { EFFECT3_EXPORTS } from './effect3-exports.mjs';
+import { parseJson } from '../scripts/json.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
@@ -130,7 +131,7 @@ const outside = 'packages/core/src/x.ts';
 // Each fixture names the rules that must catch it, so one caught by the wrong rule fails.
 const forbidden =
   /** @type {{ label: string, path: string, source: string, found: string[] }[]} */ (
-    JSON.parse(
+    parseJson(
       readFileSync(new URL('fixtures/effect3-boundary/forbidden.json', import.meta.url), 'utf8'),
     )
   );

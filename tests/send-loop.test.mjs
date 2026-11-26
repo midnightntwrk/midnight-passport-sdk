@@ -10,6 +10,7 @@ import {
   respond,
   sponsorPays,
 } from '../packages/adapter-broadcast/dist-test/support.js';
+import { parseJson } from '../scripts/json.mjs';
 
 const SPONSOR = 'https://sponsor.example/api/midnight/sponsor';
 const NODE = 'https://node.example';
@@ -36,12 +37,12 @@ function world({ busyFirst = false, refuseFirst = false } = {}) {
       if (request.url === SPONSOR) {
         // The first sponsor answer can be busy, from the recorded 503 with a wait of zero.
         if (++w.sponsorCalls === 1 && busyFirst) return respond(503, '{}', { 'retry-after': '0' });
-        const { provenTx } = /** @type {{ provenTx: string }} */ (JSON.parse(String(request.body)));
+        const { provenTx } = /** @type {{ provenTx: string }} */ (parseJson(String(request.body)));
         const paid = await sponsorPays(Uint8Array.from(Buffer.from(provenTx, 'hex')));
         return respond(200, JSON.stringify({ tx: hex(paid) }));
       }
       const body = /** @type {{ method: string, params: [string] }} */ (
-        JSON.parse(String(request.body))
+        parseJson(String(request.body))
       );
       if (body.method === 'chain_getHeader' && w.hangHeader) {
         /** @type {Promise<never>} */

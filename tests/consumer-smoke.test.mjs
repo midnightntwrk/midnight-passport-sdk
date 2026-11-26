@@ -14,12 +14,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bundle } from '../scripts/bundle-packages.mjs';
+import { parseJson } from '../scripts/json.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 // Without a pin, corepack fetches the newest pnpm, and that release can be under the cooldown.
 const { packageManager, devDependencies } =
   /** @type {{ packageManager: string, devDependencies: { '@midnight-ntwrk/midnight-js': string } }} */ (
-    JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
+    parseJson(readFileSync(join(root, 'package.json'), 'utf8'))
   );
 const PACKED = [
   'packages/protocol',
@@ -55,7 +56,7 @@ const installed = (cmd) => {
 const versionAt = (dir) =>
   existsSync(join(dir, 'package.json'))
     ? /** @type {{ version?: string }} */ (
-        JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'))
+        parseJson(readFileSync(join(dir, 'package.json'), 'utf8'))
       ).version
     : undefined;
 
@@ -93,9 +94,7 @@ test(
       const tarballs = {};
       for (const dir of PACKED) {
         const packed = /** @type {{ name: string, filename: string }} */ (
-          JSON.parse(
-            run('pnpm', ['pack', '--pack-destination', scratch, '--json'], join(root, dir)),
-          )
+          parseJson(run('pnpm', ['pack', '--pack-destination', scratch, '--json'], join(root, dir)))
         );
         tarballs[packed.name] = `file:${packed.filename}`;
       }
