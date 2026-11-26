@@ -4,6 +4,7 @@ import {
   CallFailedError,
   CancelledError,
   PaymentExpiredError,
+  SendUncertainError,
   TimeoutError,
   createSender,
   createStateSource,
@@ -148,6 +149,8 @@ const it = (name: string, run: () => Promise<void> | void): void => {
   test(name, { timeout: 5_000 }, run);
 };
 const rejectsWith = (tag: string) => (e: Error & { _tag?: string }) => e._tag === tag;
+const uncertain = (id: () => string | undefined) => (e: unknown) =>
+  e instanceof SendUncertainError && e.id === id() && e.id !== undefined;
 
 it('a sponsor retry row pays the same proof again after its wait', async () => {
   for (const refusal of [sponsor(503, 5), sponsor(undefined)]) {
@@ -226,7 +229,7 @@ it('a lost payment that can still land is never paid again, and the proof is not
   assert.equal(h.log.builds, 1);
 });
 
-it('after an abort during the submit, the slot is held by a wait that never sends', async () => {
+it('an abort during the submit gives the id, and the slot is held by a wait that never sends', async () => {
   const h = harness({ submitDelayMs: 20 });
   const sender = h.sender();
   const controller = new AbortController();
@@ -236,7 +239,10 @@ it('after an abort during the submit, the slot is held by a wait that never send
   setTimeout(() => controller.abort(), 5);
   let secondAt = 0;
   const second = sender.send(async () => ((secondAt = Date.now()), h.build()), options);
-  await assert.rejects(first, rejectsWith('CancelledError'));
+  await assert.rejects(
+    first,
+    uncertain(() => h.log.paid[0]),
+  );
   await second;
   assert.ok(secondAt - abortAt >= 25, 'the slot was held for the indexer wait');
   assert.deepEqual(h.log.submitted, [...new Set(h.log.submitted)]);
@@ -259,7 +265,7 @@ it('rebuilds stop at their bound', async () => {
   assert.equal(h.log.paid.length, 3);
 });
 
-it('a timeout after in-block goes to the caller, who can wait with final', async () => {
+it('a timeout after in-block gives the id to the caller, who can wait with final', async () => {
   const h = harness({ submits: ['final-timeout'] });
   const ids: string[] = [];
   const sender = h.sender();
@@ -270,7 +276,7 @@ it('a timeout after in-block goes to the caller, who can wait with final', async
       timeoutMs: 20,
       onSubmitted: (id) => ids.push(id),
     }),
-    rejectsWith('TimeoutError'),
+    uncertain(() => ids[0]),
   );
   assert.deepEqual(ids, h.log.paid);
   const [id] = ids;

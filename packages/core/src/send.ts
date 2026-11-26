@@ -40,8 +40,8 @@ export class SendUncertainError extends PassportError {
   readonly code = 'SEND_UNCERTAIN' as const;
   readonly id: TransactionId;
 
-  constructor(id: TransactionId) {
-    super('A payment can still land.');
+  constructor(id: TransactionId, cause: unknown) {
+    super('A payment can still land.', { cause });
     this.id = id;
   }
 }
@@ -76,9 +76,9 @@ export interface SendOptions extends CallOptions {
 export interface Sender {
   /**
    * Resolves at the `until` level or later. `build` runs again only for a
-   * refusal that needs a new proof. A `TimeoutError` after `in-block` is not
-   * paid again: wait with `final`. At `final`, a failed call rejects with
-   * `CallFailedError`, and so does `final`.
+   * refusal that needs a new proof. After a payment, an abort or a timeout
+   * rejects with `SendUncertainError`: wait with `final(error.id)`. At `final`,
+   * a failed call rejects with `CallFailedError`, and so does `final`.
    */
   send(
     build: (options: CallOptions) => Promise<ProvenTransaction>,
@@ -247,6 +247,16 @@ export function createSender(seams: SendSeams, limits: SendLimits = {}): Sender 
         }
       }
 
+      // The held wait reads the indexer only, because a submit could send the bytes.
+      const uncertain = (
+        id: TransactionId,
+        cause: unknown,
+        hold: (wait: Promise<unknown>) => void,
+      ): SendUncertainError => {
+        hold(final(id, { timeoutMs: lostWaitMs }));
+        return new SendUncertainError(id, cause);
+      };
+
       // Waits on a lost payment until the adapter finds it or says that it expired.
       const settle = async (tx: PaidTransaction, hold: (wait: Promise<unknown>) => void) => {
         const wait = (ms: number) =>
@@ -257,13 +267,9 @@ export function createSender(seams: SendSeams, limits: SendLimits = {}): Sender 
             return wait(lostWaitMs);
           });
         } catch (error) {
-          if (isTimeout(error)) error = new SendUncertainError(tx.id);
-          // Only a refusal or an expiry says that the payment cannot land. The held
-          // wait reads the indexer only, because a submit could send the bytes.
-          if (!isNodeRefusal(error) && !isExpired(error)) {
-            hold(final(tx.id, { timeoutMs: lostWaitMs }));
-          }
-          throw error;
+          // Only a refusal or an expiry says that the payment cannot land.
+          if (isNodeRefusal(error) || isExpired(error)) throw error;
+          throw uncertain(tx.id, error, hold);
         }
       };
 
@@ -284,7 +290,13 @@ export function createSender(seams: SendSeams, limits: SendLimits = {}): Sender 
             continue;
           }
           if (until === 'in-block' || status.level === 'final') return succeeded(status);
-          return succeeded(await broadcast.submit(tx, { ...options, until: 'final', timeoutMs }));
+          // The status can name another payment of the same proof: the one that landed.
+          const done = await broadcast
+            .submit(tx, { ...options, until: 'final', timeoutMs })
+            .catch((error: unknown) => {
+              throw uncertain(status.id, error, hold);
+            });
+          return succeeded(done);
         }
       });
     },
