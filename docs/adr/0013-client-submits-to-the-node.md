@@ -30,19 +30,24 @@ broadcast" · sponsor policy, "Client rules"
    polls the best block, and walks parent hashes for its own extrinsic hex.
    It needs no WebSocket and no decoder. `TransactionStatus.result` is
    `undefined` until `final`.
-3. **One attempt for each adapter call.** The send loop in `core`
-   (`createSender`) owns every retry and every new payment, with the action
-   table of the sponsor policy.
+3. **The loop owns every new payment.** Inside one call, the broadcast
+   adapter sends the same paid bytes again only after a send failed, and
+   never after `submitBy`. The send loop in `core` (`createSender`) owns
+   every sponsor retry and every new payment, with the action table of the
+   sponsor policy.
 4. **No two live payments.** After a refusal, the loop never submits those
    paid bytes again. The adapter never sends paid bytes after `submitBy`. The
    adapter, which reads the paid bytes, says when a payment can no longer
    land: it was never sent before `submitBy`, or it is past its earliest
    intent ttl plus a margin, in no block, and not indexed under any of its
    identifiers. Only then does the loop pay again. Otherwise the send fails
-   with `SendUncertainError`, and the caller decides.
+   with `SendUncertainError` and the payment id, and the caller decides. An
+   abort after the payment counts as uncertain too, because the loop cannot
+   tell if the bytes reached the node.
 5. **One send at a time for each account**, inside one sender. A payment that
-   can still land keeps the account's slot until it is found or has expired,
-   up to a cap. Two tabs, two devices, or two senders can still send at once.
+   can still land keeps the account's slot until the indexer shows it final,
+   for at most `lostWaitMs`. This wait reads only the indexer, so it sends
+   nothing. Two tabs, two devices, or two senders can still send at once.
    Only the sponsor can refuse a second open payment for one account. That is
    sponsor work.
 
@@ -59,6 +64,7 @@ Rejected options:
 
 - A node upgrade that moves the call index or the refusal codes needs an SDK
   change. The compatibility matrix names the node version.
-- A lost transaction costs a wait of about the sponsor's lock time before the
-  new payment.
+- A lost transaction costs a wait until its earliest intent ttl plus a
+  margin (150 s by default) before the new payment. The sponsor's fee intent
+  has the ttl of its coin lock, so it is often the earliest.
 - The node and the sponsor see each transaction and the client's IP address.

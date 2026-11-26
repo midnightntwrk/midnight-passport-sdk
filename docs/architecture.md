@@ -168,7 +168,7 @@ foundation, never from `owner`.
 | Adapter | Seam | Note |
 |---|---|---|
 | `adapter-prover-remote` | Prover | Transaction in, proof out. The prover holds the proving keys, or makes them again from the ZKIR and the on-chain verifier key. |
-| `adapter-broadcast` | Broadcast, fees | Gives the proven transaction to the sponsor, which pays the fees and returns the paid transaction. Submits it to a node over JSON-RPC, and waits to the level that the caller asks for: "in a block" from the node, "final" from the indexer seam. Each call makes one attempt; the send loop in `core` (`createSender`) owns the retries, the new payments, and one send at a time for each account. |
+| `adapter-broadcast` | Broadcast, fees | Gives the proven transaction to the sponsor, which pays the fees and returns the paid transaction. Submits it to a node over JSON-RPC, and waits to the level that the caller asks for: "in a block" from the node, "final" from the indexer seam. Inside one call it sends the same bytes again only after a failed send. The send loop in `core` (`createSender`) owns the sponsor retries, the new payments, and one send at a time for each account. |
 | `adapter-indexer` | Indexer | Reads from the indexer, and from the node for a block that the indexer has not reached yet. "Not found" is a value; an unreachable source is an error. |
 | `adapter-fee-capacity-exchange` | Fees | The other fee route: a swap through the Capacity Exchange. Planned for later. |
 | `adapter-browser` | Platform | The browser runtime: passkeys with PRF and the two WASM runtimes in the correct order (the contract runtime first). |
