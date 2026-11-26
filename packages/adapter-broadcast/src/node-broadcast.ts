@@ -86,13 +86,17 @@ export function nodeBroadcast(options: NodeBroadcastOptions): Broadcast {
         const facts = await call.guard(readFacts(platform, tx, call.signal, loadTimeoutMs));
         const scan = createScan(node, hex, call.signal);
         let final: TransactionStatus | undefined;
-        if (earlier) scan.from(earlier.start);
+        // A kept refusal goes on to the next call, so its walk looks below the start too.
+        if (earlier)
+          scan.from(
+            earlier.refusal ? Math.max(0, earlier.start - REFUSAL_LOOKBACK) : earlier.start,
+          );
         let start = earlier?.start;
         let attempted = earlier !== undefined;
         let sent = earlier?.sent ?? false;
         let block = earlier?.block;
         let landed = earlier?.landed ?? tx.id;
-        let refusal: NodeRefusedError | undefined;
+        let refusal = earlier?.refusal;
         let watched: TransactionId | undefined;
         // Only a wait for `final` watches the indexer, so `in-block` keeps its level.
         // The watch follows `landed`, because another payment of the same proof can land.
@@ -110,7 +114,13 @@ export function nodeBroadcast(options: NodeBroadcastOptions): Broadcast {
         watch();
         const remember = (): void => {
           if (start !== undefined)
-            keep(hex, { start, sent: sent || attempted, landed, ...(block ? { block } : {}) });
+            keep(hex, {
+              start,
+              sent: sent || attempted,
+              landed,
+              ...(block ? { block } : {}),
+              ...(refusal ? { refusal } : {}),
+            });
         };
 
         // A payment that reached no node can be sent until `submitBy`, and never after.
@@ -201,6 +211,8 @@ interface Kept {
   /** The id of the payment that a block holds: this one, or another of the same proof. */
   readonly landed: TransactionId;
   readonly block?: BlockRef;
+  /** No block or indexer read has shown the bytes since the node refused them. */
+  readonly refusal?: NodeRefusedError;
 }
 
 // Bytes that do not parse, such as stub bytes, give no expiry: they are never

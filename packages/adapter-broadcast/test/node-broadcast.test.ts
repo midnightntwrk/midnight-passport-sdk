@@ -4,7 +4,14 @@ import type { PaidTransaction, TransactionStatus } from '@midnight-ntwrk/mn-pass
 import { nodeBroadcast } from '@midnight-ntwrk/mn-passport-adapter-broadcast';
 import { createStubChain, createStubIndexer } from '@midnight-ntwrk/mn-passport-dev';
 import { extrinsicHex } from '../dist/extrinsic.js';
-import { fakeNode, hashOf, paymentId, provenTx, sponsorPays } from './support.js';
+import {
+  fakeNode,
+  hashOf,
+  paymentId,
+  provenTx,
+  sponsorPays,
+  type ScriptedNode,
+} from './support.js';
 
 const tx: PaidTransaction = {
   stage: 'paid',
@@ -130,6 +137,37 @@ test('a refusal throws, unless a block or the indexer already holds the transact
   flaky.node.drops = { chain_getBlockHash: 3 };
   const late = await flaky.broadcast.submit(tx, { until: 'in-block', timeoutMs: 1_000 });
   assert.equal(late.block.height, 1);
+});
+
+test('a refusal outlives a call that ended in failed reads, and the next call looks below its start', async () => {
+  const refusedThenTimedOut = async (refusal: object, blocks: (node: ScriptedNode) => void) => {
+    const { node, broadcast } = setup();
+    blocks(node);
+    node.refusal = refusal;
+    node.drops = { chain_getBlockHash: Number.POSITIVE_INFINITY };
+    await assert.rejects(
+      broadcast.submit(tx, { until: 'in-block', timeoutMs: 50 }),
+      (e: Error & { _tag?: string }) => e._tag === 'TimeoutError',
+    );
+    node.drops = {};
+    return broadcast.submit(tx, { until: 'in-block', timeoutMs: 300 });
+  };
+  await assert.rejects(
+    refusedThenTimedOut(
+      { code: 1010, message: 'Invalid Transaction', data: 'Custom error: 138' },
+      () => undefined,
+    ),
+    (e: Error & { _tag?: string; nodeCode?: number }) =>
+      e._tag === 'NodeRefusedError' && e.nodeCode === 138,
+  );
+  const held = await refusedThenTimedOut(
+    { code: 1012, message: 'Transaction is temporarily banned' },
+    (node) => {
+      node.add(hashOf(1), [HEX]);
+      node.add(hashOf(2));
+    },
+  );
+  assert.equal(held.block.height, 1);
 });
 
 test('after a timeout, the same bytes wait, and another payment with the same id is sent', async () => {
