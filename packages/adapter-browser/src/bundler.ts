@@ -18,6 +18,24 @@ const RUNTIMES = [
   ['@midnightntwrk/ledger-v9'],
 ];
 
+const RUNTIME_PACKAGES = new Set(RUNTIMES.map((chain) => chain[chain.length - 1]));
+
+async function packageName(file: string): Promise<string | undefined> {
+  for (let dir = dirname(file); ; dir = dirname(dir)) {
+    const text = await readFile(join(dir, 'package.json'), 'utf8').catch(() => undefined);
+    const json: unknown = text === undefined ? undefined : JSON.parse(text);
+    const named = typeof json === 'object' && json !== null && 'name' in json;
+    if (named && typeof json.name === 'string') return json.name;
+    if (dirname(dir) === dir) return undefined;
+  }
+}
+
+/** Whether the plugin owns this import. Every other WASM import stays with the bundler. */
+export async function isRuntimeWasm(source: string, importer: string): Promise<boolean> {
+  if (!source.startsWith('./') || !source.endsWith('.wasm')) return false;
+  return RUNTIME_PACKAGES.has(await packageName(importer));
+}
+
 const idOf = (bytes: Uint8Array): string =>
   createHash('sha256').update(bytes).digest('hex').slice(0, 16);
 
