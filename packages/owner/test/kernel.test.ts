@@ -1,5 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { generateKeyPairSync } from 'node:crypto';
+import { InboxKeyError, openInboxEntry, sealInboxEntry } from '@midnight-ntwrk/mn-passport-core';
 
 import { Kernel, SecretHandle } from '../dist/kernel/index.js';
 import { zeroize, withSecret } from '../dist/kernel/zeroize.js';
@@ -119,5 +121,27 @@ test('a handle carries no secret bytes', () => {
   assert.equal(JSON.stringify(handle), '{}', 'a handle serializes without bytes');
 
   kernel.releaseSecret(handle);
+  kernel.dispose();
+});
+
+test('the inbox key opens an entry sealed to the held secret, until the release', async () => {
+  const pair = generateKeyPairSync('x25519');
+  const last32 = (der: Buffer) => new Uint8Array(der.subarray(der.length - 32));
+  const secret = last32(pair.privateKey.export({ format: 'der', type: 'pkcs8' }));
+  const coin = { nonce: new Uint8Array(32).fill(1), color: new Uint8Array(32).fill(2), value: 9n };
+  const entry = await sealInboxEntry(
+    last32(pair.publicKey.export({ format: 'der', type: 'spki' })),
+    coin,
+  );
+  const kernel = new Kernel();
+  const handle = kernel.holdSecret(secret);
+  const key = kernel.inboxKey(handle);
+
+  assert.deepEqual(await openInboxEntry(entry, key), coin);
+  assert.deepEqual(await openInboxEntry(entry, key), coin, 'the held copy is not zeroed by a use');
+
+  kernel.releaseSecret(handle);
+  await assert.rejects(openInboxEntry(entry, key), InboxKeyError);
+  assert.throws(() => kernel.inboxKey(handle), { code: 'UNKNOWN_HANDLE' });
   kernel.dispose();
 });
