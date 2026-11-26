@@ -125,3 +125,18 @@ test('a disguised or nested outward command still asks', () => {
   stops("eval 'gh pr merge 1'");
   stops('cat <<EOF\n$(git push origin main)\nEOF');
 });
+
+test('a quoted or escaped command word still asks', () => {
+  for (const c of [
+    "git 'push' origin main",
+    'git "push"',
+    "g''it push",
+    'git pu\\sh origin main',
+    "git -c 'x=a;b' push origin main",
+    "echo $(date); g''it push origin main",
+    "'gh' pr merge 1",
+    "npm 'publish'",
+  ]) {
+    stops(c);
+  }
+});
