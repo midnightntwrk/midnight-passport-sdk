@@ -60,6 +60,19 @@ test('every kernel function that takes a secret buffer zeros it after use', asyn
   kernel.dispose();
 });
 
+test('the kept copy shares no memory with the caller buffer', () => {
+  const kernel = new Kernel();
+  // A Node.js Buffer, whose `slice` gives a view and not a copy.
+  const buffer = Buffer.from([1, 2, 3]);
+  const handle = kernel.holdSecret(buffer);
+  buffer.set([7, 8, 9]);
+
+  kernel.releaseSecret(handle);
+  assert.deepEqual([...buffer], [7, 8, 9], 'releaseSecret must not zero the caller buffer');
+
+  kernel.dispose();
+});
+
 test('releaseSecret invalidates the handle and rejects a stale handle', () => {
   const kernel = new Kernel();
   const handle = kernel.holdSecret(Uint8Array.from([9, 9, 9, 9]));

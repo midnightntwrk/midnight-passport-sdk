@@ -16,8 +16,8 @@ export class Kernel {
    */
   holdSecret(bytes: Uint8Array): SecretHandle {
     const handle = new SecretHandle();
-    // `slice` copies; `subarray` would share the buffer we zero next.
-    this.#retained.set(handle, bytes.slice());
+    // `slice` on a Node.js `Buffer` shares memory; this constructor always copies.
+    this.#retained.set(handle, new Uint8Array(bytes));
     zeroize(bytes);
     return handle;
   }
