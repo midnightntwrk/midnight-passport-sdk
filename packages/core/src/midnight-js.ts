@@ -37,19 +37,20 @@ function toUpstreamError(reason: unknown): UpstreamError | undefined {
         text(field(reason, 'name')) ??
         text(typeof ctor === 'function' ? ctor.name : undefined),
       sourceCode: text(field(reason, 'code')),
+      cause: reason,
     });
   } catch {
     return undefined;
   }
 }
 
-// An upstream defect can hold keys too, so only its identifiers cross.
+// An upstream defect can hold keys too, so only its identifiers reach the error.
 const scrubbed = (defect: unknown): UpstreamError =>
-  toUpstreamError(defect) ?? new UpstreamError({});
+  toUpstreamError(defect) ?? new UpstreamError({ cause: defect });
 
 const failed = (reason: unknown): Effect.Effect<never, UpstreamError> => {
   const error = toUpstreamError(reason);
-  return error ? Effect.fail(error) : Effect.die(new UpstreamError({}));
+  return error ? Effect.fail(error) : Effect.die(new UpstreamError({ cause: reason }));
 };
 
 const FOUND = { Fail: 'error', Die: 'defect', Interrupt: 'fiberId' } as const;

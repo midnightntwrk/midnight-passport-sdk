@@ -188,14 +188,27 @@ test('fromPromise: interruption aborts the signal', INTERRUPT, async () => {
   assert.ok(Exit.isFailure(exit) && Cause.hasInterruptsOnly(exit.cause));
 });
 
-test('UpstreamError keeps no upstream object, key, or text', async () => {
-  const error = await Effect.runPromise(
-    Effect.flip(fromPromise(() => Promise.reject(new TxFailedError()))),
-  );
-  assert.equal(error.cause, undefined);
-  assert.deepEqual([error.sourceTag, error.sourceCode], ['TxFailedError', 'MIDNIGHT_JS_TX_FAILED']);
-  for (const view of viewsOf(error)) assert.doesNotMatch(view, /KEY-SECRET|tx failed/);
-  for (const view of byteViewsOf(error)) assert.doesNotMatch(view, /222|de ad/);
+// The first pass runs before any call to `keepCauses`, so it checks the default.
+test('UpstreamError keeps no upstream object, key, or text, and keeps a cause only when asked', async (t) => {
+  t.after(() => UpstreamError.keepCauses(false));
+  for (const keep of [false, true]) {
+    if (keep) UpstreamError.keepCauses(true);
+    const upstream = new TxFailedError();
+    const error = await Effect.runPromise(Effect.flip(fromPromise(() => Promise.reject(upstream))));
+    const exit = await Effect.runPromiseExit(fromV3(E3, () => E3.die(upstream)));
+    const defect = Exit.isFailure(exit) ? Cause.squash(exit.cause) : undefined;
+    assert.ok(defect instanceof UpstreamError);
+    assert.equal(error.cause, undefined);
+    assert.deepEqual(
+      [error.sourceTag, error.sourceCode],
+      ['TxFailedError', 'MIDNIGHT_JS_TX_FAILED'],
+    );
+    for (const kept of [error, defect]) {
+      assert.equal(UpstreamError.causeOf(kept), keep ? upstream : undefined);
+      for (const view of viewsOf(kept)) assert.doesNotMatch(view, /KEY-SECRET|tx failed/);
+      for (const view of byteViewsOf(kept)) assert.doesNotMatch(view, /222|de ad/);
+    }
+  }
 });
 
 test('UpstreamError drops a string rejection, and an identifier that is long, not plain, or hex', async () => {
