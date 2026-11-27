@@ -13,8 +13,11 @@ try {
 if (input.tool_name !== 'Bash') process.exit(0);
 const cmd = String(input.tool_input?.command ?? '');
 
-// Ignore text that cannot run, such as quoted strings and heredoc bodies.
+// Ignore text that cannot run, such as quoted text and heredoc bodies.
 // Check the whole command when it can run a string, such as sh -c or eval.
+// A quoted piece with no space is part of a word, as in `git 'push'`, so keep it.
+// Keep no separator from it, so that it cannot split a segment.
+const piece = (content) => (/\s/.test(content) ? "''" : content.replace(/[;|&()`]/g, '_'));
 function outsideText(command) {
   let runs = false;
   const noHeredocs = command.replace(
@@ -28,24 +31,28 @@ function outsideText(command) {
   for (let i = 0; i < noHeredocs.length; i++) {
     const c = noHeredocs[i];
     if (c === '\\') {
-      out += noHeredocs.slice(i, i + 2);
+      const next = noHeredocs[i + 1] ?? '';
+      if (next !== '\n') out += piece(next);
       i++;
     } else if (c === "'") {
       const close = noHeredocs.indexOf("'", i + 1);
-      i = close === -1 ? noHeredocs.length : close;
-      out += "''";
+      const end = close === -1 ? noHeredocs.length : close;
+      out += piece(noHeredocs.slice(i + 1, end));
+      i = end;
     } else if (c === '"') {
       let j = i + 1;
       while (j < noHeredocs.length && noHeredocs[j] !== '"') j += noHeredocs[j] === '\\' ? 2 : 1;
-      if (/\$\(|`/.test(noHeredocs.slice(i + 1, j))) runs = true;
+      const content = noHeredocs.slice(i + 1, j);
+      if (/\$\(|`/.test(content)) runs = true;
+      out += piece(content);
       i = j;
-      out += '""';
     } else {
       out += c;
     }
   }
   if (/\$\(|`|\b(?:ba|z|da)?sh\s+-\w*c\b|\beval\b/.test(out)) runs = true;
-  return runs ? command : out;
+  // A string that runs can hold quotes inside quotes, so drop every quote mark.
+  return runs ? command.replace(/['"\\]/g, '') : out;
 }
 const text = outsideText(cmd);
 
@@ -72,7 +79,7 @@ function ghOutward(segment) {
   if (!m) return false;
   const [, group, sub] = m;
   if (group === 'api') {
-    // Treat any method but GET as a write. A quoted value is blanked, so it asks.
+    // Treat any method but GET as a write. A blanked value is not GET, so it asks.
     for (const mm of segment.matchAll(/(?:^|\s)(?:-X[ \t]*=?[ \t]*|--method[ \t=]+)(\S*)/g)) {
       if (mm[1].replace(/["']/g, '').toUpperCase() !== 'GET') return true;
     }
