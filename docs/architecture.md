@@ -84,7 +84,7 @@ All packages publish under the `@midnight-ntwrk/` scope.
 |---|---|
 | `mn-passport-core` | The ACC client that the three entry libraries share. It builds and signs ACC challenges for each arm, and it reads grants on chain. It has the grant-ceremony client, the coin store, the inbox codec, payments, the transaction joiner, and the grant-scope helpers. It has the WPP client: the package format, the encryption, the entry integrity checks, and the private-state provider over one package key. It defines the shared seams, storage included. |
 | `mn-passport-contract` | Typed bindings over the published ACC artifact, the version registry, and the integrity checks. It loads the compiled module, the ledger decoder, and the manifest. It loads the ZKIR only for a client that verifies circuits. It accepts a partly deployed account. It publishes the interface of the ACC for dApp circuits, and it defines the registry seam. |
-| `mn-passport-protocol` | The MIP §9 messages: the grant request, the possession proof, the redirect response, and the sign-in message (MIP §10). It also carries the shared constants: the RP ID, the PRF salt, and the largeBlob schema. It carries the guardian messages of MIP-0022 §7 and the recovery tags too (section "Recovery"). It also carries the ACC device-call tag prefixes and the k256 connector prefix, which follow the binding version. Types and constants only, with no logic. |
+| `mn-passport-protocol` | The MIP §9 messages: the grant request, the possession proof, the redirect response, and the sign-in message (MIP §10). It also carries the shared constants: the RP ID, the PRF inputs, and the largeBlob schema. It carries the guardian messages of MIP-0022 §7 and the recovery tags too (section "Recovery"). It also carries the ACC device-call tag prefixes and the k256 connector prefix, which follow the binding version. Types and constants only, with no logic. |
 
 ## Seams
 
@@ -127,7 +127,6 @@ interface KeyProvider {
 
 | Key provider | Scheme | Usual registration | Lives in |
 |---|---|---|---|
-| Passkey | JubJub, from the PRF output | Device | `owner` |
 | Passkey on secp256r1 | p256, `wa-json134-or-chrome243` WebAuthn profile only | Device or grant | `owner`, `connect` |
 | Embedded wallet of a WaaS provider | k256, envelope 0 | Device: an optional backup owner key | `adapter-waas` |
 | Midnight connector wallet | k256, envelope 1 (`signData` with `ecdsa_secp256k1_sha256`) | Device, or a read-only grant | `owner`, `connect` |
@@ -171,7 +170,7 @@ foundation, never from `owner`.
 | `adapter-broadcast` | Broadcast, fees | Gives the proven transaction to the sponsor, which pays the fees and returns the paid transaction. Submits it to a node over JSON-RPC, and waits to the level that the caller asks for: "in a block" from the node, "final" from the indexer seam. Inside one call it sends the same bytes again only after a failed send. The send loop in `core` (`createSender`) owns the sponsor retries, the new payments, and one send at a time for each account. |
 | `adapter-indexer` | Indexer | Reads from the indexer, and from the node for a block that the indexer has not reached yet. "Not found" is a value; an unreachable source is an error. |
 | `adapter-fee-capacity-exchange` | Fees | The other fee route: a swap through the Capacity Exchange. Planned for later. |
-| `adapter-browser` | Platform | The browser runtime: passkeys with PRF and the two WASM runtimes in the correct order (the contract runtime first). |
+| `adapter-browser` | Platform | The browser runtime: passkeys with the PRF extension, and the two WASM runtimes in the correct order (the contract runtime first). |
 | `adapter-nodejs` | Platform | The Node.js runtime for backends, `mn-passport-agent` included. |
 | `adapter-waas` | Key provider, account metadata | The embedded key of a WaaS provider (k256, envelope 0) and the metadata on it. It names no vendor. Only `owner` uses it, because this key is an optional backup owner key with full authority. It enrolls the key only when the provider isolates it to the Passport app. It never writes the viewing key or the WPP account key in readable form (the kernel invariant). |
 | `adapter-wpp-<backend>` | Storage | One package per WPP storage backend, so that an app loads only the backend it uses. Each stores ciphertext only. The first is `adapter-wpp-drive`, on Google Drive. |
@@ -212,10 +211,13 @@ The workspace lint and the manifest test enforce these rules on each change.
 
 The kernel in `owner` is the only code that holds these secrets in plaintext:
 
-- the PRF output of the passkey, and the JubJub device key derived from it;
+- the PRF output of the passkey, only to derive the keys of the two wraps;
+- the maintenance authority key, during a birth or a maintenance update
+  (provisional, [ADR 0014](./adr/0014-account-secrets-and-deploy-inputs.md));
 - the WPP account key, and the package keys derived from it, before the
   handoff;
 - the viewing key;
+- the keys of the authority wrap and the viewing-key wrap, for one operation;
 - the recovery secret `s`, only during a session or a recovery (section
   "Recovery");
 - the guardian secret, when this user acts as a guardian, only during one
@@ -226,22 +228,18 @@ key of one package, which the handoff gave it, and it sees only that package in
 plaintext. It never gets the account key, so a dApp cannot open the package of
 a different dApp.
 
-### Passkey devices: two arms
+### Passkey devices
 
-A passkey can act as a device on two arms of the ACC. The arms differ in what
-reaches the code of the Passport app.
+A passkey is a device on the p256 arm only, in the `wa-json134-or-chrome243`
+WebAuthn profile. Its key stays in the authenticator, and only a WebAuthn
+assertion reaches the page. The profile limits the `clientDataJSON` and the
+origin (requirements, "Keys").
 
-| | JubJub arm (PRF) | p256 arm (`wa-json134-or-chrome243`) |
-|---|---|---|
-| Signing key | A JubJub key that the kernel derives from the PRF output | The credential key of the passkey |
-| Where the key lives | In the memory of the kernel, for one operation only | In the authenticator. It never leaves it. |
-| What reaches the page | The PRF output, after a user tap | A WebAuthn assertion (a signature) only |
-| Exposure | Code that runs in the Passport app origin during the operation | None in the page |
-| Limits | The authenticator must support PRF | A 21-byte origin, and a `clientDataJSON` of exactly 134 bytes, or 243 bytes with the Chrome GREASE member |
-
-On the JubJub arm, the kernel derives the key, signs, and then discards the PRF
-output and the key. It never stores or sends them. The p256 arm gives a
-stronger boundary, because no secret enters the page.
+No passkey gives a JubJub device key. The kernel reads the PRF output only to
+wrap or open the authority key and the viewing key (ADR 0014). It derives the
+wrap key, uses it, and then discards it and the PRF output. It never stores or
+sends them. Where the JubJub successor key of a recovery comes from is open
+(section "Recovery").
 
 A device from a WaaS provider is outside the kernel. The provider holds that
 key, and the kernel gets only its signatures. Passport enrolls such a key only
@@ -261,6 +259,8 @@ it:
 | Ciphertext | WPP storage | Always |
 | A guardian share, sealed to the requesting owner | The owner, through `adapter-recovery` | After a passkey tap and an explicit confirmation of the account |
 | Two signatures: one under `s`, one under the successor device key | The prover, inside `recover_submit` | A recovery. The prover learns no scalar (MIP-0022 REC-11). |
+| A signature under the maintenance authority key | The node, inside a maintenance update | A birth, or an update that adds circuits (ADR 0014) |
+| The authority wrap, the viewing-key wrap, and the local store, as ciphertext | The account record on the device | Always |
 | The ACC address, and the viewing key and the WPP account key only as ciphertext | The metadata of an isolated WaaS backup key | Each origin of the provider can read it. Only the Passport app can get the key of that ciphertext. |
 
 The viewing key is the one exception: it leaves the kernel whole. It goes to a
@@ -315,7 +315,7 @@ These rules complete the invariant:
 ```mermaid
 flowchart TB
   subgraph APP["Passport app (trusted)"]
-    KERNEL["owner kernel<br/>PRF output · WPP account key · viewing key"]
+    KERNEL["owner kernel<br/>authority key · WPP account key · viewing key"]
   end
   subgraph CLIENTS["dApps and agents (untrusted)"]
     DAPP["dApp + connect<br/>grant key only"]
