@@ -1,0 +1,45 @@
+{
+  "manifest": "f39ce43bae73be5b82b3be7ba9aeefad90fe43668bc5a0aa01067f4d8a32a005",
+  "vectors": [
+    {
+      "envelope": 0,
+      "challenge": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "digest": "0x66687aadf862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925"
+    },
+    {
+      "envelope": 1,
+      "challenge": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "digest": "0x534bfc2cc44c1085a57c6d720e94e42761d1b86215660bb6e1b2bb81b9b5f550"
+    },
+    {
+      "envelope": 0,
+      "challenge": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "digest": "0xaf9613760f72635fbdb44a5a0a63c39f12af30f950a6ee5c971be188e89c4051"
+    },
+    {
+      "envelope": 1,
+      "challenge": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "digest": "0xa5af6621de71ac801e815c67d7a9d49250afee462cecabecbb26a318ea9d68ca"
+    },
+    {
+      "envelope": 0,
+      "challenge": "0x0430be942c44fb33bc2e86edd553fcee13e8effe1656150ffef08b704ffdeda5",
+      "digest": "0xcf12673e5c32867eca2e582a3a33b2ab55550a6fdac0507a30f2c10590133505"
+    },
+    {
+      "envelope": 1,
+      "challenge": "0x0430be942c44fb33bc2e86edd553fcee13e8effe1656150ffef08b704ffdeda5",
+      "digest": "0xc490c96072eab67b264f9abfebbdb14a5f24f4c0eb5d31b62b4c9916dca2dc28"
+    },
+    {
+      "envelope": 0,
+      "challenge": "0x8ac40093fdc5449263416ee7b238d7f7824b8674a9d539c896ee1789458dfaa6",
+      "digest": "0x82f934459f8d7dd0dfef2dd60fce18c37f49025cdb24bfac0fb3bb251b4017d7"
+    },
+    {
+      "envelope": 1,
+      "challenge": "0x8ac40093fdc5449263416ee7b238d7f7824b8674a9d539c896ee1789458dfaa6",
+      "digest": "0x5b560359dc3b734423683cee0bb604b5d6dd64a215e840e80b3267ce9ae3a430"
+    }
+  ]
+}

@@ -12,3 +12,14 @@ const tags = {
 export const DOMAIN_TAGS: Readonly<typeof tags> = Object.freeze(tags);
 
 export type DomainTag = (typeof DOMAIN_TAGS)[keyof typeof DOMAIN_TAGS];
+
+const deviceAuth = {
+  k256: 'midnight:account:auth:k1:v1:',
+  p256: 'midnight:account:auth:r1:v1:',
+} as const;
+
+/** The account contract appends the operation name, zero-pads the tag to 64 bytes, and hashes it. */
+export const DEVICE_AUTH_TAG_PREFIXES: Readonly<typeof deviceAuth> = Object.freeze(deviceAuth);
+
+/** A k256 key on envelope 1 signs SHA-256 of this prefix and the challenge. */
+export const K256_CONNECTOR_PREFIX = 'midnight_signed_message:32:';

@@ -1,0 +1,590 @@
+{
+  "manifest": "f39ce43bae73be5b82b3be7ba9aeefad90fe43668bc5a0aa01067f4d8a32a005",
+  "arm": "k256",
+  "vectors": [
+    {
+      "operation": "withdraw_unshielded",
+      "mode": "min",
+      "address": "0000000000000000000000000000000000000000000000000000000000000000",
+      "publicKey": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "authNonce": "0n",
+      "args": {
+        "color": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "amount": "0n",
+        "recipient": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "challenge": "0x069dfddf80739fc18d5d302a16805a6fceb66b4d9f6a2966e7a92187d2c24b3d"
+    },
+    {
+      "operation": "withdraw_unshielded",
+      "mode": "max",
+      "address": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "publicKey": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798b7c52588d95c3b9aa25b0403f1eef75702e84bb7597aabe663b82f6f04ef2777",
+      "authNonce": "18446744073709551615n",
+      "args": {
+        "color": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "amount": "340282366920938463463374607431768211455n",
+        "recipient": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      },
+      "challenge": "0xf3e62482f2b5c6d9cadaf05fd94eb2cdb0a17bc7f2610e2adc3ae4823cfba5eb"
+    },
+    {
+      "operation": "withdraw_unshielded",
+      "mode": "random",
+      "address": "e23cb52cfd8e4d67355b05d62147265545c98f6bac3a7c9d0b76a51de6bad4ed",
+      "publicKey": "0x6c3315a9de4251657c6f540bb6d67e95bc03d96502e7058324715d9c6f9a003c591b6c8f288a60bc6b54cebc58df2a12d34d5a8ea9c22e8f36c735cf8a204c24",
+      "authNonce": "9633849794445758996n",
+      "args": {
+        "color": "0xb46f330837c20058acf54ba6f199828117b7f9762d0d2654f9150f4ab5b6a6e4",
+        "amount": "38851876718141192582169387422679968199n",
+        "recipient": "0x0e23e7d7a023c6e3d51642a004d103d624c21969457d5e66d03835938d439c63"
+      },
+      "challenge": "0xb7d97bc54776e2bf3d295d29230f61fd4c7009b0d4cf6892cca3a798efc5471a"
+    },
+    {
+      "operation": "withdraw_unshielded",
+      "mode": "random",
+      "address": "f486010c207946034fb045396f37e087b8e74968522f96604f949772069b6764",
+      "publicKey": "0x2b79b0ce78b69845e528604bcd1a5f38e0ee1980b6fa53448f569fc06963c2caaf18c7dc470c10b7861c46de8d23ccf5dded76ed90f0f637075fafee1f391c98",
+      "authNonce": "7739812990013624049n",
+      "args": {
+        "color": "0xe83458d414ed70bf1cd4ad5dd658c74bde459d974bcda5a9ee03920350ee16ad",
+        "amount": "75309633954124833103589779869122998478n",
+        "recipient": "0x215ec9f4ac0c7fc2e3179f4f8c2394b14d00cc88edf549b51539d0c57499d010"
+      },
+      "challenge": "0x01a620b4a2b8ea66cf8916f42dac76c4a9c4a75aafd02f495d0f4a9f49ab762d"
+    },
+    {
+      "operation": "withdraw_shielded",
+      "mode": "min",
+      "address": "0000000000000000000000000000000000000000000000000000000000000000",
+      "publicKey": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "authNonce": "0n",
+      "args": {
+        "recipient": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "color": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "amount": "0n",
+        "coin": {
+          "nonce": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "color": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "value": "0n",
+          "mtIndex": "0n"
+        }
+      },
+      "challenge": "0x0cb29b01057be5c468fb8d0d4f69b47773af6aa80bfd91f163e376e9f14e9946"
+    },
+    {
+      "operation": "withdraw_shielded",
+      "mode": "max",
+      "address": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "publicKey": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798b7c52588d95c3b9aa25b0403f1eef75702e84bb7597aabe663b82f6f04ef2777",
+      "authNonce": "18446744073709551615n",
+      "args": {
+        "recipient": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "color": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "amount": "340282366920938463463374607431768211455n",
+        "coin": {
+          "nonce": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "color": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "value": "340282366920938463463374607431768211455n",
+          "mtIndex": "18446744073709551615n"
+        }
+      },
+      "challenge": "0xcfb2e2d6f6272b8723f2c782ffca980a5dcf0cf15e84a06c5581ae387e1cefc5"
+    },
+    {
+      "operation": "withdraw_shielded",
+      "mode": "random",
+      "address": "be5ebaeabb8eac432fbc9e359bfc9ee65134b1e0c1661f8b8a6166964dd75e85",
+      "publicKey": "0xc222ecfc2b638b479e1b37d65f3b995ec61836a7dfc4e091f0572ac5233c0a87dd1d118751baddf9fb18b5562d51571cbd61b3e7697af4230ac8228ab810be4e",
+      "authNonce": "5288846193048074583n",
+      "args": {
+        "recipient": "0xed88ccd408bae19b54c19d1773717bafc36e885ebe68b3cf400785baa48696e7",
+        "color": "0x44b3a40143a6f060002e6899d176a6566c5a934d537310ec3bdf58788abd80aa",
+        "amount": "313433397152121619543942128685845880726n",
+        "coin": {
+          "nonce": "0x4f5aaa83537453a3fbc508bcdd23bacc4215fb8c4cbaa1d68ae730a9dfe5d671",
+          "color": "0xe1836a77172d5b82e414aea8dd11f82c34a7999ed97c8ce48c57254e9dd1be0e",
+          "value": "106346317632344012550845888979232958457n",
+          "mtIndex": "9233689911656577383n"
+        }
+      },
+      "challenge": "0xaef3c4ae052c9457a300ef9e7c9acb0681ed8c6120cea2cdefd7da3ed6f6783b"
+    },
+    {
+      "operation": "withdraw_shielded",
+      "mode": "random",
+      "address": "2c26ebf499cb8465f4ac10ac6993a59f8839e0a6ad83264f87e810aca3329b29",
+      "publicKey": "0x578a2a783dc43e03c987bbcf4db7cc28bf3a3c8f3aff4e3231be8f64bad21bdf5709cab113081a26330a04627cc6d73568489df04aa40aadd2c92a7b095c61e3",
+      "authNonce": "1707552747137491277n",
+      "args": {
+        "recipient": "0x0387ac62187e5c65fdbd1f07b37033e6bcd1571c5ab22ac26cf65c1397ff35f1",
+        "color": "0x61cc50a6da62ee98053f96a6a4c190a07b2e913254398f82d68bcaf59fc8343a",
+        "amount": "274740725520058432832971477861108905642n",
+        "coin": {
+          "nonce": "0xdf9fc8f2087a8b4e6c81739deb17e6b9c953e2d5decc93c5523cbea5a41bef1b",
+          "color": "0x4a05c718cacf5d132012e0b0bde29630239867db5d147093e4c5c314774ad5c6",
+          "value": "138126277024291358844166867343030999947n",
+          "mtIndex": "15280529047910528289n"
+        }
+      },
+      "challenge": "0xa96e75eb55905ce48a175dcb6a384ceccc31ca869a90eed6df0e08bedb54372f"
+    },
+    {
+      "operation": "withdraw_shielded_to_contract",
+      "mode": "min",
+      "address": "0000000000000000000000000000000000000000000000000000000000000000",
+      "publicKey": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "authNonce": "0n",
+      "args": {
+        "recipient": "0000000000000000000000000000000000000000000000000000000000000000",
+        "color": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "amount": "0n",
+        "coin": {
+          "nonce": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "color": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "value": "0n",
+          "mtIndex": "0n"
+        }
+      },
+      "challenge": "0x41284f7550318eebf08ff06befbba575c87cc8f80d4e389b2d8e9ae6a6582fda"
+    },
+    {
+      "operation": "withdraw_shielded_to_contract",
+      "mode": "max",
+      "address": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "publicKey": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798b7c52588d95c3b9aa25b0403f1eef75702e84bb7597aabe663b82f6f04ef2777",
+      "authNonce": "18446744073709551615n",
+      "args": {
+        "recipient": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "color": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "amount": "340282366920938463463374607431768211455n",
+        "coin": {
+          "nonce": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "color": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "value": "340282366920938463463374607431768211455n",
+          "mtIndex": "18446744073709551615n"
+        }
+      },
+      "challenge": "0xf16eeeaa041f9efba800325e2a1333fc0cfe09d461dbd975f853c871db020a0b"
+    },
+    {
+      "operation": "withdraw_shielded_to_contract",
+      "mode": "random",
+      "address": "f94de825c3c67632fb24e8143a914c3b085cb628f7206a06948abffb7fc4a6ba",
+      "publicKey": "0xc636c73ed58d3e2ace132f8ae8527c1226c84ee052ee662f7ceb5c9cf8ea797dedff265fcbd78aee3bf6f64efb8f1167a425d5aaec1f87515e4c14a8d4b307c9",
+      "authNonce": "18405647690141810293n",
+      "args": {
+        "recipient": "147c693451c6c26df82e38e5aac05e27e0eeb4bb9a770d923ca9b4bbeced076d",
+        "color": "0xe4a6652611b9e55ffe55a134c4cf7947d1b5c41b1c67a717f8a02ebc4290fa02",
+        "amount": "5037471820336433065533705357072481954n",
+        "coin": {
+          "nonce": "0x64ec2afd9d87aebc9c20f43e96d506e3e540ec57af1dc5d1bc1350dbc7da9ff9",
+          "color": "0xc8614adf39b0e8e67d97c608c3c6af953bd33e803e548b120a5a0038d84403cf",
+          "value": "119610897556553084211515035546581861235n",
+          "mtIndex": "12478003942432603908n"
+        }
+      },
+      "challenge": "0x4692b6b53566c0529422be5007faf60fd759a48ada30aba48b2b32f34e65a16e"
+    },
+    {
+      "operation": "withdraw_shielded_to_contract",
+      "mode": "random",
+      "address": "aac6b673e12c29857a9dd1b1bdeee5fb438207d8f5ce33d41460dddcfde2c75e",
+      "publicKey": "0x4c0751fddcb71f710fdcb7411eb1162519f9ceefeb1f41522c92c9ba3059acce1b25b6fd955f1ca96bd4326ff9522be4ecc589a31431395fdddfece6c7d0837f",
+      "authNonce": "8484477207399825357n",
+      "args": {
+        "recipient": "d34e9981753b5ee829c19e6a1c3e3ea8be3a88ce4daaed4740ae0055ae0daf40",
+        "color": "0xcf3620b7117aecdec08d6b40337950a2ebae68b8b01bf942dbf6b6b9ab6f3ff6",
+        "amount": "70110420988740053449109000410920741805n",
+        "coin": {
+          "nonce": "0xef85dda1f80081fe94551ab130ed0d7d9fb0a2769edbb09a7d7654b3475fbb0b",
+          "color": "0xd60efa4c43b04121b706881f3ef1bf6a8c86d23cf8ae095a271b0397be1f3e91",
+          "value": "334533856266284782999551807241957138624n",
+          "mtIndex": "11983903402656350603n"
+        }
+      },
+      "challenge": "0xe2b0d1d25aada7b91bd7352767689288eda36b02029195029af866db7779e9ef"
+    },
+    {
+      "operation": "append_inbox",
+      "mode": "min",
+      "address": "0000000000000000000000000000000000000000000000000000000000000000",
+      "publicKey": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "authNonce": "0n",
+      "args": {
+        "entry": "0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "challenge": "0x0cbea8c1c080ae716a882853a23708e716b936d41e46c53b505871b6509756ec"
+    },
+    {
+      "operation": "append_inbox",
+      "mode": "max",
+      "address": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "publicKey": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798b7c52588d95c3b9aa25b0403f1eef75702e84bb7597aabe663b82f6f04ef2777",
+      "authNonce": "18446744073709551615n",
+      "args": {
+        "entry": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      },
+      "challenge": "0xaede13eb1d6be0093df9cec476dc0169fa753587be20dcdc5f4d9c52f0bf57c5"
+    },
+    {
+      "operation": "append_inbox",
+      "mode": "random",
+      "address": "7b9d06d65a142ddae241831ef7e970744dfb54881b81ff566bce9d0b2924bf27",
+      "publicKey": "0x664bfa9fb85b0480c620772781e22869ccdbbba5f56a4101eb77b9e9e08e1417b2df4ebe1c5cf06d0ad27a82aa57259dfc34fd98075311fb44277a245d123f56",
+      "authNonce": "12923659079296628685n",
+      "args": {
+        "entry": "0xa162bbbb35204f0d935f410d62ea0ee8205e44477b579f5a79beb42a1a3c73f0c0984cd934ac164f440b87c7957918171f7e359505dcb77dccb5191b7479afe55c3532a6e979a7998028ef4799b16002cf55aa747428d53c2253c43e02ae04dcd991732036153d1e675fac2e5eec8763aca3bd62f961981c5bc63a3994d09a3e87dcba60a3b6566f4faa7ec72a7cbda9eaf9a2b809e415f9c30d291f96b918056d67a25943ff202dc247d9b2f7c7cc7b98b5d07299322a0422605b419529b6fc"
+      },
+      "challenge": "0x8a86e9e7232b3ec9594a9cfdf5bc13729aff28389063ba1b953782e6eb802f47"
+    },
+    {
+      "operation": "append_inbox",
+      "mode": "random",
+      "address": "36f6d0c7426bc184a709e453ff671efb938b8eeea79667b52c588f7e7803b3e3",
+      "publicKey": "0x3c49b564aa39cccbf3beb4795dfc4846f6442d76c7585bcdbdf30ad352669ac5110b34f00327ca1568f277f9decb4ea580ffe90389da212db19404f11931b4c2",
+      "authNonce": "15162294572778570128n",
+      "args": {
+        "entry": "0x215f283bc2bd3afacaebe2289b5039420f9df1fbc93b9b8914dc4007ccda830d1c15dec5a690852337d074a73edc273904e4ed4447e224e8b359639c6f9476dc03c042d50086ff60ee163a1a781d242e1840c8c9b9d7ea77f69ab7ce7fbdafe8cfcf5923d16d1f6f3415d3c28f89cbc9054dcafa6cb010657bc9847a77dae8d6fac4a8022d0cff545c59f16463f14e13aa046ed81c80eb41924dead9c7853e407bd47c86b90f413ea123b7bb4ace373586f7a87abb6459c364202fdd62e0b995"
+      },
+      "challenge": "0xcd49c19f5028b9ddc116d7695e4f72b3eccc02462ccbd7464a39e3a1bed252d6"
+    },
+    {
+      "operation": "rotate_enc_key",
+      "mode": "min",
+      "address": "0000000000000000000000000000000000000000000000000000000000000000",
+      "publicKey": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "authNonce": "0n",
+      "args": { "key": "0x0000000000000000000000000000000000000000000000000000000000000000" },
+      "challenge": "0x08a906bba1a6493ba48c12836a0cc1bc10280b057077dd86c2f16e2a9c6de44f"
+    },
+    {
+      "operation": "rotate_enc_key",
+      "mode": "max",
+      "address": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "publicKey": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798b7c52588d95c3b9aa25b0403f1eef75702e84bb7597aabe663b82f6f04ef2777",
+      "authNonce": "18446744073709551615n",
+      "args": { "key": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" },
+      "challenge": "0x8dbaec6b4d08184d15dab13def576cf728a03ea10789fc714f8fac1a7764ddc6"
+    },
+    {
+      "operation": "rotate_enc_key",
+      "mode": "random",
+      "address": "96e4006ac30f904baa9d562d0dacb7f5bc48e9a7c6ef986162b0a3edd4be1642",
+      "publicKey": "0x31cd57ef6add79ab38c7849c676bc1786754df69dab6b7d1eaa269a27e094ff56ba77d977b4fbe768bbc631b9095bd45c953e17d890df64c81ce2d8e48d6cce3",
+      "authNonce": "11943442258330432425n",
+      "args": { "key": "0xd962f645c71815eb1cfbcb5c64d375d1ce23571bd64db2b8f158cdbe07c06adb" },
+      "challenge": "0x0e61a97e3d11bced1b69b388225e524c78b8d35dfa955b1197bdbd98627e8ffb"
+    },
+    {
+      "operation": "rotate_enc_key",
+      "mode": "random",
+      "address": "ff1841257c4ef7d5c1efcc4fb409fc7deb9a281bd59b15d6925fc354e3c0f596",
+      "publicKey": "0x7b184a24f0ae84570dcdaa7da5fa0f5964f512816da9cdff1fc4c52e52b5248afda1cd64cbc75908eeed0e0df76009b468f16c45a70b2d45d0007ab57c3b15fb",
+      "authNonce": "10679396625821522667n",
+      "args": { "key": "0x89779dc0f24eceae63f93b024e15aeb3ebe592de143ba6a44c9bd754cb99633e" },
+      "challenge": "0x1be5dd7b879843669c56f75dbe6d2bde8e656dd9b496778fd2b0f051246850d3"
+    },
+    {
+      "operation": "add_device",
+      "mode": "min",
+      "address": "0000000000000000000000000000000000000000000000000000000000000000",
+      "publicKey": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "authNonce": "0n",
+      "args": { "entry": "0x0000000000000000000000000000000000000000000000000000000000000000" },
+      "challenge": "0x44e5bd9f2a99eaa43ccc7afd298f75c6d8d3f2e3e6dc609683a69ded28a347b3"
+    },
+    {
+      "operation": "add_device",
+      "mode": "max",
+      "address": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "publicKey": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798b7c52588d95c3b9aa25b0403f1eef75702e84bb7597aabe663b82f6f04ef2777",
+      "authNonce": "18446744073709551615n",
+      "args": { "entry": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" },
+      "challenge": "0x46662720485d3016591a7d63862afebef838a11545dcb4c6d456de6d8398dcc9"
+    },
+    {
+      "operation": "add_device",
+      "mode": "random",
+      "address": "cf7da4241118eeaf715681742914d36c54e4305db766c41444db34a8125933c6",
+      "publicKey": "0x5cbcd9d37738f9b7ee6281a308600c0992e643b719b395053ca370d02f8fe823b66c7fcd2d9e84852c77e62a7c64ab108e07bd35354530c8795300f6d177d23b",
+      "authNonce": "6999060163128340775n",
+      "args": { "entry": "0xe1be32c9220c89c127ba5eefd54c2626c3a54c985c922710eece331f0cf20809" },
+      "challenge": "0x6d0e22c20546b1faf60013e12e096aaeea1f44c1aa14e95625869929f876b371"
+    },
+    {
+      "operation": "add_device",
+      "mode": "random",
+      "address": "a2036d13eccaf0fc8c77c6252ab43ec07698e9a787cbe831b927e458eb8eb808",
+      "publicKey": "0xb829730771c730e38b10b795e83472685e8e0a4790cd1745d2683a99f1937502e5cf41565dba7d4cfa06d140168aba547b0dc811df15561168e51fadf071fbc4",
+      "authNonce": "15080433520886193404n",
+      "args": { "entry": "0xc8b42e46606b02aca66df388be942a0a7716fc5347f366ed0e1def7a230782bc" },
+      "challenge": "0x98c802b8d3ff8bb19f3e4251d71c19ec9f5da646f4c016b599e122e0f0645032"
+    },
+    {
+      "operation": "remove_device",
+      "mode": "min",
+      "address": "0000000000000000000000000000000000000000000000000000000000000000",
+      "publicKey": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "authNonce": "0n",
+      "args": { "entry": "0x0000000000000000000000000000000000000000000000000000000000000000" },
+      "challenge": "0x93ccc891b874f132c603d7b5ec6db8764c51ecb032e7585230cf3b78c27ff8f2"
+    },
+    {
+      "operation": "remove_device",
+      "mode": "max",
+      "address": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "publicKey": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798b7c52588d95c3b9aa25b0403f1eef75702e84bb7597aabe663b82f6f04ef2777",
+      "authNonce": "18446744073709551615n",
+      "args": { "entry": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" },
+      "challenge": "0x70f4b711a02e10db5526cbc0dc7fa26ea82d29e0c919322d49ea4b084918df2d"
+    },
+    {
+      "operation": "remove_device",
+      "mode": "random",
+      "address": "ea0d026ce282831bb73204b052e6e7fdf15a894c24409c13e8f600cf265ade28",
+      "publicKey": "0x227062bfa326148a770a30fadb97635846694b24b2d80360469b7346a066a363ce9ddf644f735c7fe33259072099b2ab2eaea817ef030b32429fbaf520e2a632",
+      "authNonce": "6994895559156509872n",
+      "args": { "entry": "0x0cb58f1476e0c584a547243e82e19b883c80a955aa5488206994b6b742180382" },
+      "challenge": "0x7ebeff835327b9ba4de16480cc317968e179f1d151759f3ce6e15f7f6fc676a5"
+    },
+    {
+      "operation": "remove_device",
+      "mode": "random",
+      "address": "c4db13b436af6a011c0cf2e244e39b8e90bf1204815514268d0fe0df5d968ad3",
+      "publicKey": "0x08fb38a3eee65419687ae01928fedf58d0ec3c4cc4cc3b6bccfd24f59d0e2dd38a9af80e0bf9934011bda82ec21a132dcac0605414427356840af9be7feff28b",
+      "authNonce": "17014866545330051718n",
+      "args": { "entry": "0x6b0afbd5be9e0394f7c24c3f424b47d51f183f23a9f917e1032090108c72b9ce" },
+      "challenge": "0x0385f4e051d13f73cf6d274e5298e4e6b8de7e2a5083d675b27ad3a8f7ebbc55"
+    },
+    {
+      "operation": "issue_grant",
+      "mode": "min",
+      "address": "0000000000000000000000000000000000000000000000000000000000000000",
+      "publicKey": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "authNonce": "0n",
+      "args": {
+        "grantId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "scopeDigest": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "challenge": "0xa825ae0a51c06dcf8c87ad6c63ace24b28db0ccec14a2467b7c29b135e03ee15"
+    },
+    {
+      "operation": "issue_grant",
+      "mode": "max",
+      "address": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "publicKey": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798b7c52588d95c3b9aa25b0403f1eef75702e84bb7597aabe663b82f6f04ef2777",
+      "authNonce": "18446744073709551615n",
+      "args": {
+        "grantId": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "scopeDigest": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      },
+      "challenge": "0xee95dcb065e9bf09f5c435ebc367314af8959e87e22f0cd5a4e1a7b3e81f9ad7"
+    },
+    {
+      "operation": "issue_grant",
+      "mode": "random",
+      "address": "34afd46edef608af1f72b9471974db6b4ae9e7f9f7c1b5b7c29460fe8bb0ff36",
+      "publicKey": "0x8bcb6d15c51b9318fb1822534195a5eed4419eaa53b5af59c800d7a8c8c716757b4246aab1d85d383387c30dca873637801bb4cc980067f60026cc60524de06a",
+      "authNonce": "12405760407609268487n",
+      "args": {
+        "grantId": "0xeb007076cf66efaf9091d0bbdb04c6905fa7fb7ff1558f977d09cdc98264f537",
+        "scopeDigest": "0xec3efa7e30238398d5db7d47ce4e6f77eb046be01b0041e7fa4c81ae815bd073"
+      },
+      "challenge": "0xc1eb050a601950775aad1b30d4e5e8b38bf111991252f906d00c1259ae37f042"
+    },
+    {
+      "operation": "issue_grant",
+      "mode": "random",
+      "address": "8a56e0dbe773b7ba8a2edeb1b8a665b60f092a6558d949857d05b1a65049acd0",
+      "publicKey": "0x0a041291a00e01b28b171003a871fee7c4919bf91f08e0d69058ffe4c2abbd185dfb34ba82fb1dac474f508c162afeefae0be06a8a83191ad096951c3fc1f543",
+      "authNonce": "17658712816648718071n",
+      "args": {
+        "grantId": "0xe39f9d533779bd1a54122bf78c48aec413e10bd2aa7504a9d7ae61b499195dea",
+        "scopeDigest": "0x55d15629d59eb10e0f827b3d9ba44e6b7cf060f5d20468c0c6ac7ef061c3d20d"
+      },
+      "challenge": "0xe7b04df80b093a1198fc5bac50e7945e208ec22ba110ac165d65ad03e52844d2"
+    },
+    {
+      "operation": "revoke_grant",
+      "mode": "min",
+      "address": "0000000000000000000000000000000000000000000000000000000000000000",
+      "publicKey": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "authNonce": "0n",
+      "args": { "grantId": "0x0000000000000000000000000000000000000000000000000000000000000000" },
+      "challenge": "0x090132c24b02b231be3657e5e3b42c8d0a57d8a8fd9f265e26ec389a8520c547"
+    },
+    {
+      "operation": "revoke_grant",
+      "mode": "max",
+      "address": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "publicKey": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798b7c52588d95c3b9aa25b0403f1eef75702e84bb7597aabe663b82f6f04ef2777",
+      "authNonce": "18446744073709551615n",
+      "args": { "grantId": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" },
+      "challenge": "0x446d3698298fe82aa7df027382f576ab4cc30fda7ac2012888f06ce7a0990fe5"
+    },
+    {
+      "operation": "revoke_grant",
+      "mode": "random",
+      "address": "a0076b26ef8bc0a104014f4367b26510a953f7cc296d409a078ca62286de9b0f",
+      "publicKey": "0x2684f22f69b08951e635c27f41310cfc512c78784dc1eb19824303eef8b351ff14b90a0a69446a11f10ab39def8e7966b037d29297b9d7c05a176d24a9125865",
+      "authNonce": "15286246707006090850n",
+      "args": { "grantId": "0x37fcb4f5e1c45d610beefa0666652eec08e42b6e92f800b1204ac414abc17a07" },
+      "challenge": "0x322feb9650e14245994d7d6243b8f76ff3d4c7b34e7e9397e46b94551a9e7826"
+    },
+    {
+      "operation": "revoke_grant",
+      "mode": "random",
+      "address": "3cb37a298f690586a3b69be06a8ce02952bc6e41b9e4e2c2799fa54673db4c61",
+      "publicKey": "0xd60d35b368cfe50c39a1cbad68e2dfce0a26b2ab07782a1eece7f618cbf32b96a03886989ee1d4a768b32c6587d9687488fb80ecec0abad9cbcc43962a85eebb",
+      "authNonce": "5009166779637252889n",
+      "args": { "grantId": "0x5cdbf1e62272fc2239f66833cdc612be95bbff000ebc0091b63ab0cc57f746c9" },
+      "challenge": "0x8ed42375d33c0b4d804521d32431abc48f2710e38e758d3c123adfdbebcc5b10"
+    },
+    {
+      "operation": "revoke_all_grants",
+      "mode": "min",
+      "address": "0000000000000000000000000000000000000000000000000000000000000000",
+      "publicKey": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "authNonce": "0n",
+      "args": {},
+      "challenge": "0xa15fb0c1ca31249360136cfc2e9b68c669caf10dac97f534c02d2baa35eaced0"
+    },
+    {
+      "operation": "revoke_all_grants",
+      "mode": "max",
+      "address": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "publicKey": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798b7c52588d95c3b9aa25b0403f1eef75702e84bb7597aabe663b82f6f04ef2777",
+      "authNonce": "18446744073709551615n",
+      "args": {},
+      "challenge": "0x7c16091a69fb6eb3576861de10d28ab0c8e22ed2bd9f44e99863323a3eb28992"
+    },
+    {
+      "operation": "revoke_all_grants",
+      "mode": "random",
+      "address": "c35dd7e2ed0eaf87f30d78e264312eacd839ff7fa2bc369502ea6dba6d0176cc",
+      "publicKey": "0x8c7862665e91d8dea6ebe211266af29d4d3c8d86daea7a8bfc7ccd414128ad145cf648c449ec5acf2988fd4d2fc9e3392bfc75b0ea595e7c1bf8661f48bd5c9e",
+      "authNonce": "15558062501817452785n",
+      "args": {},
+      "challenge": "0xf89858a0b6be701392d08f1e2ba4f5a8c252247496a23044784501e68604095f"
+    },
+    {
+      "operation": "revoke_all_grants",
+      "mode": "random",
+      "address": "ed208667f869e6c671651cd3bfbf52105008354ba33c1619af8e0f85bc5faa4b",
+      "publicKey": "0x7856acb5d09b57be4c84171c80991b2aa33ac82853a8e6b907785aff5b6d77e83e058a7ee72b5b5e0a17b940932261400080fa0dff810a89cc1b57311a01c44e",
+      "authNonce": "2015030180947528666n",
+      "args": {},
+      "challenge": "0xe573b9e9c70efc57b1f216d6a94b67d64ce498ba41d139d67d4b402a95917293"
+    },
+    {
+      "operation": "publish_recovery_session",
+      "mode": "min",
+      "address": "0000000000000000000000000000000000000000000000000000000000000000",
+      "publicKey": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "authNonce": "0n",
+      "args": {
+        "recoveryKey": "0x3ea5c4673a121ca35ed37ee3b172f5ee04315c657fbe375f512dfea318d56fe557137b83ea6edb4f78f7d30d3f616cb3b9aa6e8e40808413c10cea38d50c55cb",
+        "sessionNonce": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "phi1": "0n",
+        "phi2": "0n",
+        "phi3": "0n",
+        "phi4": "0n",
+        "phiLength": "0n",
+        "wrap": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "challenge": "0x51c69dad8cedd347be58f18326ce2a8cb79b016de25768cebb853eaa7b83c402"
+    },
+    {
+      "operation": "publish_recovery_session",
+      "mode": "max",
+      "address": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "publicKey": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798b7c52588d95c3b9aa25b0403f1eef75702e84bb7597aabe663b82f6f04ef2777",
+      "authNonce": "18446744073709551615n",
+      "args": {
+        "recoveryKey": "0x3547e2ebef8b60a4d4665924582ee2174f8c479d8040249faed2015be72a901c57137b83ea6edb4f78f7d30d3f616cb3b9aa6e8e40808413c10cea38d50c55cb",
+        "sessionNonce": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "phi1": "52435875175126190479447740508185965837690552500527637822603658699938581184512n",
+        "phi2": "52435875175126190479447740508185965837690552500527637822603658699938581184512n",
+        "phi3": "52435875175126190479447740508185965837690552500527637822603658699938581184512n",
+        "phi4": "52435875175126190479447740508185965837690552500527637822603658699938581184512n",
+        "phiLength": "255n",
+        "wrap": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      },
+      "challenge": "0x409d18297f7e5b66633f09d1da6ee6d80f29cd8383fd1384bbca0f342de28c2b"
+    },
+    {
+      "operation": "publish_recovery_session",
+      "mode": "random",
+      "address": "d10686258692fd14566fa05376d05cb57a596b535154a85591fcbfcbcc225133",
+      "publicKey": "0xb1aa619b0bafb6d36e6cb8375d02dafdbfd9802f51019fd903337af586ff510a9a33f1d6f651bf062e9fb795dee902e965ad9f538aef16d77fd95b7709d2ce80",
+      "authNonce": "12079241086156839256n",
+      "args": {
+        "recoveryKey": "0x436e7bb231ffe79e93e223239c783d1f9b85edc0321ed04b9dc681e1f3f95144459cf60784e9111ff404cbce88a6efb4aa5b89a467301919e8e8412bb45a087b",
+        "sessionNonce": "0x7ccac6cb0ff14995fc0824c840d96da1e429ce40b1002c85ec2ffcc8f71a6372",
+        "phi1": "30357923875739397376655171746443926748305880217404655475618790047461485552575n",
+        "phi2": "25441615091274478373471017278250560140925124743403788917703977740731907720307n",
+        "phi3": "18188924002961945801416031903205054223666936169864748439076964631220596356036n",
+        "phi4": "4328052459487811917700482036037239029641597277099334575649838331258299867171n",
+        "phiLength": "255n",
+        "wrap": "0x66f13df9211ad1aa1d6c931fcc3f6557f0d3e489e96ffae19bb7cd96335284b971db989735e00d10d6d7c60dc29127be0747405b257d3e776f341e21711e9e73"
+      },
+      "challenge": "0x85f3d9778b6b125b535c465ac9e3087fa7fab491ada2e786a4dc16c5e5501fb6"
+    },
+    {
+      "operation": "publish_recovery_session",
+      "mode": "random",
+      "address": "c2f365fb09745c0204e05b76da0abf601e6a3329d6b828d73241ed897aa4eaa5",
+      "publicKey": "0x2b2d733af96e20a656727858d1647f2645e969156e97c0336eb33c95c8dd5da2354d49f60768a32d87ff608d859acce025808765386ca224729c22002cec8ff7",
+      "authNonce": "12708340558655565091n",
+      "args": {
+        "recoveryKey": "0x092cf692a692d7e4dd76ffd70dd5753c55882781b3647a7a50e8dea1b2233d5f43cfaba69f1cd48946051cf86e4abe76ff79deb3e97608c45775926843801d06",
+        "sessionNonce": "0xd5eaca610f7891ed6449190e80b36b4d19a5bce6060ca72852cbe096e306bffe",
+        "phi1": "3404089879491842417272846727817635754291809956548782035342921481428022207811n",
+        "phi2": "11575159747911954089502657545540658973549728556275120404963840673032251083334n",
+        "phi3": "31992457340817043243955952089130704352229655023856389363919604788461032346560n",
+        "phi4": "37355166411918568189909766184979904463153857777991144542340692072690534703561n",
+        "phiLength": "100n",
+        "wrap": "0x08aaaf10ecac7f76ee095c9524274e5ff60a72ee59c6731ae24a8e819a78fbf5537b2e1edca376aeeaf5367e4c6362e1fd14d60f05b51252e1ca261052b15a05"
+      },
+      "challenge": "0x363ba3377fb556c02baf6adccfc5ac385e23b061df975d81610efbb89b2011f1"
+    },
+    {
+      "operation": "recover_cancel",
+      "mode": "min",
+      "address": "0000000000000000000000000000000000000000000000000000000000000000",
+      "publicKey": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
+      "authNonce": "0n",
+      "args": {},
+      "challenge": "0x91c80ae247c0a5ad0bf6340c91392aec8c3134967f13894e3ef7236bd0b280f4"
+    },
+    {
+      "operation": "recover_cancel",
+      "mode": "max",
+      "address": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "publicKey": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798b7c52588d95c3b9aa25b0403f1eef75702e84bb7597aabe663b82f6f04ef2777",
+      "authNonce": "18446744073709551615n",
+      "args": {},
+      "challenge": "0xf9d215b93148106570ccfe4d867cf8bfbae4c42b0424099fbc2a131c1db9e97f"
+    },
+    {
+      "operation": "recover_cancel",
+      "mode": "random",
+      "address": "8d4095fbd233b7f04282aa9f8d9ba7feb0806141b6083b77ae9adf68a987d989",
+      "publicKey": "0x04f65d908d53363ae225c70116ec1b28a748861c128b4fb4806e0cc79da1aa666248b3727863af577723974cc1a09736528ce16b9dc5e02f35984b6ce18e554a",
+      "authNonce": "6929596118037699748n",
+      "args": {},
+      "challenge": "0xe92cdfb1ebffafc4c73a2098fdabb7b3de28710704364854c558af3d9bf0d094"
+    },
+    {
+      "operation": "recover_cancel",
+      "mode": "random",
+      "address": "0c258c1390de0361443220c3a09b217b90be9edce4547e34a9fbab7be2210bc7",
+      "publicKey": "0x947b9a534e6edf0538e640c4f934676a75c78d5119e02724601898319eebea670a995a9cbac02d1c6759dc4816ff90e532910c9e1b410b76b13f72a85f744ccc",
+      "authNonce": "3827346576672241694n",
+      "args": {},
+      "challenge": "0xc003404a1059547bed17b9fa867a27741567282ef9b3afaebfc87f09a383e927"
+    }
+  ]
+}
