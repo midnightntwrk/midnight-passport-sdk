@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { nodePlatform } from '../packages/adapter-nodejs/dist/index.js';
-import { appBuild, browserTest, runPage, viteBundle } from './chromium.mjs';
+import { appBuild, browserTest, runPage, viteBundle, viteServe } from './chromium.mjs';
 import { listen } from './server.mjs';
 import { counterState, smoke } from './smoke.mjs';
 import { parseJson } from '../scripts/json.mjs';
@@ -73,6 +73,7 @@ const page = join(root, 'tests/fixtures/app/page.js');
 const builds = {
   esbuild: async () => ({ build: appBuild }),
   Vite: viteBundle,
+  'Vite dev': viteServe,
 };
 for (const [name, build] of Object.entries(builds)) {
   browserTest(`the ${name} app runs the smoke in Chromium`, async (bin) => {

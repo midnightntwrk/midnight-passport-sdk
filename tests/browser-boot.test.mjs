@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { passportWasm } from '../packages/adapter-browser/dist/esbuild.js';
-import { browserTest, bundle, runPage, viteBundle } from './chromium.mjs';
+import { browserTest, bundle, runPage, viteBundle, viteServe } from './chromium.mjs';
 import { listen } from './server.mjs';
 
 const EMPTY_WASM = new Uint8Array([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]);
@@ -156,6 +156,29 @@ window.result = { hex: Buffer.from('0aff', 'hex').toString('hex'), pass: check(t
     }
   });
 }
+
+browserTest('Vite dev: a bare buffer or assert in app code gets the browser copy', async (bin) => {
+  const app = await mkdtemp(join(tmpdir(), 'mn-passport-app-'));
+  try {
+    const entry = join(app, 'page.js');
+    await writeFile(
+      join(app, 'late.js'),
+      `import { Buffer } from 'buffer';
+import assert from 'assert';
+export const result = { hex: Buffer.from('0aff', 'hex').toString('hex'), assert: typeof assert };`,
+    );
+    // The scan before the first page load cannot see a computed import.
+    await writeFile(
+      entry,
+      "const late = './late.js'; window.result = import(/* @vite-ignore */ late).then((m) => m.result);",
+    );
+    const { value, errors } = await runPage(bin, '', await viteServe(entry));
+    assert.deepEqual(errors, []);
+    assert.deepEqual(value, { hex: '0aff', assert: 'function' });
+  } finally {
+    await rm(app, { recursive: true, force: true });
+  }
+});
 
 test('an esbuild external does not pass the built-in check', async () => {
   await assert.rejects(bundle("import 'fs';", undefined, { external: ['fs'] }), /built-in "fs"/);
