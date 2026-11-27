@@ -48,13 +48,14 @@ const PAGE = `
         controller.abort();
         return call;
       })(),
-      // The abort comes after the browser made the credential.
+      // The abort comes after the browser made the credential. The virtual authenticator holds
+      // 3 resident keys, and the abort above can still store one: this user ID replaces it.
       abortedLate: await (async () => {
         const controller = new AbortController();
         const create = navigator.credentials.create.bind(navigator.credentials);
         navigator.credentials.create = (options) =>
           create(options).then((credential) => (controller.abort(), credential));
-        const late = { rp, user: { ...user, id: new Uint8Array([6]) }, challenge: challenge(), signal: controller.signal };
+        const late = { rp, user: { ...user, id: new Uint8Array([5]) }, challenge: challenge(), signal: controller.signal };
         return outcome(webauthn.create(late)).finally(() => (navigator.credentials.create = create));
       })(),
     };
