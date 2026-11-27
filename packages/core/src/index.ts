@@ -30,8 +30,9 @@ export {
 export { StaleNonceError, assertFresh } from './keys/nonce.js';
 export {
   createSoftwareKeyProvider,
+  type SoftwareJubjubProvider,
+  type SoftwareK256Provider,
   type SoftwareKeyOptions,
-  type SoftwareKeyProvider,
 } from './keys/software.js';
 export {
   AssertionProfileError,

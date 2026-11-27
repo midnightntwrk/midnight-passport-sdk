@@ -1,4 +1,10 @@
-import { CancelledError, type KeyProvider, type Prover } from '@midnight-ntwrk/mn-passport-core';
+import {
+  CancelledError,
+  type CallOptions,
+  type JubjubChallenge,
+  type KeyProvider,
+  type Prover,
+} from '@midnight-ntwrk/mn-passport-core';
 import {
   createStubKeyProvider,
   createStubProver,
@@ -45,21 +51,43 @@ run(
   proverContract(async () => proverHarness()),
 );
 
-const other = (p: KeyProvider): KeyProvider => ({ ...p, scheme: 'k256', envelope: 1 });
+const other = (p: KeyProvider): KeyProvider => (p.scheme === 'k256' ? { ...p, envelope: 1 } : p);
 expectFailing(
   'the key provider contract fails a provider that signs with another envelope',
   keyProviderContract(async () => keyHarness({ scheme: 'k256', envelope: 0 }, other)),
   [['sign gives an authorization of the provider scheme', 'the envelope changed']],
 );
 
-const der = (p: KeyProvider): KeyProvider => ({
-  ...p,
-  sign: async (c, o) => ({ ...(await p.sign(c, o)), signature: new Uint8Array(70) }),
-});
+const der = (p: KeyProvider): KeyProvider =>
+  p.scheme === 'p256'
+    ? {
+        ...p,
+        sign: async (c: Uint8Array, o?: CallOptions) => ({
+          ...(await p.sign(c, o)),
+          signature: new Uint8Array(70),
+        }),
+      }
+    : p;
 expectFailing(
   'the key provider contract fails a p256 signature in DER form',
   keyProviderContract(async () => keyHarness({ scheme: 'p256' }, der)),
   [['sign gives an authorization of the provider scheme', 'the signature has 70 bytes']],
+);
+
+const shortResponse = (p: KeyProvider): KeyProvider =>
+  p.scheme === 'jubjub'
+    ? {
+        ...p,
+        sign: async (c: JubjubChallenge, o?: CallOptions) => {
+          const signed = await p.sign(c, o);
+          return signed.scheme === 'jubjub' ? { ...signed, response: new Uint8Array(31) } : signed;
+        },
+      }
+    : p;
+expectFailing(
+  'the key provider contract fails a JubJub response that is not 32 bytes',
+  keyProviderContract(async () => keyHarness({ scheme: 'jubjub' }, shortResponse)),
+  [['sign gives an authorization of the provider scheme', 'R or s has the wrong size']],
 );
 
 const deafKey = (p: KeyProvider): KeyProvider => ({ ...p, publicKey: () => p.publicKey() });

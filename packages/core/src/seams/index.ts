@@ -19,7 +19,7 @@ export {
   NetworkError,
   TimeoutError,
 } from './errors.js';
-export type { Authorization, KeyProvider } from './key-provider.js';
+export type { Authorization, JubjubChallenge, KeyProvider } from './key-provider.js';
 export type { ProveOptions, Prover } from './prover.js';
 export type { Fees } from './fees.js';
 export type { Broadcast, SubmitOptions } from './broadcast.js';

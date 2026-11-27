@@ -234,7 +234,75 @@ async function generate(dir) {
       };
     }),
   );
+
   out['keys.json'] = { manifest: pin, vectors: keys };
+
+  // The JubJub sections come last, so the random draws above stay the same.
+
+  /** @param {Uint8Array} bytes */
+  const littleEndian = (bytes) =>
+    BigInt(`0x${Buffer.from(bytes).reverse().toString('hex') || '0'}`);
+  const jubjub = [];
+  for (const [operation, spec] of Object.entries(OPERATIONS)) {
+    for (const mode of MODES) {
+      const pk = pointOf('jubjub', scalarOf(mode, rt.JUBJUB_SCALAR_MODULUS));
+      const commitment = pointOf('jubjub', scalarOf(mode, rt.JUBJUB_SCALAR_MODULUS));
+      const self = bytesOf(mode, 32);
+      const authNonce = numberOf(mode, 1n << 64n);
+      /** @type {Record<string, unknown>} */
+      const args = {};
+      /** @type {unknown[]} */
+      const rtArgs = [];
+      for (const [name = '', kind = ''] of spec
+        .split(' ')
+        .filter(Boolean)
+        .map((p) => p.split(':'))) {
+        const [sdkValue, runtimeValue] = valueOf(kind, mode);
+        args[name] = sdkValue;
+        rtArgs.push(runtimeValue);
+      }
+      // The signer grinds from 0, so the vector holds the first nonce below the order.
+      let grindNonce = 0n;
+      /** @returns {Uint8Array} */
+      const challengeOf = (/** @type {bigint} */ g) =>
+        /** @type {Uint8Array} */ (
+          call(
+            `challenge_${operation}_with_jubjub`,
+            { bytes: self },
+            commitment,
+            pk,
+            ...rtArgs,
+            authNonce,
+            g,
+          )
+        );
+      let challenge = challengeOf(grindNonce);
+      while (littleEndian(challenge) >= rt.JUBJUB_SCALAR_MODULUS)
+        challenge = challengeOf(++grindNonce);
+      jubjub.push({
+        operation,
+        mode,
+        address: Buffer.from(self).toString('hex'),
+        publicKey: pointBytes(pk),
+        commitment: pointBytes(commitment),
+        authNonce,
+        args,
+        grindNonce,
+        challenge,
+      });
+    }
+  }
+  out['jubjub.json'] = { manifest: pin, arm: 'jubjub', vectors: jubjub };
+
+  const jubjubKeys = MODES.map((mode) => {
+    const scalar = scalarOf(mode, rt.JUBJUB_SCALAR_MODULUS);
+    return {
+      arm: 'jubjub',
+      secretKey: Uint8Array.from(be32(scalar)),
+      publicKey: pointBytes(pointOf('jubjub', scalar)),
+    };
+  });
+  out['keys.json'] = { manifest: pin, vectors: [...keys, ...jubjubKeys] };
 
   /** @type {Record<string, string>} */
   const texts = {};

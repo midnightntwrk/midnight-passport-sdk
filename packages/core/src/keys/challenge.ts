@@ -4,6 +4,7 @@ import {
   K256_CONNECTOR_PREFIX,
 } from '@midnight-ntwrk/mn-passport-protocol';
 import type { ContractAddress } from '../seams/common.js';
+import type { JubjubChallenge } from '../seams/key-provider.js';
 
 export interface ShieldedCoin {
   readonly nonce: Uint8Array;
@@ -71,6 +72,9 @@ export interface DeviceChallenge {
   readonly authNonce: bigint;
 }
 
+export const JUBJUB_ORDER = 0xe7db4ea6533afa906673b0101343b00a6682093ccc81082d0970e5ed6f72cb7n;
+// About 1 try in 18 passes, so 2^16 tries all fail with a chance below 2^-5000.
+const GRIND_LIMIT = 1n << 16n;
 const FIELD_MODULUS = 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001n;
 // Every tag and prefix is ASCII. The ES2022 lib has no TextEncoder.
 export const ascii = (text: string): Uint8Array =>
@@ -178,28 +182,60 @@ function tagHash(tag: string): Uint8Array {
   return sha256(padded);
 }
 
+export const littleEndian = (data: Uint8Array): bigint =>
+  data.reduceRight((value, byte) => (value << 8n) | BigInt(byte), 0n);
+export const bigEndian = (data: Uint8Array): bigint =>
+  data.reduce((value, byte) => (value << 8n) | BigInt(byte), 0n);
+/** A value below 2^256 as 32 bytes, big-endian. */
+export const be32 = (value: bigint): Uint8Array =>
+  Uint8Array.from({ length: 32 }, (_, i) => Number((value >> BigInt(8 * (31 - i))) & 0xffn));
+
 /**
  * The challenge of `<operation>_with_<arm>` for the pinned account contract. A value out of its
- * contract range throws `RangeError`.
+ * contract range throws `RangeError`. JubJub gives a challenge that the signer binds to R.
  */
+export function deviceChallenge<K extends DeviceOperation>(
+  arm: 'jubjub',
+  operation: K,
+  args: DeviceOperationArgs[K],
+  context: ChallengeContext,
+): JubjubChallenge;
 export function deviceChallenge<K extends DeviceOperation>(
   arm: 'k256' | 'p256',
   operation: K,
   args: DeviceOperationArgs[K],
   context: ChallengeContext,
-): DeviceChallenge {
+): DeviceChallenge;
+export function deviceChallenge<K extends DeviceOperation>(
+  arm: 'jubjub' | 'k256' | 'p256',
+  operation: K,
+  args: DeviceOperationArgs[K],
+  context: ChallengeContext,
+): DeviceChallenge | JubjubChallenge {
   // A plain JS caller can pass any string, and `toString` is on every object.
   if (!Object.hasOwn(DEVICE_AUTH_TAG_PREFIXES, arm)) throw new RangeError(`Unknown arm ${arm}.`);
   if (!Object.hasOwn(ENCODERS, operation)) throw new RangeError(`Unknown operation ${operation}.`);
   const encode: (a: DeviceOperationArgs[K]) => Uint8Array[] = ENCODERS[operation];
-  const bytesOut = hash([
+  const { authNonce } = context;
+  const head = [
     tagHash(DEVICE_AUTH_TAG_PREFIXES[arm] + operation),
     address(context.address, 'address'),
-    ...point(context.publicKey, 'publicKey'),
-    ...encode(args),
-    uint(context.authNonce, 64, 'authNonce'),
-  ]);
-  return { bytes: bytesOut, authNonce: context.authNonce };
+  ];
+  const publicKey = point(context.publicKey, 'publicKey');
+  const tail = [...encode(args), uint(authNonce, 64, 'authNonce')];
+  if (arm !== 'jubjub') return { bytes: hash([...head, ...publicKey, ...tail]), authNonce };
+  return {
+    authNonce,
+    bind(commitment) {
+      const r = point(commitment, 'commitment');
+      // The circuit casts `c` to a JubJub scalar, which is canonical only below the order.
+      for (let grindNonce = 0n; grindNonce < GRIND_LIMIT; grindNonce++) {
+        const bytes = hash([...head, ...r, ...publicKey, ...tail, uint(grindNonce, 64, 'grind')]);
+        if (littleEndian(bytes) < JUBJUB_ORDER) return { bytes, grindNonce };
+      }
+      throw new Error('No grind nonce gives a challenge below the JubJub order.');
+    },
+  };
 }
 
 /** Envelope 0 signs `SHA-256(c)`. Envelope 1, the connector's `signData`, signs `SHA-256(prefix ‖ c)`. */
