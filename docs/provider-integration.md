@@ -309,7 +309,7 @@ DUST, so this route matters for funds in the ACC.
 1. **The activation guard.** _Closed 2026/10/19._ A dApp never onboards a user,
    so no dApp drives the WaaS key (realignment open question 15).
 2. **The WaaS key scheme.** Does the provider enroll on k256 with envelope 0,
-   or on p256 within the `wa-json134` profile (realignment open question 11)?
+   or on p256 within the `wa-json134-or-chrome243` profile (realignment open question 11)?
 3. **The viewing key.** Is the WaaS metadata its route, or is a different
    route better (realignment open question 4)?
 4. **The metadata schema.** The namespace names, the version format, and the

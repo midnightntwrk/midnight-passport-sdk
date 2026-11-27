@@ -1,0 +1,45 @@
+{
+  "manifest": "f39ce43bae73be5b82b3be7ba9aeefad90fe43668bc5a0aa01067f4d8a32a005",
+  "vectors": [
+    {
+      "arm": "k256",
+      "secretKey": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "publicKey": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8"
+    },
+    {
+      "arm": "k256",
+      "secretKey": "0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140",
+      "publicKey": "0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798b7c52588d95c3b9aa25b0403f1eef75702e84bb7597aabe663b82f6f04ef2777"
+    },
+    {
+      "arm": "k256",
+      "secretKey": "0x76f4fefc3461d1e763fb02fb9915ffa9b4f3ca09d8ea23df5d840f5604a72f52",
+      "publicKey": "0xdd73c5023be05c55316b368ffdad0efc7cb7445b0e8be325d7b8284a0bb17534e19e4ffbde220da6ee182d5bf87d3d445421d0b7bce7c02f19aa6e3ae78b948e"
+    },
+    {
+      "arm": "k256",
+      "secretKey": "0x1ccbf2470ba973642d7c2ad78faf54dd397c6102325476a8eeac672e941a1a6e",
+      "publicKey": "0xdef7f80ccc86e0be0ca95fa1d4ba4df96bf3f39c1ec4c87aaa5a77c46a8a324866c6fd560ee5149ba614340cb7033e435ed09c1ed99986856f24e007bcc8b156"
+    },
+    {
+      "arm": "p256",
+      "secretKey": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "publicKey": "0x6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c2964fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5"
+    },
+    {
+      "arm": "p256",
+      "secretKey": "0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632550",
+      "publicKey": "0x6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296b01cbd1c01e58065711814b583f061e9d431cca994cea1313449bf97c840ae0a"
+    },
+    {
+      "arm": "p256",
+      "secretKey": "0x10d3f61044ddd1f50c0900720723b3f7a34b8afac6ff382f69cfa427e0651f8c",
+      "publicKey": "0x54c7808a27894890e19466a505c4e98e162c9d9fb26bb7ffd7d09817519bcd81000dd949ebe3481ad581516b1bce5ccf8e40aa630345cc46564fb8ce87d1e469"
+    },
+    {
+      "arm": "p256",
+      "secretKey": "0x23c12c3509c7b108ef2b24d865274d8d03095725f837bdc903dbd948214a3633",
+      "publicKey": "0xc9d999ca923a4cd1f6f944fe192009e6242da68428583fb8f3835f295784757da8577d39cae82435194e63f254ae643f87cd4456070d3bd9bf83c0b775689d0d"
+    }
+  ]
+}

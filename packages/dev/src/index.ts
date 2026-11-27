@@ -34,3 +34,8 @@ export {
   accountMetadataContract,
   type AccountMetadataHarness,
 } from './contracts/account-metadata.js';
+export {
+  createSoftwareP256Provider,
+  type SoftwareP256Options,
+  type SoftwareP256Provider,
+} from './keys/p256.js';

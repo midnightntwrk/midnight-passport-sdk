@@ -1,0 +1,89 @@
+{
+  "manifest": "f39ce43bae73be5b82b3be7ba9aeefad90fe43668bc5a0aa01067f4d8a32a005",
+  "vectors": [
+    {
+      "challenge": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "origin": "https://passport.test",
+      "base64": "0x41414141414141414141414141414141414141414141414141414141414141414141414141414141414141",
+      "clientDataHash": "0xd74a81b73599e43d72df022bf987b14afa0b80bb7c0925feb3c278ae9b854f5d",
+      "greaseHash": "0xee9c5b58c429c9f553e9237989f8f5a82e415659851b2274b604b0e3a828d95b"
+    },
+    {
+      "challenge": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "origin": "!(u$]#ye/ZUcTB&@v3wS2",
+      "base64": "0x41414141414141414141414141414141414141414141414141414141414141414141414141414141414141",
+      "clientDataHash": "0x26662d01afe897d1a35bdc5150ce34b72a36cbc4782dab5905308676a0e9c574",
+      "greaseHash": "0x474699df62b72de67e85f2beea636d489fa6283ff0f41ed61d4e07035b186cd2"
+    },
+    {
+      "challenge": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "origin": "https://passport.test",
+      "base64": "0x5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f38",
+      "clientDataHash": "0xdc1d9dd834a9a8537884dfb4d5218d454c44ffb329819c4bf6e0f8b46614d130",
+      "greaseHash": "0xe6234c8b10dd71c971875e4ff7ab1361ad2bd001e430d936f04a9cd5b8a15f04"
+    },
+    {
+      "challenge": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "origin": "!(u$]#ye/ZUcTB&@v3wS2",
+      "base64": "0x5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f38",
+      "clientDataHash": "0x9ec2a7a0374152c94f244f7065bbd93b93ee62827bafd9474283858b4bf928ee",
+      "greaseHash": "0x3f8fc78411bbd109b6d07f68b1d8014235dfc14ec2b008c15b5f955a0af767a0"
+    },
+    {
+      "challenge": "0xaf458e4494cb35673aed8ed9a6e0f6ce7155efb8125c6012bef21d80580c478c",
+      "origin": "https://passport.test",
+      "base64": "0x7230574f524a544c4e5763363759375a707544327a6e46563737675358474153767649646746674d523477",
+      "clientDataHash": "0xb0796ccfe2a58521a3f52aa40954d8f105225a037757228c0538590b1fcbdde9",
+      "greaseHash": "0x55d085c4c96d609ebd0811528d41eaebf55a7f88d7b0a08a89e8e27f343dc234"
+    },
+    {
+      "challenge": "0xaf458e4494cb35673aed8ed9a6e0f6ce7155efb8125c6012bef21d80580c478c",
+      "origin": "!(u$]#ye/ZUcTB&@v3wS2",
+      "base64": "0x7230574f524a544c4e5763363759375a707544327a6e46563737675358474153767649646746674d523477",
+      "clientDataHash": "0x72e0c70adc82d1928882dfff2e706638bf3f2ced55970186571ce38f0c8043df",
+      "greaseHash": "0x08fd793013e5067cb9c991915e68f9b26875906c4651da80de957c20a1275a1b"
+    },
+    {
+      "challenge": "0x8482a1b51c5b015f2f9b5242d6fb610fd7bb5ea345e330938a6a0322998a894d",
+      "origin": "https://passport.test",
+      "base64": "0x68494b6874527862415638766d314a43317674684439653758714e46347a4354696d6f4449706d4b695530",
+      "clientDataHash": "0x040381f2f07d42b08d97580730ad8eb3f94d53543d412a66077b767b51ff3f62",
+      "greaseHash": "0xcb8e7b233b7653f463cd20bdeb56b5cc8c64332008e0a8869922061e47fb0f0f"
+    },
+    {
+      "challenge": "0x8482a1b51c5b015f2f9b5242d6fb610fd7bb5ea345e330938a6a0322998a894d",
+      "origin": "!(u$]#ye/ZUcTB&@v3wS2",
+      "base64": "0x68494b6874527862415638766d314a43317674684439653758714e46347a4354696d6f4449706d4b695530",
+      "clientDataHash": "0x79cf873ab6fd57bd29eb00a520162200f8662dfb310a41959c3ac38cf5da5046",
+      "greaseHash": "0x3362da4eeb45700d7745d0b0276ca9e7e2eb4106fb0884ef07dc90044178c022"
+    },
+    {
+      "challenge": "0x96492caf6f9186a12d059f2d3a455d1eefcb2b60674f6d49779d6eb2e49db68f",
+      "origin": "https://passport.test",
+      "base64": "0x6c6b6b7372322d5268714574425a38744f6b566448755f4c4b32426e5432314a6435317573755364746f38",
+      "clientDataHash": "0x259d92fbbd1cc8be795b0c412c3fc5a39186a92680866127b9a7e84c6d1ef0dd",
+      "greaseHash": "0x155c8219ba8f9082a164429c226f97bc5699af8010b5bcd6455d29f2470ee192"
+    },
+    {
+      "challenge": "0x96492caf6f9186a12d059f2d3a455d1eefcb2b60674f6d49779d6eb2e49db68f",
+      "origin": "!(u$]#ye/ZUcTB&@v3wS2",
+      "base64": "0x6c6b6b7372322d5268714574425a38744f6b566448755f4c4b32426e5432314a6435317573755364746f38",
+      "clientDataHash": "0x76ecad28484cbe60a75067aa2518dac037dcb4fb8bb08e5451b877599bc1e0c3",
+      "greaseHash": "0xfeddd9257ec460f38ba02fb78574360afce8b455726a082bb3b2cd955594a1ad"
+    },
+    {
+      "challenge": "0xf4b8bab02e5d7ed9b0ef9a0491510744054d94b3ff129e511e643df772caadd7",
+      "origin": "https://passport.test",
+      "base64": "0x394c69367343356466746d7737356f456b5645485241564e6c4c505f45703552486d513939334c4b726463",
+      "clientDataHash": "0x311ffc0367832ebc874b87157908d861bfbc10e262dff665cc9191b5b25e53db",
+      "greaseHash": "0x54d11f4d454b7e508d1427a7be6588694449dee006e67beee11a8a64bbd5506c"
+    },
+    {
+      "challenge": "0xf4b8bab02e5d7ed9b0ef9a0491510744054d94b3ff129e511e643df772caadd7",
+      "origin": "!(u$]#ye/ZUcTB&@v3wS2",
+      "base64": "0x394c69367343356466746d7737356f456b5645485241564e6c4c505f45703552486d513939334c4b726463",
+      "clientDataHash": "0x00553260917207daf5a4704a89321e6f1529af307d27ca8b10c88949155a411d",
+      "greaseHash": "0x1d153259e48196c4ac09992c45d56f902deedec7697c53a457dd1c331b2ee502"
+    }
+  ]
+}

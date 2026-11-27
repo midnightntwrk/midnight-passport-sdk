@@ -102,10 +102,12 @@ async function generate(dir) {
   const rt = await import('@midnight-ntwrk/compact-runtime');
   /** @type {unknown} */
   const contract = await import(pathToFileURL(modulePath).href);
-  const { pureCircuits } =
-    /** @type {{ pureCircuits: Record<string, ((...args: unknown[]) => unknown) | undefined> }} */ (
+  const { pureCircuits, Contract } =
+    /** @type {{ pureCircuits: Record<string, ((...args: unknown[]) => unknown) | undefined>, Contract: new (witnesses: object) => { _webauthn_client_data_hash_chrome_grease_0(...args: unknown[]): unknown } }} */ (
       contract
     );
+  // The build exports no pure circuit for the GREASE hash, so the vector calls the contract's own.
+  const acc = new Contract({ held_coin: () => undefined });
   /** @param {string} name @param {unknown[]} args */
   const call = (name, ...args) => {
     const circuit = pureCircuits[name];
@@ -200,6 +202,39 @@ async function generate(dir) {
     }));
   });
   out['envelope.json'] = { manifest: pin, vectors: envelope };
+
+  // The circuit refuses an origin byte outside 33 to 126, a quote, or a backslash.
+  const originChars = [...Array(94).keys()].map((i) => i + 33).filter((b) => b !== 34 && b !== 92);
+  const origins = [
+    'https://passport.test',
+    String.fromCharCode(...randomBytes(21).map((b) => originChars[b % originChars.length] ?? 33)),
+  ];
+  const webauthn = [...MODES, 'random', 'random'].flatMap((mode) => {
+    const challenge = bytesOf(/** @type {Mode} */ (mode), 32);
+    return origins.map((origin) => ({
+      challenge,
+      origin,
+      base64: call('webauthn_challenge_base64', challenge),
+      clientDataHash: call('webauthn_client_data_hash', challenge, Buffer.from(origin, 'latin1')),
+      greaseHash: acc._webauthn_client_data_hash_chrome_grease_0(
+        challenge,
+        Buffer.from(origin, 'latin1'),
+      ),
+    }));
+  });
+  out['webauthn.json'] = { manifest: pin, vectors: webauthn };
+
+  const keys = arms.flatMap(([arm, order]) =>
+    MODES.map((mode) => {
+      const scalar = scalarOf(mode, order);
+      return {
+        arm,
+        secretKey: Uint8Array.from(be32(scalar)),
+        publicKey: pointBytes(pointOf(arm, scalar)),
+      };
+    }),
+  );
+  out['keys.json'] = { manifest: pin, vectors: keys };
 
   /** @type {Record<string, string>} */
   const texts = {};

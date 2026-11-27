@@ -1,41 +1,19 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync } from 'node:fs';
 import { deviceChallenge, envelopeDigest } from '@midnight-ntwrk/mn-passport-core';
-import { ACC_MANIFEST_SHA256 } from '@midnight-ntwrk/mn-passport-contract';
+import { hex, isRecord, loadVectors } from './vectors.js';
 
-const revive = (_key: string, value: unknown): unknown => {
-  if (typeof value !== 'string') return value;
-  if (value.startsWith('0x')) return Uint8Array.from(Buffer.from(value.slice(2), 'hex'));
-  if (/^\d+n$/.test(value)) return BigInt(value.slice(0, -1));
-  return value;
-};
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-// The JSON is untyped. The builders check each value at run time, so the tests call them untyped.
-function load(name: string): { manifest: unknown; vectors: Record<string, unknown>[] } {
-  const url = new URL(`../generated/acc-vectors/${name}`, import.meta.url);
-  const file: unknown = JSON.parse(readFileSync(url, 'utf8'), revive);
-  assert.ok(isRecord(file) && Array.isArray(file.vectors) && file.vectors.every(isRecord));
-  return { manifest: file.manifest, vectors: file.vectors };
-}
-
-const hex = (bytes: unknown): string => {
-  assert.ok(bytes instanceof Uint8Array);
-  return Buffer.from(bytes).toString('hex');
-};
+test('every vector file comes from the pinned artifact', () => {
+  const files = readdirSync(new URL('../generated/acc-vectors/', import.meta.url));
+  assert.ok(files.length > 0);
+  for (const name of files) loadVectors(name);
+});
 
 for (const arm of ['k256', 'p256'] as const) {
   describe(`the ${arm} challenges`, () => {
-    const { manifest, vectors } = load(`${arm}.json`);
-
-    test('come from the pinned artifact', () => {
-      assert.equal(manifest, ACC_MANIFEST_SHA256, 'run `pnpm vectors <managed-dir>` again');
-    });
-
     test('match the pure circuit on each vector', () => {
+      const vectors = loadVectors(`${arm}.json`);
       const name = (v: Record<string, unknown>) => `${String(v.operation)} (${String(v.mode)})`;
       assert.equal(
         new Set(vectors.map(name)).size,
@@ -57,9 +35,7 @@ for (const arm of ['k256', 'p256'] as const) {
 }
 
 test('the envelope digest matches the pure circuit for both envelopes', () => {
-  const { manifest, vectors } = load('envelope.json');
-  assert.equal(manifest, ACC_MANIFEST_SHA256);
-  for (const v of vectors) {
+  for (const v of loadVectors('envelope.json')) {
     const digest: unknown = Reflect.apply(envelopeDigest, undefined, [v.envelope, v.challenge]);
     assert.equal(hex(digest), hex(v.digest));
   }

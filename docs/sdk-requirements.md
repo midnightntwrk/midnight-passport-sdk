@@ -76,7 +76,7 @@ The SDK must supply these key providers:
 | Key provider | Scheme | Usual registration |
 |---|---|---|
 | Passkey | JubJub, from the PRF output of the passkey | Device |
-| Passkey on secp256r1 | p256, `wa-json134` WebAuthn profile only | Device or grant |
+| Passkey on secp256r1 | p256, `wa-json134-or-chrome243` WebAuthn profile only | Device or grant |
 | Embedded wallet of a WaaS provider | k256, envelope 0 | Device: an optional backup owner key |
 | Midnight connector wallet | k256, envelope 1 (`signData` with `ecdsa_secp256k1_sha256`) | Device, or a read-only grant |
 | dApp per-origin key | JubJub, k256 (envelope 0), or p256 | Grant |
@@ -85,8 +85,9 @@ The SDK must supply these key providers:
 [`architecture.md`](./architecture.md) owns the interface and the package of
 each key provider (section "Key providers"). These rules apply:
 
-- **One p256 profile.** The `clientDataJSON` is exactly 134 bytes in a fixed
-  field order, with a 21-byte origin.
+- **One p256 profile.** The `clientDataJSON` has a fixed field order and a
+  21-byte origin. It is exactly 134 bytes, or 243 bytes when Chrome adds its
+  GREASE member. The ACC accepts these two shapes only.
 - **The WaaS key enrolls from a signature**: the provider has no call to read
   the public key. The SDK enrolls it from a signature over a known digest.
 - **One envelope for each k256 key.** The envelope does not change after
@@ -620,7 +621,7 @@ The `conformance` lens checks these rules. The sections above give the detail.
    sign-in MIP (realignment open question 1)?
 8. **The viewing key.** How does it get to OWS and to dApps with read grants
    (realignment open question 4)?
-9. **The WaaS key scheme.** k256 envelope 0, or p256 within `wa-json134`
+9. **The WaaS key scheme.** k256 envelope 0, or p256 within `wa-json134-or-chrome243`
    (realignment open question 11)?
 10. **The recipient encryption key.** Must the signed challenge cover it
     (realignment open question 9)?
