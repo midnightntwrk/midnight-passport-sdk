@@ -62,3 +62,21 @@ export class AccountStateError extends Error {
     super('The account state bytes cannot be read.', options);
   }
 }
+
+/** No known build has every verifier key that the account has. */
+export class UnknownBindingError extends Error {
+  readonly _tag = 'UnknownBindingError';
+  readonly code = 'BINDING_UNKNOWN';
+  constructor() {
+    super('The account matches no known ACC build.');
+  }
+}
+
+/** More than one known build has every verifier key that the account has. */
+export class AmbiguousBindingError extends Error {
+  readonly _tag = 'AmbiguousBindingError';
+  readonly code = 'BINDING_AMBIGUOUS';
+  constructor(readonly manifestHashes: readonly string[]) {
+    super(`The account matches ${String(manifestHashes.length)} ACC builds.`);
+  }
+}

@@ -1,6 +1,6 @@
 # Compatibility matrix
 
-> **Status:** live · updated 2026/11/20
+> **Status:** live · updated 2026/11/24
 > **Owns:** the two version axes of the SDK, and the toolchain that each
 > binding uses.
 > **Maintained by:** `mn-passport-skills:deps`. A row changes only through a
@@ -26,9 +26,20 @@
 
 ## Binding axis
 
-| SDK | ACC binding | Compact CLI | Compiler | Manifest hash | Origin length | Language | Runtime (`@midnight-ntwrk/compact-runtime`) | Status |
-|---|---|---|---|---|---|---|---|---|
-| dev (unreleased) | passport `6497e22` | — | 0.36.1 | `f39ce43b…` | 21 | 0.28.0 | 0.21.0 | Provisional. Built with compactf-0.36.1, which alone reproduces `--check` (ADR 0004). |
+<!-- Generated from BINDINGS. After a build, run: node packages/contract/dist-test/binding-rows.js -->
+| SDK | ACC binding | Compact CLI | Compiler | Manifest hash | Origin length | Language | Runtime (`@midnight-ntwrk/compact-runtime`) | zkir | Status |
+|---|---|---|---|---|---|---|---|---|---|
+| dev (unreleased) | passport `6497e22` | — | 0.36.1 | `f39ce43b…` | 21 | 0.28.0 | 0.21.0 | zkir-3.2.1 (7a51b3385bbf) | current |
+<!-- End of the generated rows. -->
+
+`BINDINGS` in `mn-passport-contract` owns these rows, and a test fails when
+this table is stale. `Status` is `current` for new accounts, `supported` for
+older builds, or `unsupported`. `identifyBinding` gives the status, and it
+rejects an account that matches no row or more than one row. Nothing checks
+the status before a call yet.
+
+The binding `6497e22` is provisional. It is built with compactf-0.36.1, which
+alone reproduces `--check` (ADR 0004).
 
 The `Compiler`, `Manifest hash`, and `Origin length` columns are the three
 fields of `BindingVersion` (`mn-passport-contract`). The manifest hash commits
