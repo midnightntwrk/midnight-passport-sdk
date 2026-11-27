@@ -1,4 +1,7 @@
 import { Effect } from 'effect';
+import type { Contract } from '@midnight-ntwrk/compact-js';
+import type { VerifierKey } from '@midnight-ntwrk/midnight-js/types';
+import type { AccCallInput } from './acc-call.js';
 import { UpstreamError } from './upstream-error.js';
 
 // The foundation has no platform types, so `AbortSignal` is not in scope.
@@ -105,3 +108,60 @@ export const fromPromise = <A>(
     Effect.tryPromise({ try: (signal: AbortSignalLike) => run(signal), catch: (reason) => reason }),
     failed,
   );
+
+// The ACC keeps no private state.
+type Acc = Contract<undefined>;
+
+/** Builds the call from the given state only, with no check of the circuits. */
+export const unprovenAccCall = (input: AccCallInput): Effect.Effect<Uint8Array, UpstreamError> =>
+  fromPromise(async () => {
+    const [{ CompiledContract }, { createUnprovenCallTxFromInitialStates }, types] =
+      await Promise.all([
+        import('@midnight-ntwrk/compact-js'),
+        import('@midnight-ntwrk/midnight-js/contracts'),
+        import('@midnight-ntwrk/midnight-js/types'),
+      ]);
+    class ArtifactKeys extends types.ZKConfigProvider<string> {
+      // midnight-js 5.0.1 reads no key here. A later version gets only keys that match the pin.
+      override async getVerifierKey(circuit: string): Promise<VerifierKey> {
+        return types.createVerifierKey(await input.artifact.read(`keys/${circuit}.verifier`));
+      }
+      override getZKIR(): Promise<never> {
+        return Promise.reject(new Error('A call build reads no ZKIR.'));
+      }
+      override getProverKey(): Promise<never> {
+        return Promise.reject(new Error('A call build reads no proving key.'));
+      }
+      override getArtifactRuntimeVersion(): Promise<string> {
+        return Promise.resolve(input.artifact.manifest.toolchain.runtime);
+      }
+    }
+    // The pin covers the module, but its generated types never reach the SDK, so no check can prove
+    // these two casts.
+    const ctor = input.contract as Parameters<typeof CompiledContract.make<Acc>>[1];
+    const compiled = CompiledContract.make('account', ctor).pipe(
+      CompiledContract.withWitnesses(input.witnesses as Contract.Witnesses<Acc>),
+      // The type asks for a path, but no code on this path reads it.
+      CompiledContract.withCompiledFileAssets(''),
+    );
+    // TODO: replace with findDeployedContract once #138 is fixed.
+    const call = await createUnprovenCallTxFromInitialStates(
+      new ArtifactKeys(),
+      {
+        compiledContract: compiled,
+        circuitId: input.circuit,
+        contractAddress: input.state.address,
+        coinPublicKey: input.coinPublicKey,
+        initialContractState: types.SerializedContractState.fromBytes('v9', input.state.bytes),
+        initialZswapChainState: types.SerializedZswapChainState.fromBytes(
+          'v9',
+          input.zswapChainState,
+        ),
+        ledgerParameters: types.SerializedLedgerParameters.fromBytes('v9', input.ledgerParameters),
+        config: { networkId: input.networkId, ttlSeconds: input.ttlSeconds },
+        args: [...input.args],
+      },
+      input.encryptionPublicKey,
+    );
+    return call.private.unprovenTx.serialize();
+  });

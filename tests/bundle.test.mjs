@@ -30,15 +30,15 @@ const packed = (dir) => {
 for (const dir of BUNDLED) {
   test(`${dir} does not list effect, and ships only its bundle and types`, () => {
     const manifest =
-      /** @type {{ dependencies?: Record<string, string>, peerDependencies?: Record<string, string> }} */ (
+      /** @type {{ dependencies?: Record<string, string>, peerDependencies?: Record<string, string>, exports: Record<string, { default: string }> }} */ (
         parseJson(readFileSync(join(root, dir, 'package.json'), 'utf8'))
       );
     assert.equal(manifest.dependencies?.effect, undefined);
     assert.equal(manifest.peerDependencies?.effect, undefined);
+    const entries = Object.values(manifest.exports).map((e) => e.default.slice('./'.length));
     const files = packed(dir);
     assert.deepEqual(files.filter((f) => !/^dist\/.*\.d\.ts$/.test(f)).sort(), [
-      'dist/index.js',
-      'dist/index.js.map',
+      ...entries.sort().flatMap((e) => [e, `${e}.map`]),
       'package.json',
     ]);
     const entry = readFileSync(join(root, dir, 'dist/index.js'), 'utf8');
@@ -47,8 +47,20 @@ for (const dir of BUNDLED) {
     assert.doesNotMatch(entry, EFFECT_IMPORT);
     // Effect's license notice goes on a bundle exactly when it inlines Effect code.
     assert.equal(BANNER.test(entry), INLINED.test(entry), 'the license banner');
+    for (const file of entries.filter((e) => e !== 'dist/index.js')) {
+      const code = readFileSync(join(root, dir, file), 'utf8');
+      const relative = new Set(code.match(/\bfrom\s*["']\.\.?\/[^"']*/g));
+      assert.deepEqual(relative, new Set(['from "./index.js']), `${file}: imports`);
+      assert.doesNotMatch(code, EFFECT_IMPORT);
+      assert.equal(BANNER.test(code), INLINED.test(code), `${file}: the license banner`);
+    }
   });
 }
+
+test('the main core entry loads neither midnight-js nor compact-js', () => {
+  const entry = readFileSync(join(root, 'packages/core/dist/index.js'), 'utf8');
+  assert.doesNotMatch(entry, /["']@midnight-ntwrk\/(midnight-js|compact-js)[/"']/);
+});
 
 // No core export uses Effect yet, so the probe is what shows Effect 4 inlined.
 test(

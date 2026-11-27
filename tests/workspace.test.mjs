@@ -68,9 +68,10 @@ test('every dependency in every workspace manifest is exact-pinned', async () =>
 
 const packageDirs = (await readdir(new URL('../packages', import.meta.url))).sort();
 
-// The browser adapter also ships its bundler plugins. Every other package has one entry.
+// The browser adapter also ships its bundler plugins, and core keeps midnight-js out of its
+// main entry. Every other package has one entry.
 /** @type {Record<string, string[]>} */
-const SUBPATHS = { 'adapter-browser': ['esbuild', 'vite'] };
+const SUBPATHS = { 'adapter-browser': ['esbuild', 'vite'], core: ['chain'] };
 
 test('package shape', async () => {
   assert.ok(packageDirs.length > 0, 'packages/ must hold the scaffolded packages');

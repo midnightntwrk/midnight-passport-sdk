@@ -60,6 +60,7 @@ export const appBuild = {
   resolveDir: join(root, 'tests'),
   alias: {
     '@midnight-ntwrk/mn-passport-owner': join(root, 'packages/owner/dist/index.js'),
+    '@midnight-ntwrk/mn-passport-core/chain': join(root, 'packages/core/dist/chain.js'),
     '@midnight-ntwrk/mn-passport-adapter-browser': join(
       root,
       'packages/adapter-browser/dist/index.js',

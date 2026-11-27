@@ -55,15 +55,50 @@ function names(value: unknown, field: string): readonly string[] {
 
 const HEX_64 = /^[0-9a-f]{64}$/;
 
+// A frozen `Map` still takes `set`. The pins must not change after the load, also through a cast.
+class FrozenMap<K, V> implements ReadonlyMap<K, V> {
+  readonly #map: ReadonlyMap<K, V>;
+  constructor(map: ReadonlyMap<K, V>) {
+    this.#map = map;
+    Object.freeze(this);
+  }
+  get size(): number {
+    return this.#map.size;
+  }
+  get(key: K): V | undefined {
+    return this.#map.get(key);
+  }
+  has(key: K): boolean {
+    return this.#map.has(key);
+  }
+  forEach(callback: (value: V, key: K, map: ReadonlyMap<K, V>) => void, thisArg?: unknown): void {
+    this.#map.forEach((value, key) => {
+      callback.call(thisArg, value, key, this);
+    });
+  }
+  entries(): MapIterator<[K, V]> {
+    return this.#map.entries();
+  }
+  keys(): MapIterator<K> {
+    return this.#map.keys();
+  }
+  values(): MapIterator<V> {
+    return this.#map.values();
+  }
+  [Symbol.iterator](): MapIterator<[K, V]> {
+    return this.#map.entries();
+  }
+}
+
 function files(value: unknown): ReadonlyMap<string, AccFile> {
   const out = new Map<string, AccFile>();
   for (const [path, entry] of Object.entries(record(value, 'files'))) {
     const fields = record(entry, `files.${path}`);
     const sha256 = text(fields.sha256, `files.${path}.sha256`);
     if (!HEX_64.test(sha256)) throw new ArtifactManifestError(`files.${path}.sha256`);
-    out.set(path, { size: count(fields.size, `files.${path}.size`), sha256 });
+    out.set(path, Object.freeze({ size: count(fields.size, `files.${path}.size`), sha256 }));
   }
-  return out;
+  return new FrozenMap(out);
 }
 
 /** Rejects a manifest that does not have the shape of schema 1. */
