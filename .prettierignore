@@ -6,6 +6,8 @@ dist/
 dist-test/
 build/
 coverage/
+# The compiler writes this fixture; a format change would break its manifest hashes.
+tests/fixtures/counter/compiled/
 pnpm-lock.yaml
 *.md
 docs/
@@ -17,3 +19,4 @@ mn-passport-skills/
 /experiments/
 renovate.json
 CODEOWNERS
+packages/contract/generated/

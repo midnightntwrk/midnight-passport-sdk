@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { Kernel, SecretHandle } from '../dist/kernel/index.js';
-import { zeroize, withSecret, withSecretAsync } from '../dist/kernel/zeroize.js';
+import { zeroize, withSecret } from '../dist/kernel/zeroize.js';
 
 test('every kernel function that takes a secret buffer zeros it after use', async () => {
   const kernel = new Kernel();
@@ -41,21 +41,37 @@ test('every kernel function that takes a secret buffer zeros it after use', asyn
 
   {
     const buffer = Uint8Array.from([1, 2, 3, 4]);
-    const length = await withSecretAsync(buffer, async (secret) => secret.length);
-    assert.equal(length, 4);
+    const first = await withSecret(buffer, async (secret) => {
+      await Promise.resolve();
+      return secret[0];
+    });
+    assert.equal(first, 1, 'an async callback still reads the secret after an await');
     assert.deepEqual([...buffer], [0, 0, 0, 0]);
   }
 
   {
     const buffer = Uint8Array.from([1, 2, 3, 4]);
     await assert.rejects(
-      withSecretAsync(buffer, async () => {
+      withSecret(buffer, async () => {
         throw new Error('boom');
       }),
       /boom/,
     );
-    assert.deepEqual([...buffer], [0, 0, 0, 0], 'withSecretAsync zeros on a reject');
+    assert.deepEqual([...buffer], [0, 0, 0, 0], 'withSecret zeros on a reject');
   }
+
+  kernel.dispose();
+});
+
+test('the kept copy shares no memory with the caller buffer', () => {
+  const kernel = new Kernel();
+  // A Node.js Buffer, whose `slice` gives a view and not a copy.
+  const buffer = Buffer.from([1, 2, 3]);
+  const handle = kernel.holdSecret(buffer);
+  buffer.set([7, 8, 9]);
+
+  kernel.releaseSecret(handle);
+  assert.deepEqual([...buffer], [7, 8, 9], 'releaseSecret must not zero the caller buffer');
 
   kernel.dispose();
 });
@@ -65,7 +81,7 @@ test('releaseSecret invalidates the handle and rejects a stale handle', () => {
   const handle = kernel.holdSecret(Uint8Array.from([9, 9, 9, 9]));
 
   kernel.releaseSecret(handle);
-  assert.throws(() => kernel.releaseSecret(handle), /already released or was not issued/);
+  assert.throws(() => kernel.releaseSecret(handle), { code: 'UNKNOWN_HANDLE' });
 
   kernel.dispose();
 });
@@ -77,8 +93,8 @@ test('dispose invalidates every handle the kernel still holds', () => {
 
   kernel.dispose();
 
-  assert.throws(() => kernel.releaseSecret(first), /already released or was not issued/);
-  assert.throws(() => kernel.releaseSecret(second), /already released or was not issued/);
+  assert.throws(() => kernel.releaseSecret(first), { code: 'UNKNOWN_HANDLE' });
+  assert.throws(() => kernel.releaseSecret(second), { code: 'UNKNOWN_HANDLE' });
 });
 
 test('a secret handled by one kernel is unknown to another', () => {
@@ -86,7 +102,7 @@ test('a secret handled by one kernel is unknown to another', () => {
   const second = new Kernel();
   const handle = first.holdSecret(Uint8Array.from([3, 3, 3]));
 
-  assert.throws(() => second.releaseSecret(handle), /already released or was not issued/);
+  assert.throws(() => second.releaseSecret(handle), { code: 'UNKNOWN_HANDLE' });
 
   first.releaseSecret(handle);
   first.dispose();

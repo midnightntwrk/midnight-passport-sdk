@@ -1,0 +1,30 @@
+{
+  "source": "Built from the midnight-js 5.0.1 indexer schema and the recorded call inputs query, pinned to the recorded head. Not recorded from a live indexer.",
+  "request": {
+    "query": "query CONTRACT_STATE_QUERY($address: HexEncoded!, $offset: BlockOffset!) {\n  block(offset: $offset) { height hash }\n  contract(address: $address, offset: $offset) { state stateAt { height hash } }\n}",
+    "variables": {
+      "address": "abababababababababababababababababababababababababababababababab",
+      "offset": {
+        "hash": "dc12b44a0c030c441d68dcc0beeb1960721733ad2b8892474a991f74f51c2444"
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "data": {
+        "block": {
+          "height": 2935,
+          "hash": "dc12b44a0c030c441d68dcc0beeb1960721733ad2b8892474a991f74f51c2444"
+        },
+        "contract": {
+          "state": "000102a0ff",
+          "stateAt": {
+            "height": 1037,
+            "hash": "1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e"
+          }
+        }
+      }
+    }
+  }
+}

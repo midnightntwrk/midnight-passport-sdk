@@ -34,12 +34,20 @@ CHANGED=$(git diff -M --numstat "$BASE"...HEAD -- . "${EXCLUDES[@]}" \
 echo "Net changed lines vs $BASE (lockfiles/generated/fixtures/experiments excluded): $CHANGED"
 
 if [ "$CHANGED" -gt "$HARD" ]; then
-  MSG="Diff is $CHANGED lines — over the 600-line hard budget. Tranches must split (mn-passport-skills:pr-open); merging an exceptional PR (e.g. a migration) is a human decision."
-  if [ "$CI" = "--ci" ]; then
-    # Advisory in CI: the budget is loop discipline, not a merge gate.
-    echo "::warning::$MSG"
+  # Swap CR for a line end. A bare CR then starts a line, and a trailing CR
+  # stays out of the reason.
+  body=${PR_BODY:-}
+  body=${body//$'\r'/$'\n'}
+  override=$(grep -im1 -E '^[[:blank:]]*budget-override:[[:blank:]]*[^[:space:]]' <<<"$body" || true)
+  if [ -n "$override" ]; then
+    # The reason is the text after the token, with leading blanks removed.
+    reason=${override#*:}
+    reason=${reason#"${reason%%[![:blank:]]*}"}
+    MSG="Diff is $CHANGED lines, over the 600-line budget. Budget-override in effect: $reason"
+    if [ "$CI" = "--ci" ]; then echo "::warning::$MSG"; else echo "WARN: $MSG"; fi
   else
-    echo "HARD FAIL: $MSG"
+    MSG="Diff is $CHANGED lines, over the 600-line budget. Split it, or add a 'Budget-override: <reason>' line to the PR body."
+    if [ "$CI" = "--ci" ]; then echo "::error::$MSG"; else echo "FAIL: $MSG"; fi
     exit 1
   fi
 elif [ "$CHANGED" -gt "$SOFT" ]; then

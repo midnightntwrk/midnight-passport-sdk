@@ -1,0 +1,19 @@
+{
+  "source": "Recorded from a local network (indexer 4.4.101, node 2.1.101) on 2026/11/23. Each hex field is cut to its first 48 bytes.",
+  "request": {
+    "query": "query LEDGER_PARAMETERS_QUERY { block { height hash ledgerParameters } }",
+    "variables": {}
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "data": {
+        "block": {
+          "height": 2935,
+          "hash": "dc12b44a0c030c441d68dcc0beeb1960721733ad2b8892474a991f74f51c2444",
+          "ledgerParameters": "6d69646e696768743a6c65646765722d706172616d65746572735b76385d3ac64a0600008e0a8c0072618b007eed6000"
+        }
+      }
+    }
+  }
+}

@@ -14,8 +14,8 @@ and "provider-integration" name a section of those docs.
 
 ## Blocking checklist
 
-- **Plaintext secret outside the kernel** — the PRF output, the JubJub device
-  key, a WPP account or package key, or the viewing key passed to an adapter,
+- **Plaintext secret outside the kernel** — the PRF output, the maintenance
+  authority key, a WPP account or package key, or the viewing key passed to an adapter,
   dApp, agent, log line, error message, telemetry, or state projection, other
   than as "What leaves the kernel" allows (architecture, "The owner kernel
   invariant").
@@ -76,9 +76,8 @@ Procedure:
    - **Mitigations:** what reduces it today, and the trigger to revisit.
    ```
 
-3. Commit and push in the debts repo. This push is the workflow's one
-   **recorded exception** to the no-outward-actions rule — it is allowed
-   without stopping.
+3. Commit and push in the debts repo. The register lives only there, but
+   this push still stops for the user's allow, like every push.
 4. When later work resolves an entry, mark it **Resolved (date, PR)** in
    place — do not delete it.
 

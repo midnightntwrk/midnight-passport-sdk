@@ -1,0 +1,8 @@
+{
+  "version": 3,
+  "file": "index.js",
+  "sourceRoot": "../../../../../",
+  "sources": ["tests/fixtures/counter/counter.compact"],
+  "names": [],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;EAAA;;;;;;;;;;MAGA,AAAA,SAEC;;;;;;;;;;;;;;;;;;;;;;;OAAA;;;;GACA;EAND;;;;;;;;;;;;;;;;;;;;;;;;;;IAEA;;;;;;;;;yEAA6B;;;;;;;GAI5B;EAHD,AAAA,kBAEC;UADC,KAAK;IAAL;;;;;;;;;;6FAAA,KAAK;;;;wEAAA;;GACN;;;;;;;;;;;;;;;;IAHD;qCAAA;;;;;;;;;;;0GAA6B;KAAA;;;;;;;;;;;;;;;;"
+}

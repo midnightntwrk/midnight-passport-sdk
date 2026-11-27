@@ -37,6 +37,10 @@ stays. One ACC holds the device set, the grants, the name binding (for example
 **A device** has full authority. It can add and remove devices, issue and
 revoke grants, and spend. Only a device can issue a grant.
 
+**The maintenance authority** adds circuits to a live account. It can replace
+any verifier key, so it also has full control until it is retired. It is not a
+device. ADR 0014 gives its key source.
+
 **A grant** has scoped authority, with these limits:
 
 | Limit | Meaning |
@@ -75,8 +79,7 @@ The SDK must supply these key providers:
 
 | Key provider | Scheme | Usual registration |
 |---|---|---|
-| Passkey | JubJub, from the PRF output of the passkey | Device |
-| Passkey on secp256r1 | p256, `wa-json134` WebAuthn profile only | Device or grant |
+| Passkey on secp256r1 | p256, `wa-json134-or-chrome243` WebAuthn profile only | Device or grant |
 | Embedded wallet of a WaaS provider | k256, envelope 0 | Device: an optional backup owner key |
 | Midnight connector wallet | k256, envelope 1 (`signData` with `ecdsa_secp256k1_sha256`) | Device, or a read-only grant |
 | dApp per-origin key | JubJub, k256 (envelope 0), or p256 | Grant |
@@ -85,8 +88,9 @@ The SDK must supply these key providers:
 [`architecture.md`](./architecture.md) owns the interface and the package of
 each key provider (section "Key providers"). These rules apply:
 
-- **One p256 profile.** The `clientDataJSON` is exactly 134 bytes in a fixed
-  field order, with a 21-byte origin.
+- **One p256 profile.** The `clientDataJSON` has a fixed field order and a
+  21-byte origin. It is exactly 134 bytes, or 243 bytes when Chrome adds its
+  GREASE member. The ACC accepts these two shapes only.
 - **The WaaS key enrolls from a signature**: the provider has no call to read
   the public key. The SDK enrolls it from a signature over a known digest.
 - **One envelope for each k256 key.** The envelope does not change after
@@ -130,18 +134,19 @@ call. The exception is a grant key that is itself a passkey on the origin of
 the dApp.
 
 Each passkey signature in the Passport app also needs a tap, so no process can
-make a device signature without the user. On the JubJub arm, the kernel of
-`owner` derives the device key and the WPP account key from the PRF output, for
-one operation only. On the p256 arm, the key stays in the authenticator.
+make a device signature without the user. The passkey key stays in the
+authenticator. The kernel of `owner` reads the passkey PRF output only to wrap
+and open the maintenance authority key and the viewing key. This use is
+provisional ([ADR 0014](./adr/0014-account-secrets-and-deploy-inputs.md)).
 [`architecture.md`](./architecture.md) owns the kernel invariant.
 
 **Recovery taps.** Recovery operations are not calls, so each one gets its own
 tap: a recovery session, each share that a guardian gives, a cancel, and the
 display of a paper key (section "Recovery").
 
-**A device without PRF.** The JubJub arm and the WPP keys need the PRF
-extension. The p256 arm gives a device without PRF, but WPP still needs a
-secret. Open question 1 asks if a password fallback stays.
+**A passkey without PRF.** It can sign as a p256 device. It cannot make or open
+a PRF wrap, so account creation stops with a typed error for now. The source of
+the WPP account key is open.
 
 ## Proving and fees
 
@@ -166,16 +171,19 @@ each dApp circuit. Encryption of the proving input to an enclave becomes
 mandatory when a trusted-hardware prover exists. The SDK does not do remote
 attestation.
 
-**No proofs in the tab in V1.** The ACC circuits are at k=15 to 17, with
-proving keys of 112 to 224 MB. The zkir WASM package has no key generation.
+**No proofs in the tab in V1.** The ACC circuits are at k=15 to 17. The p256
+circuits have proving keys of 470 to 495 MB. The zkir WASM package has no key
+generation.
 
 ### Fees and broadcast
 
 - **No user-held DUST.** No SDK path can assume that the user holds DUST.
 - **Broadcast.** The client gives the proven transaction to the sponsor, which
-  pays the fees and broadcasts it. The client monitors it until it is final.
-- **Bounded waits.** The broadcast client uses bounded waits, and submits again
-  when a transaction does not arrive.
+  pays the fees and returns the paid transaction. The client submits it to a
+  node, and monitors it until it is final.
+- **Bounded waits.** The broadcast client uses bounded waits. After a refusal,
+  or when a transaction does not arrive before its payment expires, it gets a
+  new payment. It never submits paid bytes again after a refusal.
 - **Onboarding.** A sponsor pays the fees of account creation and the opening
   balance.
 
@@ -198,7 +206,8 @@ Each service is replaceable behind a seam.
 | Process | Service | What it can see or do |
 |---|---|---|
 | Proving | The prover | The private inputs of each proof, for example the coin and the amount |
-| Fees and broadcast | The sponsor | The proven transaction |
+| Fees | The sponsor | The proven transaction |
+| Broadcast | A node | The paid transaction |
 | Fee swaps | The Capacity Exchange | The amount class and the payment token of a quote |
 | Backup owner key (optional) | The WaaS provider | It holds a full-authority key, isolated to the Passport app. It reads the public account metadata. |
 | Private-data storage | WPP storage | Ciphertext only |
@@ -233,7 +242,7 @@ partly deployed account, and a client checks only the circuits that it calls.
 
 **Recognition.** `owner` recognizes an account from the passkey and its
 largeBlob. The largeBlob is a cache, never the source of truth: a hit is checked
-against the chain. The RP ID, the PRF salt, and the largeBlob schema come from
+against the chain. The RP ID, the PRF inputs, and the largeBlob schema come from
 `mn-passport-protocol`.
 
 ### From a dApp
@@ -374,7 +383,7 @@ server.
 **Execution.** The library gets the artifacts of a dApp from a registry, by
 content hash. It makes the verifier key again from the ZKIR and compares it
 with the key on chain. Then it runs the circuit. OWS signs, the prover proves,
-and the sponsor broadcasts, with the Passport app closed. In V1, the agent
+and the sponsor pays, with the Passport app closed. In V1, the agent
 verifies the client code against a hash that the dApp publishes.
 
 ## Private data
@@ -419,8 +428,8 @@ without Passport, and its witness code does not change.
 |---|---|---|
 | The private state of a dApp | Irreplaceable | WPP |
 | The coin store of the ACC | Passport can make it again with the viewing key | Local cache only |
-| Viewing key, ACC address, grant references | Small, rarely changed | WPP metadata, the passkey largeBlob, or the WaaS metadata (keys never in readable form) |
-| Device keys | Passport can make them again from the passkey | Not stored |
+| Viewing key, ACC address, grant references | Small, rarely changed | On the device, the viewing key and the maintenance authority key only as PRF wraps. A store that survives a wipe is open: WPP metadata, the passkey largeBlob, the WaaS metadata, or the chain (keys never in readable form) |
+| Device keys | Stay in the authenticator | Not stored |
 
 WPP storage uses a folder that the user can see (the `drive.file` scope). A
 hidden `appDataFolder` is only a cache. When two histories conflict, WPP keeps
@@ -600,14 +609,14 @@ The `conformance` lens checks these rules. The sections above give the detail.
 
 ## Open questions
 
-1. **Password fallback (decision D).** On a device without PRF, does the
-   ceremony use a password with a key-derivation function? This is open.
+1. **Password fallback (decision D).** _Closed 2026/11/20._ No password: the
+   user never keeps a secret (ADR 0014).
 2. **The activation guard.** _Closed 2026/10/19._ A dApp never onboards a user,
    so no dApp drives an owner key (realignment open question 15).
 3. **Agents and private data.** Can an agent backend get the private data of a
    dApp (realignment open question 3)?
-4. **DID keys in V1.** Is the DID controller key derived from the PRF output, or
-   kept in WPP? Where does its recovery key go (realignment open question 12)?
+4. **DID keys in V1.** Where does the DID controller key come from, now that no
+   passkey derives a device key? Is it kept in WPP? Where does its recovery key go (realignment open question 12)?
 5. **One signing primitive.** Is a separate JubJub DID key acceptable until the
    ACC controls the DID (realignment open questions 12 and 14)?
 6. **Ethereum-style wallets.** A new EIP-191 envelope, or a provider wallet
@@ -616,7 +625,7 @@ The `conformance` lens checks these rules. The sections above give the detail.
    sign-in MIP (realignment open question 1)?
 8. **The viewing key.** How does it get to OWS and to dApps with read grants
    (realignment open question 4)?
-9. **The WaaS key scheme.** k256 envelope 0, or p256 within `wa-json134`
+9. **The WaaS key scheme.** k256 envelope 0, or p256 within `wa-json134-or-chrome243`
    (realignment open question 11)?
 10. **The recipient encryption key.** Must the signed challenge cover it
     (realignment open question 9)?

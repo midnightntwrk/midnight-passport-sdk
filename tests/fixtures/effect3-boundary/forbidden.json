@@ -1,0 +1,141 @@
+[
+  {
+    "label": "an @effect package",
+    "path": "packages/core/src/x.ts",
+    "source": "import { HttpClient } from '@effect/platform';",
+    "found": ["\"@effect/platform\" is Effect 3; import it only in the adapter file"]
+  },
+  {
+    "label": "compact-js",
+    "path": "packages/core/src/x.ts",
+    "source": "import { CompiledContract } from '@midnight-ntwrk/compact-js';",
+    "found": ["\"@midnight-ntwrk/compact-js\" is Effect 3; import it only in the adapter file"]
+  },
+  {
+    "label": "a compact-js subpath",
+    "path": "packages/core/src/x.ts",
+    "source": "import * as E from '@midnight-ntwrk/compact-js/effect';",
+    "found": [
+      "\"@midnight-ntwrk/compact-js/effect\" is Effect 3; import it only in the adapter file"
+    ]
+  },
+  {
+    "label": "platform-js",
+    "path": "packages/core/src/x.ts",
+    "source": "import type { Hex } from '@midnight-ntwrk/platform-js';",
+    "found": ["\"@midnight-ntwrk/platform-js\" is Effect 3; import it only in the adapter file"]
+  },
+  {
+    "label": "an inner midnight-js package",
+    "path": "packages/core/src/x.ts",
+    "source": "import { deployContract } from '@midnight-ntwrk/midnight-js-contracts';",
+    "found": [
+      "\"@midnight-ntwrk/midnight-js-contracts\" is Effect 3; import it only in the adapter file"
+    ]
+  },
+  {
+    "label": "a named Effect 3 value",
+    "path": "packages/core/src/x.ts",
+    "source": "import { asEffectOption } from '@midnight-ntwrk/midnight-js/types';",
+    "found": ["\"asEffectOption\" from \"@midnight-ntwrk/midnight-js/types\" has an Effect 3 type"]
+  },
+  {
+    "label": "a whole module",
+    "path": "packages/core/src/x.ts",
+    "source": "import * as types from '@midnight-ntwrk/midnight-js/types';",
+    "found": [
+      "import named values from \"@midnight-ntwrk/midnight-js/types\", not the whole module"
+    ]
+  },
+  {
+    "label": "a re-export",
+    "path": "packages/core/src/x.ts",
+    "source": "export { types } from '@midnight-ntwrk/midnight-js';",
+    "found": ["\"types\" from \"@midnight-ntwrk/midnight-js\" has an Effect 3 type"]
+  },
+  {
+    "label": "a dynamic import",
+    "path": "packages/core/src/x.ts",
+    "source": "await import('@midnight-ntwrk/compact-js');",
+    "found": ["\"@midnight-ntwrk/compact-js\" is Effect 3; import it only in the adapter file"]
+  },
+  {
+    "label": "effect outside core",
+    "path": "packages/connect/src/x.ts",
+    "source": "import { Effect } from 'effect';",
+    "found": ["only core may import \"effect\""]
+  },
+  {
+    "label": "a default import",
+    "path": "packages/core/src/x.ts",
+    "source": "import types from '@midnight-ntwrk/midnight-js/types';",
+    "found": [
+      "import named values from \"@midnight-ntwrk/midnight-js/types\", not the whole module"
+    ]
+  },
+  {
+    "label": "an export star",
+    "path": "packages/core/src/x.ts",
+    "source": "export * from '@midnight-ntwrk/midnight-js/protocol/v9';",
+    "found": [
+      "import named values from \"@midnight-ntwrk/midnight-js/protocol/v9\", not the whole module"
+    ]
+  },
+  {
+    "label": "an import type",
+    "path": "packages/core/src/x.ts",
+    "source": "type C = import('@midnight-ntwrk/compact-js').CompiledContract;",
+    "found": ["\"@midnight-ntwrk/compact-js\" is Effect 3; import it only in the adapter file"]
+  },
+  {
+    "label": "an import equals",
+    "path": "packages/core/src/x.ts",
+    "source": "import cj = require('@midnight-ntwrk/compact-js');",
+    "found": ["\"@midnight-ntwrk/compact-js\" is Effect 3; import it only in the adapter file"]
+  },
+  {
+    "label": "node:module",
+    "path": "packages/core/src/x.ts",
+    "source": "import { createRequire } from 'node:module';",
+    "found": ["\"node:module\" can load any module; use it only in the adapter file"]
+  },
+  {
+    "label": "the Module class",
+    "path": "packages/core/src/x.ts",
+    "source": "import { Module } from 'node:module';\nModule.createRequire(import.meta.url);",
+    "found": ["\"node:module\" can load any module; use it only in the adapter file"]
+  },
+  {
+    "label": "a namespace of module",
+    "path": "packages/core/src/x.ts",
+    "source": "import * as m from 'module';\nm.createRequire(import.meta.url)('@midnight-ntwrk/compact-js');",
+    "found": [
+      "\"module\" can load any module; use it only in the adapter file",
+      "\"@midnight-ntwrk/compact-js\" is Effect 3; import it only in the adapter file"
+    ]
+  },
+  {
+    "label": "a renamed createRequire",
+    "path": "packages/connect/src/x.ts",
+    "source": "import { createRequire as cr } from 'node:module';\ncr(import.meta.url)('@effect/platform');",
+    "found": [
+      "\"node:module\" can load any module; use it only in the adapter file",
+      "\"@effect/platform\" is Effect 3; import it only in the adapter file"
+    ]
+  },
+  {
+    "label": "a loader used before its declaration",
+    "path": "packages/core/src/x.ts",
+    "source": "const cj = load('@midnight-ntwrk/compact-js');\nvar load = process.getBuiltinModule('module').createRequire(import.meta.url);",
+    "found": [
+      "\"@midnight-ntwrk/compact-js\" is Effect 3; import it only in the adapter file",
+      "\"module\" can load any module; use it only in the adapter file"
+    ]
+  },
+  {
+    "label": "a tagged template",
+    "path": "packages/core/src/x.ts",
+    "source": "r`@midnight-ntwrk/compact-js`;",
+    "found": ["\"@midnight-ntwrk/compact-js\" is Effect 3; import it only in the adapter file"]
+  }
+]

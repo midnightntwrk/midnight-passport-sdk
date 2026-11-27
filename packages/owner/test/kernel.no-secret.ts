@@ -1,5 +1,7 @@
 import { Kernel, type SecretHandle } from '../dist/kernel/index.js';
 
+/* eslint-disable @typescript-eslint/no-unused-expressions, @typescript-eslint/no-unused-vars -- Each statement exists only for the compiler to reject it. */
+
 const kernel = new Kernel();
 const handle: SecretHandle = kernel.holdSecret(new Uint8Array(1));
 

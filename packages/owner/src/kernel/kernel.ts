@@ -1,3 +1,4 @@
+import { UnknownHandleError } from './errors.js';
 import { SecretHandle } from './handle.js';
 import { zeroize } from './zeroize.js';
 
@@ -15,8 +16,8 @@ export class Kernel {
    */
   holdSecret(bytes: Uint8Array): SecretHandle {
     const handle = new SecretHandle();
-    // `slice` copies; `subarray` would share the buffer we zero next.
-    this.#retained.set(handle, bytes.slice());
+    // `slice` on a Node.js `Buffer` shares memory; this constructor always copies.
+    this.#retained.set(handle, new Uint8Array(bytes));
     zeroize(bytes);
     return handle;
   }
@@ -25,9 +26,7 @@ export class Kernel {
   releaseSecret(handle: SecretHandle): void {
     const copy = this.#retained.get(handle);
     if (copy === undefined) {
-      throw new Error(
-        'releaseSecret: the handle was already released or was not issued by this kernel.',
-      );
+      throw new UnknownHandleError();
     }
     zeroize(copy);
     this.#retained.delete(handle);

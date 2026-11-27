@@ -4,12 +4,14 @@
 // An empty workspace passes, and each package added later is checked:
 // - its directory is in the graph, and its name is the scoped package name;
 // - each @midnight-ntwrk/mn-passport-* dependency is a permitted edge;
+// - an adapter may list `dev` in devDependencies only, for its tests;
 // - its tsconfig project references mirror those dependencies;
 // - `connect`, `agent`, `ecosystems`, and `dev` reach no forbidden package,
 //   not even transitively.
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { ALLOWED, NEVER_REACHES, SCOPE } from './dependency-graph.mjs';
+import { parseJson } from './json.mjs';
 
 /**
  * @typedef {{ dependencies?: Record<string, string>, devDependencies?: Record<string, string>, peerDependencies?: Record<string, string>, name?: string }} Manifest
@@ -17,7 +19,7 @@ import { ALLOWED, NEVER_REACHES, SCOPE } from './dependency-graph.mjs';
  */
 
 /** @param {string} path @returns {unknown} */
-const readJson = (path) => JSON.parse(readFileSync(path, 'utf8'));
+const readJson = (path) => parseJson(readFileSync(path, 'utf8'));
 
 /**
  * Returns each violation of the dependency rules in the workspace at `root`.
@@ -51,15 +53,22 @@ export function checkWorkspace(root) {
     }
     const manifest = /** @type {Manifest} */ (readJson(manifestPath));
     if (manifest.name !== SCOPE + dir) {
-      violations.push(`"${dir}" must be named "${SCOPE}${dir}", got "${manifest.name}"`);
+      violations.push(`"${dir}" must be named "${SCOPE}${dir}", got "${String(manifest.name)}"`);
     }
+    // `dev` never ships, so an adapter's test-only use of it is not an edge of the graph.
+    const testStubs = SCOPE + 'dev';
+    const testOnly = (/** @type {string} */ name) =>
+      name === testStubs &&
+      dir.startsWith('adapter-') &&
+      !manifest.dependencies?.[name] &&
+      !manifest.peerDependencies?.[name];
     const deps = new Set(
       Object.keys({
         ...manifest.dependencies,
         ...manifest.devDependencies,
         ...manifest.peerDependencies,
       })
-        .filter((name) => name.startsWith(SCOPE))
+        .filter((name) => name.startsWith(SCOPE) && !testOnly(name))
         .map((name) => name.slice(SCOPE.length)),
     );
     for (const dep of deps) {
@@ -67,6 +76,7 @@ export function checkWorkspace(root) {
     }
 
     const projectPath = join(packagesDir, dir, 'tsconfig.json');
+    /** @type {Set<string>} */
     const refs = new Set();
     if (existsSync(projectPath)) {
       const project = /** @type {ProjectConfig} */ (readJson(projectPath));

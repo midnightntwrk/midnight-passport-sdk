@@ -18,20 +18,23 @@ after(() => {
 });
 
 /**
- * Writes a fixture workspace: each package lists its SDK dependencies, and
- * its project references (by default the same packages).
- * @param {Record<string, { deps?: string[], refs?: string[], name?: string }>} packages
+ * Writes a fixture workspace: each package lists its SDK dependencies and dev
+ * dependencies, and its project references (by default the dependencies).
+ * @param {Record<string, { deps?: string[], devDeps?: string[], refs?: string[], name?: string }>} packages
  * @returns {string}
  */
 function workspace(packages) {
   const root = mkdtempSync(join(tmpdir(), 'mn-passport-deps-'));
   fixtures.push(root);
-  for (const [dir, { deps = [], refs = deps, name = SCOPE + dir }] of Object.entries(packages)) {
+  for (const [dir, { deps = [], devDeps = [], refs = deps, name = SCOPE + dir }] of Object.entries(
+    packages,
+  )) {
     mkdirSync(join(root, 'packages', dir), { recursive: true });
-    const dependencies = Object.fromEntries(deps.map((dep) => [SCOPE + dep, 'workspace:*']));
+    const scoped = (/** @type {string[]} */ list) =>
+      Object.fromEntries(list.map((dep) => [SCOPE + dep, 'workspace:*']));
     writeFileSync(
       join(root, 'packages', dir, 'package.json'),
-      JSON.stringify({ name, dependencies }),
+      JSON.stringify({ name, dependencies: scoped(deps), devDependencies: scoped(devDeps) }),
     );
     const references = refs.map((ref) => ({ path: `../${ref}` }));
     writeFileSync(join(root, 'packages', dir, 'tsconfig.json'), JSON.stringify({ references }));
@@ -94,4 +97,17 @@ test('an unknown or misnamed package is rejected', () => {
   const violations = checkWorkspace(root);
   assert.ok(violations.some((v) => v.startsWith('"onboard" is not in the graph')));
   assert.ok(violations.some((v) => v.startsWith('"protocol" must be named')));
+});
+
+test('an adapter may take dev for its tests, but no package may ship it', () => {
+  const root = workspace({
+    dev: {},
+    'adapter-indexer': { devDeps: ['dev'] },
+    'adapter-broadcast': { deps: ['dev'] },
+    connect: { devDeps: ['dev'], refs: [] },
+  });
+  const violations = checkWorkspace(root);
+  assert.ok(!violations.some((v) => v.startsWith('"adapter-indexer"')));
+  assert.ok(violations.some((v) => v.startsWith('"adapter-broadcast" must not depend on "dev"')));
+  assert.ok(violations.some((v) => v.startsWith('"connect" must not depend on "dev"')));
 });

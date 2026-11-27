@@ -4,12 +4,16 @@
     "rootDir": "test",
     "outDir": "dist-test",
     "tsBuildInfoFile": "dist-test/.tsbuildinfo",
-    "types": ["node"]
+    "types": ["node"],
+    "isolatedDeclarations": false
   },
   "include": ["test"],
   "references": [
     {
       "path": "./tsconfig.json"
+    },
+    {
+      "path": "../dev/tsconfig.json"
     }
   ]
 }

@@ -5,12 +5,12 @@ import { readdir } from 'node:fs/promises';
 /** @typedef {import('../packages/protocol/dist/index.js').ProtocolVersion} ProtocolVersion */
 /** @typedef {import('../packages/contract/dist/index.js').BindingVersion} BindingVersion */
 
-/** @param {ProtocolVersion} _v */
-function wantsWireVersion(_v) {}
-/** @param {BindingVersion} _v */
-function wantsBindingVersion(_v) {}
+/** @type {(version: ProtocolVersion) => void} */
+const wantsWireVersion = () => {};
+/** @type {(version: BindingVersion) => void} */
+const wantsBindingVersion = () => {};
 
-// Nothing calls this function. The compiler checks it.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Nothing calls this function. The compiler checks it.
 function _axesAreDisjoint() {
   /** @type {ProtocolVersion} */
   const wire = { major: 2, minor: 0 };
@@ -28,13 +28,15 @@ test('PROTOCOL_VERSION is exported from protocol only', async () => {
   /** @type {string[]} */
   const exporters = [];
   for (const dir of packages.sort()) {
+    /** @type {unknown} */
     let entry;
     try {
       entry = await import(new URL(`../packages/${dir}/dist/index.js`, import.meta.url).href);
     } catch {
       continue;
     }
-    if ('PROTOCOL_VERSION' in entry) exporters.push(dir);
+    if (typeof entry === 'object' && entry !== null && 'PROTOCOL_VERSION' in entry)
+      exporters.push(dir);
   }
   assert.deepEqual(exporters, ['protocol']);
 });

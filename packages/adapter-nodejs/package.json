@@ -20,6 +20,8 @@
     "test": "node --test \"dist-test/**/*.test.js\""
   },
   "dependencies": {
-    "@midnight-ntwrk/mn-passport-core": "workspace:*"
+    "@midnight-ntwrk/compact-runtime": "0.21.0",
+    "@midnight-ntwrk/mn-passport-core": "workspace:*",
+    "@midnightntwrk/ledger-v9": "1.0.2"
   }
 }

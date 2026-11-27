@@ -1,0 +1,37 @@
+{
+  "source": "Recorded from a local network (indexer 4.4.101, node 2.1.101) on 2026/11/23. The block holds one shielded deposit to account 19d0e7afd018aebcf526678dda828d3b59ae482f9043bf58180b4c98580a4c6a: a wallet input, the account output at tree position 28, and the wallet change at 29.",
+  "request": {
+    "query": "query ZSWAP_EVENTS_QUERY($offset: BlockOffset!) {\n  block(offset: $offset) { height hash transactions { zswapLedgerEvents { raw } } }\n}",
+    "variables": {
+      "offset": {
+        "hash": "f713af4cb7c4e2ea01e6d5d134ed68133eb9070bffe510a7db810b424d5dabe0"
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "data": {
+        "block": {
+          "height": 2969,
+          "hash": "f713af4cb7c4e2ea01e6d5d134ed68133eb9070bffe510a7db810b424d5dabe0",
+          "transactions": [
+            {
+              "zswapLedgerEvents": [
+                {
+                  "raw": "6d69646e696768743a6576656e745b7631345d3a040019019165f0e4d23beabe25ffe5d00fc8c006372d0f1eb3b36920aaeffd4856fdccaa0000000000050d27d9b42dd59baa0515c0890de8b3766b152ffc2eeaab7596739515bce07001"
+                },
+                {
+                  "raw": "6d69646e696768743a6576656e745b7631345d3a08008019d0e7afd018aebcf526678dda828d3b59ae482f9043bf58180b4c98580a4c6a040021019165f0e4d23beabe25ffe5d00fc8c006372d0f1eb3b36920aaeffd4856fdccaa000000000137f3aa067e22d53cb45d06c37d0471a2dda8f3afc1e7eee591e4d12b72c514c4020070"
+                },
+                {
+                  "raw": "6d69646e696768743a6576656e745b7631345d3a0400b9049165f0e4d23beabe25ffe5d00fc8c006372d0f1eb3b36920aaeffd4856fdccaa0000000001ed98fcaf70aa673b339531005d601f5869b59bb873ae5ffbb4d72d68b0a686b5002b35dcd4fbe998a6fa61952a8990fcbfe648bfb88d76cf9df7b0b4550b969818737bfad7f4a92c56108476aa029cc617aac794b6440f65b5a1af10149f37e8df4d7356b6dfd9d747cfc3e9aaf5c3c3cc615242e1f5ac633d3c8159158234013ffb1273b1fac175d56b6d3681b21218b33c348544fa757d24c7cc8d6c27d072e8ab005b73fb7fbd533f323378c879904a9bd5d51be0f4754d758c885cf7074bc561ab6c6d73a03e5391782a6981c23014cd3bca1e177685a2022e88e77af16beab762a7110c7312fe2db30426749d0bb3a3076ef6436c5f039f7eb3c3f71add46e6bff413290a0174"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}

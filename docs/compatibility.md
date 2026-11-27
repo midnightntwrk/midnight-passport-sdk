@@ -1,6 +1,6 @@
 # Compatibility matrix
 
-> **Status:** live · updated 2026/11/17
+> **Status:** live · updated 2026/11/24
 > **Owns:** the two version axes of the SDK, and the toolchain that each
 > binding uses.
 > **Maintained by:** `mn-passport-skills:deps`. A row changes only through a
@@ -26,9 +26,20 @@
 
 ## Binding axis
 
-| SDK | ACC binding | Compact CLI | Compiler | Manifest hash | Origin length | Language | Runtime (`@midnight-ntwrk/compact-runtime`) | Status |
-|---|---|---|---|---|---|---|---|---|
-| dev (unreleased) | None | — | — | — | — | — | — | Placeholder. Pending the first ACC build (E05.01). |
+<!-- Generated from BINDINGS. After a build, run: node packages/contract/dist-test/binding-rows.js -->
+| SDK | ACC binding | Compact CLI | Compiler | Manifest hash | Origin length | Language | Runtime (`@midnight-ntwrk/compact-runtime`) | zkir | Status |
+|---|---|---|---|---|---|---|---|---|---|
+| dev (unreleased) | passport `6497e22` | — | 0.36.1 | `f39ce43b…` | 21 | 0.28.0 | 0.21.0 | zkir-3.2.1 (7a51b3385bbf) | current |
+<!-- End of the generated rows. -->
+
+`BINDINGS` in `mn-passport-contract` owns these rows, and a test fails when
+this table is stale. `Status` is `current` for new accounts, `supported` for
+older builds, or `unsupported`. `identifyBinding` gives the status, and it
+rejects an account that matches no row or more than one row. Nothing checks
+the status before a call yet.
+
+The binding `6497e22` is provisional. It is built with compactf-0.36.1, which
+alone reproduces `--check` (ADR 0004).
 
 The `Compiler`, `Manifest hash`, and `Origin length` columns are the three
 fields of `BindingVersion` (`mn-passport-contract`). The manifest hash commits
@@ -53,12 +64,13 @@ keys"). Thus, the matrix records the revisions, not only the versions.
 | `@midnightntwrk/ledger-v9` | 1.0.2 | midnight-js 5.0.1 requires exactly 1.0.2. ledger-v9 1.0.0 prices some calls lower than the node does (error 138) |
 | Proof server | 9.0.2 | The prover must match the ledger version of the build (ledger 9.1.0.2) |
 | `effect` (Effect 4) | 4.1.3 | The SDK will bundle Effect 4. midnight-js keeps its own Effect 3 |
-| zkir crate | None yet | The prover must use the same revision to make the same keys |
+| zkir crate | zkir-3.2.1 (7a51b3385bbf) | The prover must use the same revision to make the same keys |
 | midnight-zk crate | None yet | Same as zkir |
 
 Compact and the proof server are not npm packages. Their rows are not in the
 lockfile. The other npm rows are exact pins in the root `package.json`, except
-ledger-v9, which comes through midnight-js. The lockfile must agree.
+ledger-v9. midnight-js brings it, and `adapter-prover-remote` pins it as a
+runtime dependency. The lockfile must agree.
 
 `pnpm run lint` runs `scripts/check-single-copy.mjs`. It fails when the
 lockfile has two versions of ledger-v9, `compact-js`, `compact-runtime`, or

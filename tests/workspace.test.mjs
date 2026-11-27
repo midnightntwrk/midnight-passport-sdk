@@ -4,10 +4,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
+import { BUNDLED } from '../scripts/bundle-packages.mjs';
+import { parseJson } from '../scripts/json.mjs';
 
 /** @param {string} path */
 const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
-const root = JSON.parse(await read('../package.json'));
+/**
+ * @typedef {{ dependencies?: Record<string, string>, devDependencies?: Record<string, string>, peerDependencies?: Record<string, string> }} Pins
+ * @typedef {Pins & { private?: unknown, workspaces?: unknown, packageManager: string, engines?: { node?: unknown } }} RootManifest
+ */
+const root = /** @type {RootManifest} */ (parseJson(await read('../package.json')));
 
 test('the repo is a private pnpm workspace over packages/*', async () => {
   assert.equal(root.private, true);
@@ -19,7 +25,8 @@ test('the repo is a private pnpm workspace over packages/*', async () => {
 
 test('the Node baseline agrees across manifest, .nvmrc, and the CI gate', async () => {
   assert.ok(root.engines, 'root manifest must declare engines');
-  assert.equal(root.engines.node, '>=22');
+  // The tests use `module.registerHooks`, which came in 22.15.
+  assert.equal(root.engines.node, '>=22.15');
   assert.equal((await read('../.nvmrc')).trim(), '22');
   const workflow = await read('../.github/workflows/pr-checks.yml');
   const pins = [...workflow.matchAll(/node-version(?:-file)?:\s*(.+)/g)].map((m) =>
@@ -35,11 +42,12 @@ test('the Node baseline agrees across manifest, .nvmrc, and the CI gate', async 
 });
 
 test('every dependency in every workspace manifest is exact-pinned', async () => {
+  /** @type {[string, Pins][]} */
   const manifests = [['package.json', root]];
   const packages = await readdir(new URL('../packages', import.meta.url)).catch(() => []);
   for (const dir of packages) {
     const path = `../packages/${dir}/package.json`;
-    manifests.push([path, JSON.parse(await read(path))]);
+    manifests.push([path, /** @type {Pins} */ (parseJson(await read(path)))]);
   }
   for (const [path, manifest] of manifests) {
     const all = {
@@ -60,25 +68,38 @@ test('every dependency in every workspace manifest is exact-pinned', async () =>
 
 const packageDirs = (await readdir(new URL('../packages', import.meta.url))).sort();
 
+// The browser adapter also ships its bundler plugins, and core keeps midnight-js out of its
+// main entry. Every other package has one entry.
+/** @type {Record<string, string[]>} */
+const SUBPATHS = { 'adapter-browser': ['esbuild', 'vite'], core: ['chain'] };
+
 test('package shape', async () => {
   assert.ok(packageDirs.length > 0, 'packages/ must hold the scaffolded packages');
   for (const dir of packageDirs) {
     const manifest =
       /** @type {{ type?: string, sideEffects?: boolean, exports?: unknown, files?: string[], private?: boolean }} */ (
-        JSON.parse(await read(`../packages/${dir}/package.json`))
+        parseJson(await read(`../packages/${dir}/package.json`))
       );
     assert.equal(manifest.type, 'module', `${dir}: type`);
     assert.equal(manifest.sideEffects, false, `${dir}: sideEffects`);
     assert.deepEqual(
       manifest.exports,
-      { '.': { types: './dist/index.d.ts', default: './dist/index.js' } },
-      `${dir}: one exports entry`,
+      Object.fromEntries(
+        ['index', ...(SUBPATHS[dir] ?? [])].map((name) => [
+          name === 'index' ? '.' : `./${name}`,
+          { types: `./dist/${name}.d.ts`, default: `./dist/${name}.js` },
+        ]),
+      ),
+      `${dir}: the "." entry, and the listed subpaths`,
     );
-    assert.deepEqual(
-      manifest.files,
-      ['dist', '!dist/.tsbuildinfo'],
-      `${dir}: only the build ships`,
-    );
+    // The bundle test checks what a bundled package ships.
+    if (!BUNDLED.includes(`packages/${dir}`)) {
+      assert.deepEqual(
+        manifest.files,
+        ['dist', '!dist/.tsbuildinfo'],
+        `${dir}: only the build ships`,
+      );
+    }
     const tests = await readdir(new URL(`../packages/${dir}/test`, import.meta.url));
     assert.ok(
       tests.some((file) => file.endsWith('.test.ts')),
@@ -90,7 +111,7 @@ test('package shape', async () => {
 
 test('the root build references every package', async () => {
   const solution = /** @type {{ references: { path: string }[] }} */ (
-    JSON.parse(await read('../tsconfig.build.json'))
+    parseJson(await read('../tsconfig.build.json'))
   );
   const built = solution.references.map((ref) => ref.path);
   assert.deepEqual(
