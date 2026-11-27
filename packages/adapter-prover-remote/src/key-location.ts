@@ -16,10 +16,7 @@ const CONTRACT = /^contract:([0-9a-fA-F]{64})\/([A-Za-z0-9_]+)\?vk=([0-9a-f]{64}
 // The label is the transaction author's choice, so no other name passes.
 const BUILTINS = new Set(['midnight/zswap/spend', 'midnight/zswap/output', 'midnight/dust/spend']);
 
-/**
- * Throws `ProverRejectedError` (`input`) for a malformed location or a bare circuit
- * name. Neither has a verifier key hash for the service to find the key by.
- */
+/** Throws `ProverRejectedError` (`input`) unless the location names a built-in key or a verifier key hash. */
 export function parseKeyLocation(location: string): ParsedKeyLocation {
   if (BUILTINS.has(location)) return { kind: 'builtin', location };
   const match = CONTRACT.exec(location);
