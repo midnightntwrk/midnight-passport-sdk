@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { delimiter, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
-import { build as viteBuild } from 'vite';
+import { build as viteBuild, createServer as viteServer } from 'vite';
 import { passportWasm } from '../packages/adapter-browser/dist/esbuild.js';
 import { passportWasm as passportWasmVite } from '../packages/adapter-browser/dist/vite.js';
 import { contractRoutes, listen } from './server.mjs';
@@ -70,6 +70,11 @@ export const appBuild = {
   loader: /** @type {Record<string, import('esbuild').Loader>} */ ({ '.wasm': 'file' }),
 };
 
+const viteAlias = {
+  ...appBuild.alias,
+  '@midnightntwrk/ledger-v9': join(appBuild.nodePaths[0] ?? '', '@midnightntwrk/ledger-v9'),
+};
+
 /**
  * Builds the file `entry` with Vite and the same names as `appBuild`, into `page.js`.
  * @param {string} entry
@@ -88,12 +93,7 @@ export async function viteBundle(entry, plugins = []) {
     publicDir: false,
     logLevel: 'silent',
     plugins: [plugin, ...plugins],
-    resolve: {
-      alias: {
-        ...appBuild.alias,
-        '@midnightntwrk/ledger-v9': join(appBuild.nodePaths[0] ?? '', '@midnightntwrk/ledger-v9'),
-      },
-    },
+    resolve: { alias: viteAlias },
     build: {
       outDir: outdir,
       target: 'es2022',
@@ -104,12 +104,76 @@ export async function viteBundle(entry, plugins = []) {
   return { outdir };
 }
 
+/**
+ * Serves the file `entry` from a Vite dev server that has only the Passport plugin.
+ * @param {string} entry
+ * @returns {Promise<{ serve: Serve }>}
+ */
+export async function viteServe(entry) {
+  return {
+    serve: async (run, { files }) => {
+      // As in an app, a bare import in a pre-bundled file resolves from the cache folder.
+      const work = await mkdtemp(join(root, 'node_modules/.mn-passport-vite-'));
+      dirs.push(work);
+      let wasm = 0;
+      /** @type {import('vite').Plugin} */
+      const page = {
+        name: 'test-page',
+        configureServer(server) {
+          server.middlewares.use((request, response, next) => {
+            const path = request.url ?? '/';
+            if (path === '/') {
+              response.writeHead(200, { 'content-type': 'text/html' });
+              return response.end(`<script type="module" src="/@fs${entry}"></script>`);
+            }
+            const file = files[path];
+            if (file) return response.writeHead(200).end(file);
+            // The module requests carry a query. Only a fetch of the file has none.
+            if (path.endsWith('.wasm')) wasm += 1;
+            next();
+          });
+        },
+      };
+      const server = await viteServer({
+        configFile: false,
+        root: join(root, 'tests'),
+        cacheDir: join(work, 'cache'),
+        publicDir: false,
+        logLevel: 'silent',
+        server: { host: 'localhost', port: 0, hmr: false, ws: false, fs: { strict: false } },
+        optimizeDeps: { entries: [entry] },
+        plugins: [passportWasmVite(), page],
+        resolve: { alias: viteAlias },
+      });
+      const close = async () => {
+        open.delete(close);
+        await server.close();
+      };
+      open.add(close);
+      try {
+        await server.listen();
+        const address = server.httpServer?.address();
+        assert.ok(address && typeof address === 'object');
+        await run(`http://localhost:${address.port}/`, () => wasm);
+      } finally {
+        await close();
+      }
+    },
+  };
+}
+
 // The servers, and the pages of a test that times out, close when the test ends.
 /** @type {Set<() => Promise<void>>} */
 const open = new Set();
 
 /** @type {Record<string, string>} */
 const TYPES = { '.js': 'text/javascript', '.wasm': 'application/wasm' };
+
+/**
+ * @typedef {(run: (url: string, wasmRequests: () => number) => Promise<void>,
+ *   options: { files: Record<string, Uint8Array>, routes: Record<string, () => Promise<void>>,
+ *   host: string }) => Promise<void>} Serve
+ */
 
 /**
  * Serves the bundle and counts the WASM requests. A request to a route waits for it, then gets 204.
@@ -158,11 +222,12 @@ async function serve(outdir, run, { files, routes, host }) {
 }
 
 /**
- * Bundles `contents` as the page, opens it, runs `before`, and evaluates `expression`.
+ * Bundles `contents` as the page, or uses `serve`, opens it, runs `before`, and evaluates `expression`.
  * @param {string} bin
  * @param {string} contents
  * @param {{ expression?: string, before?: (page: Page) => Promise<void>,
- *   build?: Parameters<typeof bundle>[2], outdir?: string, files?: Record<string, Uint8Array>,
+ *   build?: Parameters<typeof bundle>[2], outdir?: string, serve?: Serve,
+ *   files?: Record<string, Uint8Array>,
  *   routes?: Record<string, (page: Page) => Promise<void>>, host?: string }} [options]
  */
 export async function runPage(bin, contents, options = {}) {
@@ -178,13 +243,16 @@ export async function runPage(bin, contents, options = {}) {
       },
     ]),
   );
-  const { outdir } = options.outdir
-    ? { outdir: options.outdir }
-    : await bundle(contents, [passportWasm()], options.build);
+  /** @type {Serve} */
+  const built = async (run, served) => {
+    const { outdir } = options.outdir
+      ? { outdir: options.outdir }
+      : await bundle(contents, [passportWasm()], options.build);
+    await serve(outdir, run, served);
+  };
   /** @type {{ value: unknown, errors: string[], wasmRequests: number }} */
   let out = { value: undefined, errors: [], wasmRequests: 0 };
-  await serve(
-    outdir,
+  await (options.serve ?? built)(
     async (url, wasmRequests) => {
       // Another host maps to localhost and counts as a secure context.
       const flags =

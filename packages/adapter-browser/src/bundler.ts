@@ -28,6 +28,12 @@ const RUNTIMES = [
 
 const RUNTIME_PACKAGES = new Set(RUNTIMES.map((chain) => chain[chain.length - 1]));
 
+/** This package and the runtimes: each one imports a WASM file or the WASM list. */
+export const WASM_PACKAGES: readonly string[] = [
+  '@midnight-ntwrk/mn-passport-adapter-browser',
+  ...new Set(RUNTIMES.flat()),
+];
+
 async function packageName(file: string): Promise<string | undefined> {
   for (let dir = dirname(file); ; dir = dirname(dir)) {
     const text = await readFile(join(dir, 'package.json'), 'utf8').catch(() => undefined);

@@ -5,5 +5,5 @@ export {
   ProverUnavailableError,
   type ProverRejectedReason,
 } from './errors.js';
-export type { KeyLocation } from './key-location.js';
+export { parseKeyLocation, type KeyLocation, type ParsedKeyLocation } from './key-location.js';
 export { remoteProver, type RemoteProverOptions } from './remote-prover.js';
