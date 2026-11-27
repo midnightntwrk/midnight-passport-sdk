@@ -12,6 +12,10 @@ test('the domain tags are the registry strings', () => {
     recoveryShare: 'midnight:account:recovery:share:v1',
     recoverySubmit: 'midnight:account:recovery:submit:v1',
     recoveryWrap: 'midnight:account:recovery:wrap:v1',
+    prfAuthority: 'midnight:passport:prf:authority:v1',
+    prfViewing: 'midnight:passport:prf:viewing:v1',
+    authorityWrap: 'midnight:passport:authority:wrap:v1',
+    viewingWrap: 'midnight:passport:viewing:wrap:v1',
   });
 });
 
