@@ -1,5 +1,13 @@
 import { dirname, isAbsolute, resolve } from 'node:path';
-import { BUILTIN, bindingModule, builtinMessage, fileList, type ResolveEntry } from './bundler.js';
+import {
+  BUILTIN,
+  SHIMS,
+  bindingModule,
+  builtinMessage,
+  fileList,
+  isRuntimeWasm,
+  type ResolveEntry,
+} from './bundler.js';
 
 interface ResolvedLike {
   readonly id: string;
@@ -40,13 +48,18 @@ export function passportWasm(): VitePluginLike {
     async resolveId(source, importer) {
       if (importer === undefined) return undefined;
       if (source === 'mn-passport:wasm') return FILE_LIST + importer;
-      if (source.endsWith('.wasm')) return BINDING + resolve(dirname(importer), source);
+      if (source.endsWith('.wasm')) {
+        if (!(await isRuntimeWasm(source, importer))) return undefined;
+        return BINDING + resolve(dirname(importer), source);
+      }
       if (!BUILTIN.test(source)) return undefined;
-      // A bare name such as `buffer` passes when the app installs a package of that name.
+      // A bare name such as `buffer` passes when the app installs a package of that name, or has a shim.
       if (!source.startsWith('node:')) {
         const found = await this.resolve(source, importer, { skipSelf: true });
         if (found && !found.external && isAbsolute(found.id)) return found.id;
       }
+      const shim = SHIMS.get(source);
+      if (shim) return shim;
       return this.error(builtinMessage(importer, source));
     },
     async load(id) {

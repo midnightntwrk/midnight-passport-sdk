@@ -66,13 +66,15 @@ export const appBuild = {
     ),
   },
   nodePaths: [join(root, 'packages/adapter-browser/node_modules')],
+  loader: /** @type {Record<string, import('esbuild').Loader>} */ ({ '.wasm': 'file' }),
 };
 
 /**
  * Builds the file `entry` with Vite and the same names as `appBuild`, into `page.js`.
  * @param {string} entry
+ * @param {import('vite').Plugin[]} [plugins] run after the Passport plugin
  */
-export async function viteBundle(entry) {
+export async function viteBundle(entry, plugins = []) {
   const work = await mkdtemp(join(tmpdir(), 'mn-passport-vite-'));
   dirs.push(work);
   const outdir = join(work, 'out');
@@ -84,7 +86,7 @@ export async function viteBundle(entry) {
     cacheDir: join(work, 'cache'),
     publicDir: false,
     logLevel: 'silent',
-    plugins: [plugin],
+    plugins: [plugin, ...plugins],
     resolve: {
       alias: {
         ...appBuild.alias,

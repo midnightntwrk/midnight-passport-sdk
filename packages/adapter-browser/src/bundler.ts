@@ -2,9 +2,17 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { builtinModules } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // eslint-disable-next-line @typescript-eslint/no-inferrable-types -- isolatedDeclarations needs the type.
 export const BUILTIN: RegExp = new RegExp(`^(?:node:.*|(?:${builtinModules.join('|')})(?:/.*)?)$`);
+
+/** The browser copies of the built-ins that midnight-js imports, for an app that installs none. */
+export const SHIMS: ReadonlyMap<string, string> = new Map([
+  // The file path finds the package, not the Node.js built-in.
+  ['buffer', fileURLToPath(import.meta.resolve('buffer/index.js'))],
+  ['assert', fileURLToPath(new URL('./assert.js', import.meta.url))],
+]);
 
 export const builtinMessage = (importer: string, path: string): string =>
   `${importer} imports the Node.js built-in "${path}". A browser cannot load it.`;
@@ -17,6 +25,24 @@ const RUNTIMES = [
   ['@midnight-ntwrk/compact-runtime', '@midnightntwrk/onchain-runtime-v4'],
   ['@midnightntwrk/ledger-v9'],
 ];
+
+const RUNTIME_PACKAGES = new Set(RUNTIMES.map((chain) => chain[chain.length - 1]));
+
+async function packageName(file: string): Promise<string | undefined> {
+  for (let dir = dirname(file); ; dir = dirname(dir)) {
+    const text = await readFile(join(dir, 'package.json'), 'utf8').catch(() => undefined);
+    const json: unknown = text === undefined ? undefined : JSON.parse(text);
+    const named = typeof json === 'object' && json !== null && 'name' in json;
+    if (named && typeof json.name === 'string') return json.name;
+    if (dirname(dir) === dir) return undefined;
+  }
+}
+
+/** Whether the plugin owns this import. Every other WASM import stays with the bundler. */
+export async function isRuntimeWasm(source: string, importer: string): Promise<boolean> {
+  if (!source.startsWith('./') || !source.endsWith('.wasm')) return false;
+  return RUNTIME_PACKAGES.has(await packageName(importer));
+}
 
 const idOf = (bytes: Uint8Array): string =>
   createHash('sha256').update(bytes).digest('hex').slice(0, 16);
