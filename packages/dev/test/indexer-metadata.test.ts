@@ -81,6 +81,21 @@ expectFailing(
   ],
 );
 
+const notFound = async () => ({
+  ...createStubIndexer(createStubChain(), { unreachable: true }),
+  callInputs: async () => undefined,
+});
+expectFailing(
+  'the indexer contract fails call inputs that read an outage as "not found"',
+  indexerContract(async () => harness(undefined, notFound)),
+  [
+    [
+      'an unreachable source is IndexerUnreachableError, never "not found", and an abort still cancels',
+      'expected a rejection with IndexerUnreachableError, got a result',
+    ],
+  ],
+);
+
 const last = (m: AccountMetadata): AccountMetadata => ({
   ...m,
   write: async (namespace, data, _revision, options) =>

@@ -69,6 +69,9 @@ export function createIndexer(options: IndexerOptions): Indexer {
   return {
     contractState: reads.contractState,
     transaction: reads.transaction,
+    ledgerParameters: reads.ledgerParameters,
+    callInputs: reads.callInputs,
+    zswapEvents: reads.zswapEvents,
     watchContract: (address) =>
       createStateSource((emit, fail) => {
         let last: Lookup<ContractState> | undefined;

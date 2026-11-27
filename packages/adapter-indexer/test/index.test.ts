@@ -9,9 +9,12 @@ test('the entry exports createIndexer only, and an indexer has only the seam met
     http: () => Promise.reject(new Error('no request expected')),
   });
   assert.deepEqual(Object.keys(indexer).sort(), [
+    'callInputs',
     'contractState',
+    'ledgerParameters',
     'transaction',
     'watchContract',
     'watchTransaction',
+    'zswapEvents',
   ]);
 });

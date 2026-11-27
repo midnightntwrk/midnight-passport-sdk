@@ -13,7 +13,17 @@ import {
   type WebSocketConstructorLike,
   type WebSocketLike,
 } from '@midnight-ntwrk/mn-passport-adapter-indexer';
-import { INDEXER_URL, NODE_URL, block, nodeWith, ok, route, stateAnswer } from './fakes.js';
+import {
+  INDEXER_URL,
+  NODE_URL,
+  block,
+  indexerAt,
+  nodeWith,
+  ok,
+  pinnedHash,
+  route,
+  stateAnswer,
+} from './fakes.js';
 
 const WS_URL = 'wss://indexer.test/graphql/ws';
 const id = 'cd'.repeat(32);
@@ -72,9 +82,13 @@ const indexer = (
 
 const gaps = (at: readonly number[]) => at.slice(1).map((time, i) => time - (at[i] ?? 0));
 
-/** Gives `answer(n)` to the n-th request, from 0. */
+/** Gives `answer(n)` to the n-th read, from 0. The pinned half of a state read gets the same answer. */
 function counting(answer: (n: number) => HttpResponse) {
-  const fake = { calls: 0, http: async (): Promise<HttpResponse> => answer(fake.calls++) };
+  const fake = {
+    calls: 0,
+    http: async (request: HttpRequest): Promise<HttpResponse> =>
+      answer(pinnedHash(request) === undefined ? fake.calls++ : fake.calls - 1),
+  };
   return fake;
 }
 
@@ -224,7 +238,7 @@ test('a watch emits only when "found" or the bytes change, and stops polling aft
 /** For each indexer read, its answer, and the node's state and block or `fail` for a network error. */
 function chain(
   steps: readonly {
-    readonly indexer: HttpResponse;
+    readonly indexer: HttpResponse | ((request: HttpRequest) => HttpResponse);
     readonly node: 'fail' | readonly [string, number];
   }[],
 ): Http {
@@ -236,9 +250,10 @@ function chain(
     return { result: typeof now === 'object' ? now[0] : undefined };
   });
   return route(
-    async () => {
-      read++;
-      return step()?.indexer ?? down;
+    async (request) => {
+      if (pinnedHash(request) === undefined) read++;
+      const answer = step()?.indexer ?? down;
+      return typeof answer === 'function' ? answer(request) : answer;
     },
     async (request) => {
       const now = step()?.node ?? 'fail';
@@ -281,6 +296,26 @@ test('the bytes do not go back before the indexer reaches the node block', async
   assert.deepEqual(
     watch.values.map((v) => bytesOf(v)),
     [[0x0b], [0x0a]],
+  );
+});
+
+test('the bytes never go back when the indexer reaches the node block', async (t) => {
+  fakeTime(t);
+  const history = [
+    [5, '0a'],
+    [12, '0b'],
+  ] as const;
+  const http = chain([
+    { indexer: indexerAt(11, history), node: ['0b', 12] },
+    { indexer: indexerAt(12, history), node: ['0b', 12] },
+    { indexer: indexerAt(13, history), node: ['0b', 13] },
+  ]);
+  const watch = record(indexer(http, { nodeUrl: NODE_URL }).watchContract(address));
+  await wait(20);
+  watch.stop();
+  assert.deepEqual(
+    watch.values.map((v) => bytesOf(v)),
+    [[0x0b]],
   );
 });
 

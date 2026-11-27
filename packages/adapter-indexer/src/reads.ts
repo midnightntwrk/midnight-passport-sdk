@@ -1,12 +1,14 @@
 import {
   IndexerUnreachableError,
   type BlockRef,
+  type CallInputs,
   type CallOptions,
   type ContractAddress,
   type ContractState,
   type HttpRequest,
   type HttpResponse,
   type Indexer,
+  type LedgerParametersRead,
   type TransactionId,
   type TransactionResult,
   type TransactionStatus,
@@ -18,9 +20,11 @@ import { readNodeState } from './node.js';
 import { ownSignal, type Data, type Endpoint } from './transport.js';
 
 // Keep these in step with the indexer API of the pinned midnight-js version.
-const CONTRACT_STATE_QUERY = `query CONTRACT_STATE_QUERY($address: HexEncoded!) {
-  block { height hash }
-  contract(address: $address) { state stateAt { height hash } }
+// Each query with a `$offset` is pinned to one hash. Unpinned, `block` and `contract` each follow
+// the tip and can name two blocks.
+const CONTRACT_STATE_QUERY = `query CONTRACT_STATE_QUERY($address: HexEncoded!, $offset: BlockOffset!) {
+  block(offset: $offset) { height hash }
+  contract(address: $address, offset: $offset) { state stateAt { height hash } }
 }`;
 
 const TX_ID_QUERY = `query TX_ID_QUERY($offset: TransactionOffset!) {
@@ -29,6 +33,19 @@ const TX_ID_QUERY = `query TX_ID_QUERY($offset: TransactionOffset!) {
     block { height hash }
     ... on RegularTransaction { transactionResult { status } }
   }
+}`;
+
+const HEAD_QUERY = `query HEAD_QUERY { block { height hash } }`;
+
+const LEDGER_PARAMETERS_QUERY = `query LEDGER_PARAMETERS_QUERY { block { height hash ledgerParameters } }`;
+
+const CALL_INPUTS_QUERY = `query CALL_INPUTS_QUERY($address: HexEncoded!, $offset: BlockOffset!) {
+  block(offset: $offset) { height hash ledgerParameters contractZswapState(address: $address) }
+  contract(address: $address, offset: $offset) { state stateAt { height hash } }
+}`;
+
+const ZSWAP_EVENTS_QUERY = `query ZSWAP_EVENTS_QUERY($offset: BlockOffset!) {
+  block(offset: $offset) { height hash transactions { zswapLedgerEvents { raw } } }
 }`;
 
 // A `Map`, so a status such as "constructor" finds nothing on the prototype.
@@ -57,6 +74,67 @@ function blockRef(value: unknown): BlockRef {
   return { height, hash: hash.toLowerCase() };
 }
 
+const bytesOf = (value: unknown): Uint8Array => decodeHex(value) ?? malformed();
+
+/** Reads the head, then `document` at its hash. `undefined` before the indexer's first block. */
+async function atHead(
+  endpoint: Endpoint,
+  document: string,
+  variables: Data,
+  options?: CallOptions,
+): Promise<{ readonly head: BlockRef; readonly data: Data } | undefined> {
+  const answer = (await query(endpoint, HEAD_QUERY, {}, options)).block;
+  if (answer === null) return undefined;
+  const head = blockRef(answer);
+  const offset = { hash: head.hash };
+  const data = await query(endpoint, document, { ...variables, offset }, options);
+  if (blockRef(data.block).hash !== head.hash) return malformed();
+  return { head, data };
+}
+
+/** An indexer with no block yet is unreachable: nothing can be built on it. */
+export async function readLedgerParameters(
+  endpoint: Endpoint,
+  options?: CallOptions,
+): Promise<LedgerParametersRead> {
+  const head = (await query(endpoint, LEDGER_PARAMETERS_QUERY, {}, options)).block;
+  return { bytes: bytesOf(field(head, 'ledgerParameters')), block: blockRef(head) };
+}
+
+export async function readCallInputs(
+  endpoint: Endpoint,
+  address: ContractAddress,
+  options?: CallOptions,
+): Promise<CallInputs | undefined> {
+  const { head, data } =
+    (await atHead(endpoint, CALL_INPUTS_QUERY, { address }, options)) ?? malformed();
+  const zswap = field(data.block, 'contractZswapState');
+  // Only both `null` is "no contract". One `null` alone fails below.
+  if (data.contract === null && zswap === null) return undefined;
+  const bytes = bytesOf(field(data.contract, 'state'));
+  return {
+    state: { address, bytes, block: blockRef(field(data.contract, 'stateAt')) },
+    ledgerParameters: bytesOf(field(data.block, 'ledgerParameters')),
+    zswapChainState: bytesOf(zswap),
+    block: head,
+  };
+}
+
+const list = (value: unknown): readonly unknown[] => (Array.isArray(value) ? value : malformed());
+
+export async function readZswapEvents(
+  endpoint: Endpoint,
+  at: BlockRef,
+  options?: CallOptions,
+): Promise<readonly Uint8Array[] | undefined> {
+  const data = await query(endpoint, ZSWAP_EVENTS_QUERY, { offset: { hash: at.hash } }, options);
+  if (data.block === null) return undefined;
+  if (blockRef(data.block).hash !== at.hash.toLowerCase()) return malformed();
+  return list(field(data.block, 'transactions')).flatMap((tx) =>
+    list(field(tx, 'zswapLedgerEvents')).map((event) => bytesOf(field(event, 'raw'))),
+  );
+}
+
 export interface IndexerStateRead {
   /** The latest block that the indexer holds, `undefined` before its first block. */
   readonly head: BlockRef | undefined;
@@ -68,11 +146,12 @@ export async function readContractState(
   address: ContractAddress,
   options?: CallOptions,
 ): Promise<IndexerStateRead> {
-  const data = await query(endpoint, CONTRACT_STATE_QUERY, { address }, options);
-  if (!('block' in data) || !('contract' in data)) return malformed();
-  const head = data.block === null ? undefined : blockRef(data.block);
+  const read = await atHead(endpoint, CONTRACT_STATE_QUERY, { address }, options);
+  if (read === undefined) return { head: undefined, state: undefined };
+  const { head, data } = read;
+  if (!('contract' in data)) return malformed();
   if (data.contract === null) return { head, state: undefined };
-  const bytes = decodeHex(field(data.contract, 'state')) ?? malformed();
+  const bytes = bytesOf(field(data.contract, 'state'));
   return { head, state: { address, bytes, block: blockRef(field(data.contract, 'stateAt')) } };
 }
 
@@ -119,7 +198,10 @@ export interface StateRead {
   readonly nodeBlock: BlockRef | undefined;
 }
 
-export interface Reads extends Pick<Indexer, 'contractState' | 'transaction'> {
+export interface Reads extends Pick<
+  Indexer,
+  'contractState' | 'transaction' | 'ledgerParameters' | 'callInputs' | 'zswapEvents'
+> {
   /** `contractState` with where the state came from. */
   readState(address: ContractAddress, options?: CallOptions): Promise<StateRead>;
 }
@@ -161,5 +243,9 @@ export function createReads(options: ReadOptions): Reads {
     readState,
     contractState: async (address, call) => (await readState(address, call)).state,
     transaction: (id, call) => readTransaction(indexer, id, call),
+    // The node has no parameters or Zswap state, so these reads never use it.
+    ledgerParameters: (call) => readLedgerParameters(indexer, call),
+    callInputs: (address, call) => readCallInputs(indexer, address, call),
+    zswapEvents: (block, call) => readZswapEvents(indexer, block, call),
   };
 }

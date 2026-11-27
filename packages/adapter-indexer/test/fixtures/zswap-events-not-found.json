@@ -1,0 +1,19 @@
+{
+  "source": "Recorded from a local network (indexer 4.4.101, node 2.1.101) on 2026/11/23. Each hex field is cut to its first 48 bytes.",
+  "request": {
+    "query": "query ZSWAP_EVENTS_QUERY($offset: BlockOffset!) {\n  block(offset: $offset) { height hash transactions { zswapLedgerEvents { raw } } }\n}",
+    "variables": {
+      "offset": {
+        "hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "data": {
+        "block": null
+      }
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "source": "Recorded from a local network (indexer 4.4.101, node 2.1.101) on 2026/11/23. Each hex field is cut to its first 48 bytes.",
+  "request": {
+    "query": "query CALL_INPUTS_QUERY($address: HexEncoded!, $offset: BlockOffset!) {\n  block(offset: $offset) { height hash ledgerParameters contractZswapState(address: $address) }\n  contract(address: $address, offset: $offset) { state stateAt { height hash } }\n}",
+    "variables": {
+      "address": "19d0e7afd018aebcf526678dda828d3b59ae482f9043bf58180b4c98580a4c6a",
+      "offset": {
+        "hash": "dc12b44a0c030c441d68dcc0beeb1960721733ad2b8892474a991f74f51c2444"
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "data": {
+        "block": {
+          "height": 2935,
+          "hash": "dc12b44a0c030c441d68dcc0beeb1960721733ad2b8892474a991f74f51c2444",
+          "ledgerParameters": "6d69646e696768743a6c65646765722d706172616d65746572735b76385d3ac64a0600008e0a8c0072618b007eed6000",
+          "contractZswapState": "6d69646e696768743a7a737761702d6c65646765722d73746174655b76355d3a7101008473b35bda8df702a240f2b760"
+        },
+        "contract": {
+          "state": "6d69646e696768743a636f6e74726163742d73746174655b76385d3aa90300040404000801040404900304408035a4e6",
+          "stateAt": {
+            "height": 1545,
+            "hash": "23de74a1f6782ce21961540c2c9b73bb4a236a9a3542074e6bf32298022be764"
+          }
+        }
+      }
+    }
+  }
+}
