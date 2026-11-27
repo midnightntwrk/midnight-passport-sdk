@@ -9,12 +9,15 @@ import {
   hkdfSync,
 } from 'node:crypto';
 import {
+  createCoinStore,
   deriveInboxKey,
   InboxKeyError,
   InboxRecipientKeyError,
   openInboxEntry,
   sealInboxEntry,
+  walkInbox,
   type InboxKey,
+  type InboxLedger,
 } from '@midnight-ntwrk/mn-passport-core';
 
 interface Vector {
@@ -149,4 +152,87 @@ test('a recipient key with no agreement is refused, and a bad coin is a RangeErr
   await assert.rejects(sealInboxEntry(key, { ...coin, value: 1n << 128n }), RangeError);
   await assert.rejects(sealInboxEntry(key, { ...coin, value: -1n }), RangeError);
   await assert.rejects(sealInboxEntry(key, { ...coin, nonce: new Uint8Array(31) }), RangeError);
+});
+
+const ledgerOf = (entries: Map<bigint, Uint8Array>, count: bigint): InboxLedger => ({
+  inbox_count: count,
+  inbox: {
+    member: (i) => entries.has(i),
+    lookup: (i) => entries.get(i) ?? assert.fail(`lookup of a missing index ${String(i)}`),
+  },
+});
+const coinNo = (n: number) => ({
+  nonce: new Uint8Array(32).fill(n),
+  color: new Uint8Array(32).fill(9),
+  value: BigInt(n),
+});
+
+test('the walk gives our coins once each, at their first index, and skips the rest', async () => {
+  const keys = newKeys();
+  const [a, b, again] = [
+    await sealInboxEntry(keys.public, coinNo(1)),
+    await sealInboxEntry(keys.public, coinNo(2)),
+    await sealInboxEntry(keys.public, coinNo(1)),
+  ];
+  const theirs = await sealInboxEntry(newKeys().public, coinNo(3));
+  // Index 2 is missing, and index 3 is not an entry of ours.
+  const entries = new Map([
+    [0n, a],
+    [1n, theirs],
+    [3n, new Uint8Array(192)],
+    [4n, again],
+    [5n, b],
+  ]);
+  const walk = await walkInbox(ledgerOf(entries, 6n), keyOf(keys.secret));
+  assert.deepEqual(walk, {
+    candidates: [
+      { ...coinNo(1), inboxIndex: 0n },
+      { ...coinNo(2), inboxIndex: 5n },
+    ],
+    next: 6n,
+  });
+});
+
+test('a walk from next opens only the new entries', async () => {
+  const keys = newKeys();
+  const entries = new Map([[0n, await sealInboxEntry(keys.public, coinNo(1))]]);
+  const first = await walkInbox(ledgerOf(entries, 1n), keyOf(keys.secret));
+  entries.set(1n, await sealInboxEntry(keys.public, coinNo(2)));
+  const asked: Uint8Array[] = [];
+  const counting: InboxKey = (eph) => {
+    asked.push(eph);
+    return keyOf(keys.secret)(eph);
+  };
+  const second = await walkInbox(ledgerOf(entries, 2n), counting, first.next);
+  assert.equal(asked.length, 1);
+  assert.deepEqual(second.candidates, [{ ...coinNo(2), inboxIndex: 1n }]);
+});
+
+test('a key holder that fails mid-walk gives InboxKeyError, not a shorter list', async () => {
+  const keys = newKeys();
+  const entries = new Map([
+    [0n, await sealInboxEntry(keys.public, coinNo(1))],
+    [1n, await sealInboxEntry(keys.public, coinNo(2))],
+  ]);
+  let calls = 0;
+  const locksAfterOne: InboxKey = (eph) =>
+    ++calls > 1 ? Promise.reject(new Error('locked')) : keyOf(keys.secret)(eph);
+  await assert.rejects(walkInbox(ledgerOf(entries, 2n), locksAfterOne), InboxKeyError);
+});
+
+test('a store saved after a walk holds no secret and no derived key', async () => {
+  const keys = newKeys();
+  const key = keyOf(keys.secret);
+  const sealed = await sealInboxEntry(keys.public, coinNo(1));
+  const { candidates } = await walkInbox(ledgerOf(new Map([[0n, sealed]]), 1n), key);
+  const store = createCoinStore();
+  for (const c of candidates) store.offer(c);
+  store.hold(coinNo(1), 0n);
+  const derived = await key(sealed.slice(2, 34));
+  assert.ok(derived);
+  const saved = Buffer.from(store.serialize());
+  for (const secret of [keys.secret, derived]) {
+    assert.equal(saved.indexOf(Buffer.from(secret)), -1);
+    assert.ok(!saved.toString('latin1').includes(Buffer.from(secret).toString('hex')));
+  }
 });

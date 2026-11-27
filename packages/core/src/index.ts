@@ -53,3 +53,17 @@ export {
   type CoinDescription,
   type InboxKey,
 } from './inbox/entry.js';
+export { walkInbox, type InboxLedger, type InboxWalk } from './inbox/walk.js';
+export { fromHex, toHex } from './hex.js';
+export {
+  CoinStoreFormatError,
+  createCoinStore,
+  loadCoinStore,
+  saveCoinStore,
+  type CoinState,
+  type CoinStore,
+  type CoinStoreScope,
+  type HeldCoin,
+  type InboxCandidate,
+  type StoredCoin,
+} from './coins/store.js';
