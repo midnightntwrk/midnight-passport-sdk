@@ -23,8 +23,8 @@ export type Kind = 'deploy' | 'activation' | `update@${string}`;
 
 const block = { height: 1, hash: '00'.repeat(32) };
 
-export function memoryStore(): LocalStore {
-  const entries = new Map<string, Uint8Array>();
+/** Two stores on one `entries` map act as one store before and after a reload. */
+export function memoryStore(entries = new Map<string, Uint8Array>()): LocalStore {
   return {
     get: async (key) => entries.get(key),
     set: async (key, value) => void entries.set(key, value),

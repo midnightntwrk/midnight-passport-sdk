@@ -5,7 +5,6 @@ import { CallFailedError } from '@midnight-ntwrk/mn-passport-core';
 import {
   loadRecord,
   runBirth,
-  saveRecord,
   updateTransaction,
   type BirthRecord,
   type DeployProgress,
@@ -27,7 +26,6 @@ async function setup(otherSigner = false): Promise<{
   const { key: authority } = await AuthorityKey.create(ledger, prf());
   const record = testRecord(authority.verifyingKey);
   const store = memoryStore();
-  await saveRecord(store, record);
   const progress: DeployProgress[] = [];
   const signer = otherSigner ? (await AuthorityKey.create(ledger, prf())).key : authority;
   return {

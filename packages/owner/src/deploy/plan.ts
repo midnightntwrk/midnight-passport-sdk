@@ -54,6 +54,8 @@ export interface BirthPlanOptions {
   readonly price: WavePrice;
   /** The rest of each block stays free for the sponsor's fee and other transactions. */
   readonly headroom?: number;
+  /** Circuits to add right after the birth set, such as the grant-spend set. */
+  readonly then?: readonly string[];
 }
 
 /** The birth set is the shared circuits and the circuits of one arm. */
@@ -63,8 +65,13 @@ export function planBirth(options: BirthPlanOptions): BirthPlan {
   if (!(headroom > 0 && headroom <= 1)) throw new RangeError('headroom must be in (0, 1].');
   const waveOne = manifest.waveOne[arm];
   if (price('deploy', waveOne) > headroom) throw new WaveTooLargeError(waveOne);
-  const rest = [...manifest.circuits.shared, ...manifest.circuits[arm]].filter(
+  const birth = [...manifest.circuits.shared, ...manifest.circuits[arm]];
+  const rest = birth.filter(
     (circuit, i, all) => !waveOne.includes(circuit) && all.indexOf(circuit) === i,
   );
-  return { waveOne, updates: packWaves(rest, price, headroom) };
+  const then = (options.then ?? []).filter((circuit) => !birth.includes(circuit));
+  return {
+    waveOne,
+    updates: [...packWaves(rest, price, headroom), ...packWaves(then, price, headroom)],
+  };
 }

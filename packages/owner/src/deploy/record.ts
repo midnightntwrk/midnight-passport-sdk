@@ -74,7 +74,8 @@ function isRecord(value: unknown): value is BirthRecord {
 
 const storeKey = (address: string): string => `deploy:${address}`;
 
-export async function saveRecord(store: LocalStore, record: BirthRecord): Promise<void> {
+/** Claims no account. `saveRecord` does. */
+export async function writeRecord(store: LocalStore, record: BirthRecord): Promise<void> {
   await store.set(storeKey(record.address), ascii(JSON.stringify(record)));
 }
 
