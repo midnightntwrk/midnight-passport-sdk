@@ -154,6 +154,7 @@ export async function deriveInboxKey(
   }
 }
 
+/** A field out of range throws `RangeError`. */
 export function checkCoin(coin: CoinDescription): void {
   if (coin.nonce.length !== 32 || coin.color.length !== 32) {
     throw new RangeError('The coin nonce and color are 32 bytes each.');

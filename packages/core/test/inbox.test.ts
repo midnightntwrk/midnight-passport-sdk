@@ -8,6 +8,7 @@ import {
   generateKeyPairSync,
   hkdfSync,
 } from 'node:crypto';
+import { ContractState } from '@midnight-ntwrk/compact-runtime';
 import {
   createCoinStore,
   deriveInboxKey,
@@ -16,9 +17,11 @@ import {
   openInboxEntry,
   sealInboxEntry,
   walkInbox,
+  type CoinDescription,
   type InboxKey,
   type InboxLedger,
 } from '@midnight-ntwrk/mn-passport-core';
+import { receiveCoins, type ReceiveInput } from '@midnight-ntwrk/mn-passport-core/chain';
 
 interface Vector {
   secretKey: string;
@@ -235,4 +238,110 @@ test('a store saved after a walk holds no secret and no derived key', async () =
     assert.equal(saved.indexOf(Buffer.from(secret)), -1);
     assert.ok(!saved.toString('latin1').includes(Buffer.from(secret).toString('hex')));
   }
+});
+
+interface DepositEvents {
+  address: string;
+  coin: { nonce: string; color: string; value: string };
+  mtIndex: string;
+  /** The Zswap events of the block of a shielded deposit on a local node. */
+  events: string[];
+}
+const isStringList = (value: unknown): boolean =>
+  Array.isArray(value) && value.every((item) => typeof item === 'string');
+const isDepositEvents = (value: unknown): value is DepositEvents =>
+  typeof value === 'object' &&
+  value !== null &&
+  strings(value, ['address', 'mtIndex']) &&
+  strings(Reflect.get(value, 'coin'), ['nonce', 'color', 'value']) &&
+  isStringList(Reflect.get(value, 'events'));
+const deposited = fixture('deposit-events.json');
+assert.ok(isDepositEvents(deposited), 'the deposit events file has the wrong shape');
+const realCoin = {
+  nonce: bytes(deposited.coin.nonce),
+  color: bytes(deposited.coin.color),
+  value: BigInt(deposited.coin.value),
+};
+const emptyState = new ContractState().serialize();
+
+async function receiving(coins: CoinDescription[], events: Uint8Array[] | undefined) {
+  const keys = newKeys();
+  const entries = new Map<bigint, Uint8Array>();
+  for (const [i, coin] of coins.entries())
+    entries.set(BigInt(i), await sealInboxEntry(keys.public, coin));
+  const reads: number[] = [];
+  const store = createCoinStore();
+  // The indexer's state changed at block 3, and its head is block 5.
+  const head = { height: 5, hash: '05'.repeat(32) };
+  const input = (address: string, from = 0n, seen = head): ReceiveInput => ({
+    address,
+    seen,
+    ledger: () => ({ enc_key: keys.public, ...ledgerOf(entries, BigInt(coins.length)) }),
+    indexer: {
+      callInputs: (at) =>
+        Promise.resolve({
+          state: { address: at, bytes: emptyState, block: { height: 3, hash: '03'.repeat(32) } },
+          ledgerParameters: new Uint8Array(),
+          zswapChainState: new Uint8Array(),
+          block: head,
+        }),
+      zswapEvents: (block) => {
+        reads.push(block.height);
+        return Promise.resolve(events);
+      },
+    },
+    key: keyOf(keys.secret),
+    store,
+    from,
+  });
+  return { input, store, reads };
+}
+
+test('only the coin that the block created for this account is held, with its tree position', async () => {
+  const events = deposited.events.map(bytes);
+  const fake = { ...realCoin, value: realCoin.value + 1n };
+  const elsewhere = await receiving([realCoin], events);
+  assert.equal(await receiveCoins(elsewhere.input('cd'.repeat(32))), 0n);
+  assert.deepEqual(
+    elsewhere.store.coins().map((c) => c.state),
+    ['candidate'],
+  );
+
+  const { input, store, reads } = await receiving([fake, realCoin], events);
+  assert.equal(await receiveCoins(input(deposited.address)), 0n);
+  assert.deepEqual(reads, [3], 'the events of the block where the state changed');
+  const byValue = new Map(store.coins().map((c) => [c.value, c]));
+  assert.equal(byValue.get(fake.value)?.state, 'candidate');
+  assert.equal(byValue.get(realCoin.value)?.state, 'held');
+  assert.equal(byValue.get(realCoin.value)?.mtIndex, BigInt(deposited.mtIndex));
+  assert.equal(store.total(realCoin.color), realCoin.value);
+});
+
+test('a deposit from an earlier block keeps the next walk at its entry', async () => {
+  // Entry 0 landed in block 2. Entry 1 landed in block 3, the block of the indexer's state.
+  const earlier = coinNo(1);
+  const { input, store } = await receiving([earlier, realCoin], deposited.events.map(bytes));
+  const from = await receiveCoins(input(deposited.address));
+  assert.equal(from, 0n);
+  assert.equal(store.total(realCoin.color), realCoin.value);
+  assert.equal(await receiveCoins(input(deposited.address, from)), 0n);
+  const byValue = new Map(store.coins().map((c) => [c.value, c.state]));
+  assert.equal(byValue.get(earlier.value), 'candidate');
+});
+
+test('a receive waits for the indexer, and it leaves the store unchanged', async () => {
+  const { input, store, reads } = await receiving([realCoin], undefined);
+  const ahead = { height: 6, hash: '06'.repeat(32) };
+  assert.equal(await receiveCoins(input(deposited.address, 0n, ahead)), undefined);
+  assert.equal(await receiveCoins(input(deposited.address)), undefined, 'no events yet');
+  assert.deepEqual(store.coins(), []);
+  assert.equal(await receiveCoins(input(deposited.address, 1n)), 1n);
+  assert.deepEqual(reads, [3], 'no new entry needs no event read');
+});
+
+test('an event that does not decode is skipped, and the others still hold the coin', async () => {
+  const events = [new Uint8Array([1, 2, 3]), ...deposited.events.map(bytes)];
+  const { input, store } = await receiving([realCoin], events);
+  assert.equal(await receiveCoins(input(deposited.address)), 1n);
+  assert.equal(store.total(realCoin.color), realCoin.value);
 });

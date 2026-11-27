@@ -16,3 +16,5 @@ handle[0];
 const leaked: Uint8Array = kernel.holdSecret(new Uint8Array(1));
 // @ts-expect-error — releaseSecret must not return a secret.
 const fromRelease: Uint8Array = kernel.releaseSecret(handle);
+// @ts-expect-error — inboxKey must not return bytes.
+const fromInbox: Uint8Array = kernel.inboxKey(handle);

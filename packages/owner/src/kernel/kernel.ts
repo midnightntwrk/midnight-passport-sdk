@@ -1,3 +1,4 @@
+import { deriveInboxKey, type InboxKey } from '@midnight-ntwrk/mn-passport-core';
 import { UnknownHandleError } from './errors.js';
 import { SecretHandle } from './handle.js';
 import { zeroize } from './zeroize.js';
@@ -24,12 +25,23 @@ export class Kernel {
 
   /** Zeros the copy for `handle`. A later call with the same handle throws. */
   releaseSecret(handle: SecretHandle): void {
-    const copy = this.#retained.get(handle);
-    if (copy === undefined) {
-      throw new UnknownHandleError();
-    }
-    zeroize(copy);
+    zeroize(this.#copyOf(handle));
     this.#retained.delete(handle);
+  }
+
+  /**
+   * Opens inbox entries with the X25519 viewing secret that `handle` holds. The secret stays in the
+   * kernel. After `releaseSecret` or `dispose`, each call of the key rejects.
+   */
+  inboxKey(handle: SecretHandle): InboxKey {
+    this.#copyOf(handle);
+    return async (ephemeralPublicKey) => deriveInboxKey(this.#copyOf(handle), ephemeralPublicKey);
+  }
+
+  #copyOf(handle: SecretHandle): Uint8Array {
+    const copy = this.#retained.get(handle);
+    if (copy === undefined) throw new UnknownHandleError();
+    return copy;
   }
 
   /** Zeros every copy the kernel holds. */
