@@ -86,7 +86,7 @@ test(
 );
 
 test(
-  'an abort before the send, then a queued retry, sends the action once',
+  'an abort before the send gives the id, and a queued retry sends the action once',
   { timeout: 10_000 },
   async () => {
     const tx = await provenTx();
@@ -99,9 +99,11 @@ test(
       controller.abort();
       w.hangHeader = false;
     }, 10);
+    // The loop cannot tell that the bytes never left, so it calls the send uncertain.
     await assert.rejects(
       first,
-      (/** @type {{ _tag?: string }} */ e) => e._tag === 'CancelledError',
+      (/** @type {{ _tag?: string, id?: string }} */ e) =>
+        e._tag === 'SendUncertainError' && typeof e.id === 'string',
     );
     assert.equal((await retry).level, 'in-block');
     assert.equal(w.submitted.length, 1);

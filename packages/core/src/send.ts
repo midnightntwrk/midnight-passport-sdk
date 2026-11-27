@@ -21,10 +21,38 @@ export interface SendSeams {
 export interface SendLimits {
   /** Default: 4. */
   readonly sponsorRetries?: number;
-  /** New payments after a node refusal or a lost transaction. Default: 3. */
+  /** New payments after a node refusal, a lost transaction, or an expired proof. Default: 3. */
   readonly rebuilds?: number;
   /** The longest wait for a lost payment to land or expire. Default: 300,000. */
   readonly lostWaitMs?: number;
+  /** The longest pause before a rebuild after a rejected transcript. Default: 3,000. */
+  readonly contentionPauseMs?: number;
+}
+
+/** `unknown` when no check can decide. */
+export type TranscriptRejectionCause = 'state-moved' | 'out-of-gas' | 'unknown';
+
+export interface BuiltTransaction extends ProvenTransaction {
+  /**
+   * Runs when the node rejects the transcript, which means a stale read or out of gas.
+   * `state-moved`: the contract state is not the one this build read. `out-of-gas`: the
+   * state did not move, and the cost under the chain's ledger parameters is over the gas.
+   */
+  readonly whyRejected?: (options: CallOptions) => Promise<TranscriptRejectionCause>;
+}
+
+/** The node refused the transcript, and a rebuild with the same parameters fails again. No new payment was made. */
+export class OutOfGasError extends PassportError {
+  static {
+    this.prototype.name = 'OutOfGasError';
+  }
+
+  readonly _tag = 'OutOfGasError' as const;
+  readonly code = 'OUT_OF_GAS' as const;
+
+  constructor(cause: NodeRefusedError) {
+    super("The call runs out of gas under the chain's ledger parameters.", { cause });
+  }
 }
 
 /**
@@ -40,8 +68,8 @@ export class SendUncertainError extends PassportError {
   readonly code = 'SEND_UNCERTAIN' as const;
   readonly id: TransactionId;
 
-  constructor(id: TransactionId) {
-    super('A payment can still land.');
+  constructor(id: TransactionId, cause: unknown) {
+    super('A payment can still land.', { cause });
     this.id = id;
   }
 }
@@ -76,12 +104,13 @@ export interface SendOptions extends CallOptions {
 export interface Sender {
   /**
    * Resolves at the `until` level or later. `build` runs again only for a
-   * refusal that needs a new proof. A `TimeoutError` after `in-block` is not
-   * paid again: wait with `final`. At `final`, a failed call rejects with
-   * `CallFailedError`, and so does `final`.
+   * refusal that needs a new proof, or for a proof past its own ttl. A rejected
+   * transcript that ran out of gas rejects with `OutOfGasError`. After a payment, an abort or a timeout
+   * rejects with `SendUncertainError`: wait with `final(error.id)`. At `final`,
+   * a failed call rejects with `CallFailedError`, and so does `final`.
    */
   send(
-    build: (options: CallOptions) => Promise<ProvenTransaction>,
+    build: (options: CallOptions) => Promise<BuiltTransaction>,
     options: SendOptions,
   ): Promise<TransactionStatus>;
   final(
@@ -108,6 +137,7 @@ const isNodeRefusal = (error: unknown): error is NodeRefusedError =>
   tagOf(error) === 'NodeRefusedError';
 const isTimeout = (error: unknown): error is TimeoutError => tagOf(error) === 'TimeoutError';
 const isExpired = (error: unknown): boolean => tagOf(error) === 'PaymentExpiredError';
+const isProofExpired = (error: unknown): boolean => tagOf(error) === 'ProofExpiredError';
 
 function succeeded(status: TransactionStatus): TransactionStatus {
   if (status.level === 'final' && status.result !== 'succeeded') throw new CallFailedError(status);
@@ -152,6 +182,12 @@ export function createSender(seams: SendSeams, limits: SendLimits = {}): Sender 
   const sponsorRetries = count('sponsorRetries', limits.sponsorRetries, 4);
   const rebuilds = count('rebuilds', limits.rebuilds, 3);
   const lostWaitMs = count('lostWaitMs', limits.lostWaitMs, 300_000, MAX_TIMER_MS);
+  const contentionPauseMs = count(
+    'contentionPauseMs',
+    limits.contentionPauseMs,
+    3_000,
+    MAX_TIMER_MS,
+  );
   const tails = new Map<ContractAddress, Promise<void>>();
 
   async function inQueue<A>(
@@ -247,6 +283,16 @@ export function createSender(seams: SendSeams, limits: SendLimits = {}): Sender 
         }
       }
 
+      // The held wait reads the indexer only, because a submit could send the bytes.
+      const uncertain = (
+        id: TransactionId,
+        cause: unknown,
+        hold: (wait: Promise<unknown>) => void,
+      ): SendUncertainError => {
+        hold(final(id, { timeoutMs: lostWaitMs }));
+        return new SendUncertainError(id, cause);
+      };
+
       // Waits on a lost payment until the adapter finds it or says that it expired.
       const settle = async (tx: PaidTransaction, hold: (wait: Promise<unknown>) => void) => {
         const wait = (ms: number) =>
@@ -257,20 +303,23 @@ export function createSender(seams: SendSeams, limits: SendLimits = {}): Sender 
             return wait(lostWaitMs);
           });
         } catch (error) {
-          if (isTimeout(error)) error = new SendUncertainError(tx.id);
-          // Only a refusal or an expiry says that the payment cannot land. The held
-          // wait reads the indexer only, because a submit could send the bytes.
-          if (!isNodeRefusal(error) && !isExpired(error)) {
-            hold(final(tx.id, { timeoutMs: lostWaitMs }));
-          }
-          throw error;
+          // Only a refusal or an expiry says that the payment cannot land.
+          if (isNodeRefusal(error) || isExpired(error)) throw error;
+          throw uncertain(tx.id, error, hold);
         }
       };
 
       return inQueue(account, signal, async (hold) => {
         let proven = await build(options);
         for (let attempt = 0; ; attempt++) {
-          const tx = await pay(proven);
+          let tx: PaidTransaction;
+          try {
+            tx = await pay(proven);
+          } catch (error) {
+            if (!isProofExpired(error) || attempt >= rebuilds) throw error;
+            proven = await build(options);
+            continue;
+          }
           onSubmitted?.(tx.id);
           let status: TransactionStatus;
           try {
@@ -278,13 +327,29 @@ export function createSender(seams: SendSeams, limits: SendLimits = {}): Sender 
           } catch (error) {
             // The payment cannot land, so a new payment of the same proof is safe.
             if (isExpired(error) && attempt < rebuilds) continue;
-            if (!isNodeRefusal(error) || error.action === 'stop' || attempt >= rebuilds)
-              throw error;
+            if (!isNodeRefusal(error) || error.action === 'stop') throw error;
+            const stale = error.reason === 'transcript-rejected';
+            if (stale) {
+              // No hook, or a hook that fails, cannot tell the causes apart, so the loop rebuilds.
+              const cause = await Promise.resolve()
+                .then(() => proven.whyRejected?.(options))
+                .catch(() => undefined);
+              if (cause === 'out-of-gas') throw new OutOfGasError(error);
+            }
+            if (attempt >= rebuilds) throw error;
+            // A random pause, so two senders that read the same state do not collide again.
+            if (stale) await sleep(contentionPauseMs * (0.5 + Math.random() / 2), signal);
             if (error.newProof) proven = await build(options);
             continue;
           }
           if (until === 'in-block' || status.level === 'final') return succeeded(status);
-          return succeeded(await broadcast.submit(tx, { ...options, until: 'final', timeoutMs }));
+          // The status can name another payment of the same proof: the one that landed.
+          const done = await broadcast
+            .submit(tx, { ...options, until: 'final', timeoutMs })
+            .catch((error: unknown) => {
+              throw uncertain(status.id, error, hold);
+            });
+          return succeeded(done);
         }
       });
     },

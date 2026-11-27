@@ -148,14 +148,17 @@ those of `midnight-node` 2.1.101. Every refusal is a `NodeRefusedError` with a
 | 228, 242 | `expired-intent` | rebuild | yes |
 | 170 | `dust-proof-refused` | rebuild | no |
 | 196 | `dust-double-spend` | rebuild | no |
-| 104 | `transcript-rejected` | rebuild | yes |
+| 104 | `transcript-rejected` | rebuild, or stop on out of gas | yes |
 | 138 | `fee-too-low` | stop | no |
 | 232, or 1010 with "would exhaust the block limits" | `over-block-limit` | stop | no |
 | Another code or text | `unknown` | stop | no |
 
 - 104 is a stale read or a call that ran out of gas. The node gives no other
-  sign. A rebuild helps only if it reads the state and the ledger parameters
-  from the chain again.
+  sign. When the build gives a check, the loop asks it. If the state did not
+  move and the cost is over the gas, the send stops with `OutOfGasError` and
+  pays no more. In all other cases the loop pauses for a random time up to
+  `contentionPauseMs`, and then rebuilds. A rebuild helps only if it reads the state and the ledger
+  parameters from the chain again.
 - On 196, check the chain before the rebuild. The earlier transaction can
   already be in a block.
 - 138 stops, because the sponsor has one fixed fee margin. A rebuild gets the

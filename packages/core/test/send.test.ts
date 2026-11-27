@@ -3,18 +3,23 @@ import assert from 'node:assert/strict';
 import {
   CallFailedError,
   CancelledError,
+  OutOfGasError,
   PaymentExpiredError,
+  ProofExpiredError,
+  SendUncertainError,
   TimeoutError,
   createSender,
   createStateSource,
   nodeRefusal,
   sponsorRefusal,
   type Indexer,
+  type BuiltTransaction,
   type Lookup,
   type PaidTransaction,
   type ProvenTransaction,
   type SendLimits,
   type TransactionResult,
+  type TranscriptRejectionCause,
   type TransactionStatus,
 } from '@midnight-ntwrk/mn-passport-core';
 
@@ -33,7 +38,7 @@ const sponsor = (status?: number, retryAfterMs?: number) => {
   return refusal;
 };
 
-type Outcome = 'block' | 'call-failed' | 'lost' | 'final-timeout' | Error;
+type Outcome = 'block' | 'call-failed' | 'failed-at-once' | 'lost' | 'final-timeout' | Error;
 
 const status = (
   id: string,
@@ -53,6 +58,8 @@ function harness(script: {
   /** What a wait on a known id gives, when it does not land. */
   resubmit?: Error;
   submitDelayMs?: number;
+  /** What the hook of each build answers after a 104. */
+  causes?: (TranscriptRejectionCause | Error)[];
 }) {
   const pays = [...(script.pays ?? [])];
   const submits = [...(script.submits ?? [])];
@@ -123,17 +130,27 @@ function harness(script: {
             if (next === 'lost') throw new TimeoutError(timeoutMs);
             if (next === 'block') land(tx.id);
             if (next === 'call-failed') land(tx.id, 'partly-failed');
+            if (next === 'failed-at-once') return status(tx.id, 'final', 'partly-failed');
             return status(tx.id, 'in-block');
           },
         },
         indexer,
       },
-      { lostWaitMs: 30, ...limits },
+      { lostWaitMs: 30, contentionPauseMs: 4, ...limits },
     );
-  const build = async (): Promise<ProvenTransaction> => {
+  const build = async (): Promise<BuiltTransaction> => {
     log.builds++;
     log.events.push(`build ${log.builds}`);
-    return { stage: 'proven', bytes: Uint8Array.of(log.builds) };
+    const cause = script.causes?.[log.builds - 1];
+    const proven = { stage: 'proven', bytes: Uint8Array.of(log.builds) } as const;
+    if (cause === undefined) return proven;
+    return {
+      ...proven,
+      whyRejected: async () => {
+        if (cause instanceof Error) throw cause;
+        return cause;
+      },
+    };
   };
   return { sender, build, log, land, watchers: () => listeners.size };
 }
@@ -148,6 +165,8 @@ const it = (name: string, run: () => Promise<void> | void): void => {
   test(name, { timeout: 5_000 }, run);
 };
 const rejectsWith = (tag: string) => (e: Error & { _tag?: string }) => e._tag === tag;
+const uncertain = (id: () => string | undefined) => (e: unknown) =>
+  e instanceof SendUncertainError && e.id === id() && e.id !== undefined;
 
 it('a sponsor retry row pays the same proof again after its wait', async () => {
   for (const refusal of [sponsor(503, 5), sponsor(undefined)]) {
@@ -196,6 +215,43 @@ it('a node rebuild row with a new proof builds again, and no paid bytes go twice
   );
 });
 
+it('a 104 on a build that ran out of gas stops with no new payment', async () => {
+  const refusal = node(104);
+  const h = harness({ submits: [refusal], causes: ['out-of-gas'] });
+  await assert.rejects(send(h), (e) => e instanceof OutOfGasError && e.cause === refusal);
+  assert.equal(h.log.builds, 1);
+  assert.equal(h.log.paid.length, 1);
+});
+
+it('each 104 asks the build that was refused', async () => {
+  const h = harness({ submits: [node(104), node(104)], causes: ['state-moved', 'out-of-gas'] });
+  await assert.rejects(send(h), rejectsWith('OutOfGasError'));
+  assert.equal(h.log.builds, 2);
+  assert.equal(h.log.paid.length, 2);
+});
+
+it('a 104 rebuilds when the hook cannot tell or throws', async () => {
+  for (const cause of ['unknown', new Error('no read')] as const) {
+    const h = harness({ submits: [node(104)], causes: [cause] });
+    assert.equal((await send(h)).level, 'final');
+    assert.equal(h.log.builds, 2);
+  }
+});
+
+it('a contention rebuild waits first, and an abort ends the wait at once', async () => {
+  const h = harness({ submits: [node(104)], causes: ['state-moved'] });
+  const controller = new AbortController();
+  const done = h.sender({ contentionPauseMs: 10_000 }).send(h.build, {
+    account: 'aa',
+    until: 'final',
+    timeoutMs: 50,
+    signal: controller.signal,
+  });
+  setTimeout(() => controller.abort(), 30);
+  await assert.rejects(done, rejectsWith('CancelledError'));
+  assert.equal(h.log.builds, 1);
+});
+
 it('a node rebuild row with no new proof pays the same proof again', async () => {
   for (const code of [170, 196]) {
     const h = harness({ submits: [node(code)] });
@@ -204,6 +260,13 @@ it('a node rebuild row with no new proof pays the same proof again', async () =>
     assert.equal(new Set(h.log.submitted).size, 2);
     assert.deepEqual(h.log.proofs[0], h.log.proofs[1]);
   }
+});
+
+it('a proof past its own ttl is built again before any payment', async () => {
+  const h = harness({ pays: [new ProofExpiredError()] });
+  assert.equal((await send(h)).level, 'final');
+  assert.equal(h.log.builds, 2);
+  assert.equal(h.log.paid.length, 1);
 });
 
 it('a node stop row throws', async () => {
@@ -226,7 +289,7 @@ it('a lost payment that can still land is never paid again, and the proof is not
   assert.equal(h.log.builds, 1);
 });
 
-it('after an abort during the submit, the slot is held by a wait that never sends', async () => {
+it('an abort during the submit gives the id, and the slot is held by a wait that never sends', async () => {
   const h = harness({ submitDelayMs: 20 });
   const sender = h.sender();
   const controller = new AbortController();
@@ -236,7 +299,10 @@ it('after an abort during the submit, the slot is held by a wait that never send
   setTimeout(() => controller.abort(), 5);
   let secondAt = 0;
   const second = sender.send(async () => ((secondAt = Date.now()), h.build()), options);
-  await assert.rejects(first, rejectsWith('CancelledError'));
+  await assert.rejects(
+    first,
+    uncertain(() => h.log.paid[0]),
+  );
   await second;
   assert.ok(secondAt - abortAt >= 25, 'the slot was held for the indexer wait');
   assert.deepEqual(h.log.submitted, [...new Set(h.log.submitted)]);
@@ -259,7 +325,7 @@ it('rebuilds stop at their bound', async () => {
   assert.equal(h.log.paid.length, 3);
 });
 
-it('a timeout after in-block goes to the caller, who can wait with final', async () => {
+it('a timeout after in-block gives the id to the caller, who can wait with final', async () => {
   const h = harness({ submits: ['final-timeout'] });
   const ids: string[] = [];
   const sender = h.sender();
@@ -270,7 +336,7 @@ it('a timeout after in-block goes to the caller, who can wait with final', async
       timeoutMs: 20,
       onSubmitted: (id) => ids.push(id),
     }),
-    rejectsWith('TimeoutError'),
+    uncertain(() => ids[0]),
   );
   assert.deepEqual(ids, h.log.paid);
   const [id] = ids;
@@ -297,6 +363,11 @@ it('a final call that failed rejects with its status, and is not paid or built a
   const [id] = h.log.paid;
   assert.ok(id !== undefined);
   await assert.rejects(sender.final(id, { timeoutMs: 1_000 }), failed);
+});
+
+it('a send at in-block rejects an adapter answer that is already final and failed', async () => {
+  const h = harness({ submits: ['failed-at-once'] });
+  await assert.rejects(send(h, 'in-block'), rejectsWith('CallFailedError'));
 });
 
 it('a send at in-block resolves before final', async () => {
@@ -346,6 +417,7 @@ it('bad limits throw RangeError, and a bad timeoutMs rejects before any build', 
   assert.throws(() => h.sender({ sponsorRetries: 1.5 }), RangeError);
   assert.throws(() => h.sender({ lostWaitMs: -1 }), RangeError);
   assert.throws(() => h.sender({ lostWaitMs: 2 ** 31 }), RangeError);
+  assert.throws(() => h.sender({ contentionPauseMs: 2 ** 31 }), RangeError);
   for (const timeoutMs of [1.5, -1]) {
     const bad = h.sender().send(h.build, { account: 'aa', until: 'in-block', timeoutMs });
     await assert.rejects(bad, RangeError);

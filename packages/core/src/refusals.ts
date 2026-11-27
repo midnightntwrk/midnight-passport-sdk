@@ -177,7 +177,7 @@ const NODE_RULES: ReadonlyMap<number, NodeRule> = new Map([
   [242, EXPIRED_INTENT],
   [170, { reason: 'dust-proof-refused', action: 'rebuild', newProof: false }],
   [196, { reason: 'dust-double-spend', action: 'rebuild', newProof: false }],
-  // Also "ran out of gas". A rebuild helps only if it reads the ledger parameters again.
+  // Also "ran out of gas", with the same reply. The send loop asks the build which one.
   [104, { reason: 'transcript-rejected', action: 'rebuild', newProof: true }],
   [138, { reason: 'fee-too-low', action: 'stop', newProof: false }],
   [232, OVER_BLOCK_LIMIT],
