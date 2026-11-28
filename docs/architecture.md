@@ -391,8 +391,8 @@ rotation of the viewing key):
 
 **Recovery** (every device is lost):
 
-1. On a fresh device, the user makes a new passkey. Its JubJub key is the
-   successor device key `Q`.
+1. On a fresh device, the user makes a new passkey. The successor device
+   key `Q` is a JubJub key. Its source is still open.
 2. `adapter-recovery` gets `t+1` shares from guardians. The user types in
    paper keys.
 3. The kernel reconstructs `s` and checks it against `P` locally. Then, at
